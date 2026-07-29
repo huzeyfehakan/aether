@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Aether — AI Readiness</title>
+    <style>
+      :root { color: #132238; background: #f4f7fb; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; } .shell { width: min(1120px, calc(100% - 40px)); margin: 0 auto; padding: 52px 0 72px; }
+      .eyebrow { color: #0768d7; font-size: .78rem; font-weight: 760; letter-spacing: .09em; text-transform: uppercase; }
+      h1 { margin: 10px 0; font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -.045em; } h2 { margin: 0 0 7px; font-size: 1.1rem; }
+      .intro, .muted { color: #58677b; line-height: 1.55; } .intro { max-width: 660px; margin: 0; font-size: 1.08rem; }
+      .panel { margin-top: 32px; border: 1px solid #dce4ee; border-radius: 16px; background: #fff; box-shadow: 0 12px 32px #193b650d; }
+      .tabs { display: flex; gap: 4px; border-bottom: 1px solid #e7ecf2; padding: 12px 14px 0; } .tab { border: 0; border-bottom: 2px solid transparent; background: transparent; color: #59687c; cursor: pointer; font: inherit; font-weight: 680; padding: 11px 14px; }
+      .tab[aria-selected="true"] { border-color: #086ad8; color: #075ebf; } .form-panel { display: none; padding: 24px; } .form-panel.active { display: block; }
+      label { display: block; margin: 16px 0 6px; font-size: .88rem; font-weight: 720; } input { width: 100%; border: 1px solid #bdc9d8; border-radius: 8px; color: #16263b; font: inherit; padding: 12px; } input:focus { border-color: #086ad8; box-shadow: 0 0 0 3px #086ad822; outline: 0; }
+      .primary { margin-top: 20px; border: 0; border-radius: 8px; background: #0768d7; color: #fff; cursor: pointer; font: inherit; font-weight: 720; padding: 12px 17px; } .primary:hover { background: #045ab9; } .primary:disabled { cursor: wait; opacity: .7; }
+      details { margin-top: 18px; border-top: 1px solid #e8edf3; padding-top: 15px; } summary { color: #45617d; cursor: pointer; font-weight: 680; } .help { color: #69788a; font-size: .87rem; line-height: 1.45; margin: 7px 0 0; }
+      .source-url-field { display: none; } .source-url-field.show { display: block; } .advanced-grid { display: grid; gap: 0 16px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+      #status { min-height: 1.5em; color: #af251b; font-weight: 620; margin: 16px 2px 0; } .hidden { display: none !important; }
+      #report-card { padding: 28px; } .report-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 22px; } .report-heading h2 { font-size: 1.55rem; letter-spacing: -.025em; }
+      .assessment-grid, .metric-grid { display: grid; gap: 13px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); } .assessment-card, .metric-card { border: 1px solid #e0e8f1; border-radius: 12px; padding: 16px; } .assessment-card p, .metric-card p { color: #637184; font-size: .86rem; margin: 0 0 9px; } .assessment-card h3, .metric-card strong { font-size: 1rem; margin: 0; }
+      .badge { display: inline-flex; align-items: center; border-radius: 100px; font-size: .83rem; font-weight: 760; padding: 5px 9px; text-transform: capitalize; } .badge.complete { background: #ddf6e8; color: #146c3a; } .badge.partial { background: #fff0cc; color: #895700; } .badge.missing { background: #fde3e2; color: #a92a25; }
+      .section { margin-top: 28px; } .section h3 { font-size: 1.02rem; margin: 0 0 6px; } .section > p { color: #647286; margin: 0 0 14px; }
+      .metadata-table { border: 1px solid #e1e8f0; border-radius: 10px; border-spacing: 0; overflow: hidden; width: 100%; } .metadata-table td { border-bottom: 1px solid #e7edf3; padding: 11px 14px; } .metadata-table tr:last-child td { border-bottom: 0; } .metadata-table td:last-child { text-align: right; } .available { color: #176b3e; font-weight: 700; } .unavailable { color: #a3342b; font-weight: 700; }
+      .missing-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; } .missing-item { background: #fff0ef; border-radius: 99px; color: #9c312b; font-size: .86rem; font-weight: 650; padding: 6px 10px; }
+      .technical { margin-top: 28px; } .technical pre { background: #101d2c; border-radius: 10px; color: #dce9f7; margin: 14px 0 0; overflow: auto; padding: 16px; white-space: pre-wrap; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+      @media (max-width: 640px) { .shell { width: min(100% - 28px, 1120px); padding-top: 30px; } .form-panel, #report-card { padding: 19px; } .tabs { overflow-x: auto; } }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header>
+        <div class="eyebrow">Publisher analysis</div>
+        <h1>AI Readiness</h1>
+        <p class="intro">See whether a publisher article has clear structure, complete metadata, and fully captured content for deterministic AI analysis.</p>
+      </header>
+
+      <section class="panel" aria-label="Article input">
+        <div class="tabs" role="tablist" aria-label="Analysis source">
+          <button class="tab" id="url-tab" role="tab" aria-controls="url-form" aria-selected="true">Analyze a URL</button>
+          <button class="tab" id="file-tab" role="tab" aria-controls="file-form" aria-selected="false">Upload HTML</button>
+        </div>
+
+        <form class="form-panel active" id="url-form" data-endpoint="/analyze/url" role="tabpanel">
+          <h2>Article URL</h2>
+          <p class="muted">Paste a public publisher article. Aether reads available metadata directly from the source.</p>
+          <label>URL <input name="url" type="url" placeholder="https://publisher.example/article" required /></label>
+          <input name="article_type" type="hidden" value="news_report" />
+          <details>
+            <summary>Advanced source details</summary>
+            <p class="help">Publisher is derived from the URL unless you override it. Use fallbacks only when the source omits language or publication date.</p>
+            <div class="advanced-grid">
+              <label>Publisher override <input name="publisher" placeholder="Derived from URL" /></label>
+              <label>Content type <input name="article_type_override" value="news_report" /></label>
+              <label>Fallback language <input name="fallback_language" placeholder="en" /></label>
+              <label>Fallback publication date <input name="fallback_published_at" placeholder="2026-05-14T14:00:00+03:00" /></label>
+            </div>
+          </details>
+          <button class="primary">Analyze article</button>
+        </form>
+
+        <form class="form-panel" id="file-form" data-endpoint="/analyze/file" role="tabpanel" aria-labelledby="file-tab">
+          <h2>HTML file</h2>
+          <p class="muted">Upload a saved publisher article. If the file contains a canonical URL, Aether uses it automatically.</p>
+          <label>HTML file <input name="file" type="file" accept=".html,text/html" required /></label>
+          <div class="source-url-field" data-source-url-field>
+            <label>Source URL <input name="source_url" type="url" placeholder="https://publisher.example/article" /></label>
+            <p class="help">This file has no canonical URL. Enter its original article URL.</p>
+          </div>
+          <input name="article_type" type="hidden" value="news_report" />
+          <details>
+            <summary>Advanced source details</summary>
+            <p class="help">Publisher is derived from the canonical or source URL unless you override it.</p>
+            <div class="advanced-grid">
+              <label>Publisher override <input name="publisher" placeholder="Derived from source URL" /></label>
+              <label>Content type <input name="article_type_override" value="news_report" /></label>
+              <label>Fallback language <input name="fallback_language" placeholder="en" /></label>
+              <label>Fallback publication date <input name="fallback_published_at" placeholder="2026-05-14T14:00:00+03:00" /></label>
+            </div>
+          </details>
+          <button class="primary">Analyze HTML file</button>
+        </form>
+      </section>
+
+      <p id="status" role="alert"></p>
+
+      <section id="report-card" class="panel hidden" aria-live="polite">
+        <div class="report-heading"><div><div class="eyebrow">Analysis complete</div><h2>AI Readiness Report</h2></div><span id="report-state" class="badge partial">Assessment available</span></div>
+        <div id="assessment-grid" class="assessment-grid"></div>
+
+        <div class="section"><h3>Article structure</h3><p>How the stored article is organized for deterministic passage analysis.</p><div id="structure-metrics" class="metric-grid"></div></div>
+
+        <div class="section"><h3>Metadata availability</h3><p id="metadata-summary">Source fields found in the article.</p><table class="metadata-table"><tbody id="metadata-table"></tbody></table><div id="missing-list" class="missing-list"></div></div>
+
+        <div class="section"><h3>Content coverage</h3><p id="coverage-summary"></p><div id="coverage-metrics" class="metric-grid"></div></div>
+
+        <details class="technical"><summary>Technical details</summary><p class="help">Immutable identifiers and the existing plain-text report are retained for validation and troubleshooting.</p><pre id="report"></pre></details>
+      </section>
+    </div>
+
+    <script>
+      const titleCase = (value) => value.charAt(0).toUpperCase() + value.slice(1);
+      const statusBadge = (value) => `<span class="badge ${value}">${titleCase(value)}</span>`;
+      const metric = (label, value) => `<div class="metric-card"><p>${label}</p><strong>${value}</strong></div>`;
+      const contentType = (form) => form.querySelector('[name="article_type_override"]').value || "news_report";
+
+      document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach((item) => item.setAttribute('aria-selected', String(item === tab)));
+        document.querySelectorAll('.form-panel').forEach((panel) => panel.classList.toggle('active', panel.id === tab.getAttribute('aria-controls')));
+      }));
+
+      const fileInput = document.querySelector('#file-form input[type="file"]');
+      fileInput.addEventListener('change', () => {
+        const sourceField = document.querySelector('[data-source-url-field]');
+        const sourceInput = sourceField.querySelector('input');
+        const file = fileInput.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const document = new DOMParser().parseFromString(reader.result, 'text/html');
+          const canonical = [...document.querySelectorAll('link[rel]')].find((link) => link.rel.toLowerCase().split(/\s+/).includes('canonical'));
+          sourceInput.value = canonical?.href || '';
+          sourceField.classList.toggle('show', !canonical?.href);
+        };
+        reader.readAsText(file);
+      });
+
+      function renderReport(view, rawReport) {
+        const assessment = view.assessment;
+        const cards = [
+          ['Metadata', assessment.metadata, 'Important source fields'],
+          ['Content coverage', assessment.coverage, 'Stored passages match source paragraphs'],
+          ['Structure', assessment.structure, 'Passages, words, and paragraphs are present'],
+        ];
+        document.querySelector('#assessment-grid').innerHTML = cards.map(([title, value, description]) => `<div class="assessment-card"><p>${description}</p><h3>${title}</h3>${statusBadge(value)}</div>`).join('');
+        document.querySelector('#report-state').className = `badge ${assessment.metadata}`;
+        document.querySelector('#report-state').textContent = 'Assessment available';
+
+        const structure = view.structure;
+        document.querySelector('#structure-metrics').innerHTML = [metric('Passages', structure.passage_count), metric('Paragraphs', structure.paragraph_count), metric('Words', structure.word_count)].join('');
+
+        const missing = view.metadata.filter((field) => !field.available);
+        document.querySelector('#metadata-summary').textContent = missing.length ? `${missing.length} metadata field${missing.length === 1 ? '' : 's'} missing from the stored article.` : 'All currently assessed metadata fields are available.';
+        document.querySelector('#metadata-table').innerHTML = view.metadata.map((field) => `<tr><td>${field.label}</td><td class="${field.available ? 'available' : 'unavailable'}">${field.available ? 'Available' : 'Missing'}</td></tr>`).join('');
+        document.querySelector('#missing-list').innerHTML = missing.map((field) => `<span class="missing-item">${field.label} missing</span>`).join('');
+
+        const coverage = view.coverage;
+        document.querySelector('#coverage-summary').textContent = `${coverage.covered_source_paragraph_count} of ${coverage.source_paragraph_count} source paragraphs are represented by stored passages.`;
+        document.querySelector('#coverage-metrics').innerHTML = [metric('Coverage', `${Math.round(coverage.ratio * 100)}%`), metric('Passage order', coverage.ordinals_are_contiguous ? 'Contiguous' : 'Not contiguous')].join('');
+        document.querySelector('#report').textContent = rawReport;
+      }
+
+      document.querySelectorAll('form[data-endpoint]').forEach((form) => {
+        form.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const button = form.querySelector('button'); const status = document.querySelector('#status'); const reportCard = document.querySelector('#report-card');
+          const payload = new FormData(form); payload.set('article_type', contentType(form));
+          button.disabled = true; status.textContent = 'Analyzing article…'; reportCard.classList.add('hidden');
+          try {
+            const response = await fetch(form.dataset.endpoint, { method: 'POST', body: payload });
+            const data = await response.json(); if (!response.ok) throw new Error(data.detail || 'Analysis failed');
+            renderReport(data.view, data.report); status.textContent = ''; reportCard.classList.remove('hidden'); reportCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } catch (error) { status.textContent = error.message; }
+          finally { button.disabled = false; }
+        });
+      });
+    </script>
+  </body>
+</html>

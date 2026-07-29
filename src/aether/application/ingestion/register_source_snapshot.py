@@ -3,7 +3,8 @@
 from dataclasses import dataclass, replace
 from datetime import datetime
 from hashlib import sha256
-from typing import Tuple
+import json
+from typing import Optional, Tuple
 
 from aether.domain.content import Article, ArticleVersion, Passage
 from aether.ports.outbound.content_repository import ContentRepository
@@ -20,9 +21,12 @@ class SourceArticleSnapshot:
     title: str
     body: str
     observed_at: datetime
-    source_published_at: datetime
-    source_updated_at: datetime = None
+    source_published_at: Optional[datetime]
+    source_updated_at: Optional[datetime] = None
     source_available: bool = True
+    author: Optional[str] = None
+    description: Optional[str] = None
+    keywords: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -62,7 +66,13 @@ class RegisterSourceSnapshot:
         current_version = self._content_repository.get_article_version(
             existing_article.current_version_id
         )
-        candidate_fingerprint = self._fingerprint(snapshot.title, snapshot.body)
+        candidate_fingerprint = self._fingerprint(
+            snapshot.title,
+            snapshot.body,
+            snapshot.author,
+            snapshot.description,
+            snapshot.keywords,
+        )
         if current_version.content_fingerprint == candidate_fingerprint:
             passages = self._content_repository.list_passages_for_version(
                 current_version.article_version_id
@@ -89,6 +99,9 @@ class RegisterSourceSnapshot:
             source_published_at=snapshot.source_published_at,
             source_updated_at=snapshot.source_updated_at,
             source_available=snapshot.source_available,
+            author=snapshot.author,
+            description=snapshot.description,
+            keywords=snapshot.keywords,
         )
         passages = self._create_passages(version, article.original_language)
         updated_article = replace(
@@ -111,8 +124,19 @@ class RegisterSourceSnapshot:
         return "article_" + sha256(canonical_source.encode("utf-8")).hexdigest()
 
     @staticmethod
-    def _fingerprint(title: str, body: str) -> str:
-        return sha256(f"{title}\n{body}".encode("utf-8")).hexdigest()
+    def _fingerprint(
+        title: str,
+        body: str,
+        author: Optional[str] = None,
+        description: Optional[str] = None,
+        keywords: Optional[str] = None,
+    ) -> str:
+        snapshot = json.dumps(
+            [title, body, author, description, keywords],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        return sha256(snapshot.encode("utf-8")).hexdigest()
 
     @staticmethod
     def _create_passages(

@@ -1,0 +1,139 @@
+import sys
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, "src")
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from aether.presentation.web.app import create_app  # noqa: E402
+
+
+FIXTURE_PATH = Path(__file__).parent / "fixtures" / "trt_world_erdogan_kazakhstan.html"
+
+
+class StubHtmlFetcher:
+    def __init__(self, html: str) -> None:
+        self.html = html
+        self.urls = []
+
+    def fetch(self, url: str) -> str:
+        self.urls.append(url)
+        return self.html
+
+
+class WebPresentationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.html = FIXTURE_PATH.read_text(encoding="utf-8")
+        self.fetcher = StubHtmlFetcher(self.html)
+        self.client = TestClient(create_app(self.fetcher))
+
+    def test_index_displays_url_and_html_file_submission_forms(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('data-endpoint="/analyze/url"', response.text)
+        self.assertIn('data-endpoint="/analyze/file"', response.text)
+        self.assertIn("Advanced source details", response.text)
+        self.assertIn('id="assessment-grid"', response.text)
+        self.assertIn('id="report"', response.text)
+
+    def test_url_submission_fetches_html_and_returns_existing_plain_text_report(self):
+        response = self.client.post(
+            "/analyze/url",
+            data={"url": "https://www.trtworld.com/article/3e946db45c45"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.fetcher.urls, ["https://www.trtworld.com/article/3e946db45c45"])
+        report = response.json()["report"]
+        self.assertIn("AI Readiness Report", report)
+        self.assertIn("Metadata Completeness: complete", report)
+        self.assertNotIn("raw_html", report)
+        self.assertEqual(response.json()["view"]["assessment"]["metadata"], "complete")
+        self.assertNotIn("article_id", response.json()["view"])
+
+    def test_file_submission_returns_existing_plain_text_report(self):
+        response = self.client.post(
+            "/analyze/file",
+            data={},
+            files={"file": ("article.html", self.html, "text/html")},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Passage Coverage: complete", response.json()["report"])
+
+    def test_file_submission_requires_source_url_only_when_canonical_is_absent(self):
+        html = """
+            <html lang="en"><head><title>No canonical URL</title></head>
+            <body><article><p>Visible article content.</p></article></body></html>
+        """
+
+        response = self.client.post(
+            "/analyze/file",
+            data={},
+            files={"file": ("article.html", html, "text/html")},
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(
+            response.json()["detail"],
+            "HTML file needs a source URL because no canonical URL was found",
+        )
+
+    def test_invalid_url_submission_returns_a_user_facing_validation_error(self):
+        response = TestClient(create_app()).post(
+            "/analyze/url",
+            data={"url": "not-a-url", "publisher": "TRT World", "article_type": "news_report"},
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.json()["detail"], "URL must be an absolute HTTP(S) URL")
+
+    def test_file_submission_can_use_existing_optional_metadata_fallbacks(self):
+        html = """
+            <html><head><title>Fallback article</title></head>
+            <body><article><p>Visible content for the fallback path.</p></article></body>
+            </html>
+        """
+
+        response = self.client.post(
+            "/analyze/file",
+            data={
+                "source_url": "https://example.org/fallback-article",
+                "publisher": "Example Publisher",
+                "article_type": "news_report",
+                "fallback_language": "en",
+                "fallback_published_at": "2026-05-14T14:00:00+03:00",
+            },
+            files={"file": ("article.html", html, "text/html")},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Publication Date Available: True", response.json()["report"])
+
+    def test_file_submission_reports_a_missing_publication_date(self):
+        html = """
+            <html lang="en"><head><title>Undated article</title></head>
+            <body><article><p>Visible content without a publication date.</p></article></body>
+            </html>
+        """
+
+        response = self.client.post(
+            "/analyze/file",
+            data={
+                "source_url": "https://example.org/undated-article",
+                "publisher": "Example Publisher",
+                "article_type": "news_report",
+            },
+            files={"file": ("undated.html", html, "text/html")},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        report = response.json()["report"]
+        self.assertIn("Publication Date Available: False", report)
+        self.assertIn("Metadata Completeness: partial", report)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from hashlib import sha256
+import json
 from typing import Optional, Tuple
 from urllib.parse import urlparse
 
@@ -30,9 +31,12 @@ class ArticleVersion:
     title: str
     body: str
     observed_at: datetime
-    source_published_at: datetime
+    source_published_at: Optional[datetime]
     source_updated_at: Optional[datetime] = None
     source_available: bool = True
+    author: Optional[str] = None
+    description: Optional[str] = None
+    keywords: Optional[str] = None
     content_fingerprint: str = field(init=False)
 
     def __post_init__(self) -> None:
@@ -43,14 +47,22 @@ class ArticleVersion:
         if self.version_number < 1:
             raise DomainValidationError("version_number must be positive")
         require_aware(self.observed_at, "observed_at")
-        require_aware(self.source_published_at, "source_published_at")
+        if self.source_published_at is not None:
+            require_aware(self.source_published_at, "source_published_at")
         if self.source_updated_at is not None:
             require_aware(self.source_updated_at, "source_updated_at")
-            if self.source_updated_at < self.source_published_at:
+            if (
+                self.source_published_at is not None
+                and self.source_updated_at < self.source_published_at
+            ):
                 raise DomainValidationError(
                     "source_updated_at cannot precede source_published_at"
                 )
-        snapshot = f"{self.title}\n{self.body}".encode("utf-8")
+        snapshot = json.dumps(
+            [self.title, self.body, self.author, self.description, self.keywords],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
         object.__setattr__(self, "content_fingerprint", sha256(snapshot).hexdigest())
 
 
@@ -63,7 +75,7 @@ class Article:
     canonical_source: str
     original_language: str
     article_type: str
-    initial_published_at: datetime
+    initial_published_at: Optional[datetime]
     ingested_at: datetime
     version_ids: Tuple[str, ...] = ()
     current_version_id: Optional[str] = None
@@ -74,7 +86,8 @@ class Article:
         _validate_url(self.canonical_source)
         _require_non_empty(self.original_language, "original_language")
         _require_non_empty(self.article_type, "article_type")
-        require_aware(self.initial_published_at, "initial_published_at")
+        if self.initial_published_at is not None:
+            require_aware(self.initial_published_at, "initial_published_at")
         require_aware(self.ingested_at, "ingested_at")
         if len(set(self.version_ids)) != len(self.version_ids):
             raise DomainValidationError("article version_ids must be unique")

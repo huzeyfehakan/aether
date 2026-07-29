@@ -1,0 +1,407 @@
+"""Deterministically normalize raw article HTML into existing source snapshots."""
+
+from dataclasses import dataclass
+from datetime import datetime
+from html.parser import HTMLParser
+import json
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse
+
+from aether.application.ingestion.register_source_snapshot import (
+    RegisterSourceSnapshot,
+    RegistrationResult,
+    SourceArticleSnapshot,
+)
+from aether.domain.common import DomainValidationError, require_aware
+from aether.ports.outbound.content_repository import ContentRepository
+
+
+@dataclass(frozen=True)
+class RawHtmlArticle:
+    """Raw source input plus the source context HTML cannot reliably provide."""
+
+    html: str
+    source_url: str
+    publisher: str
+    article_type: str
+    observed_at: datetime
+    fallback_language: Optional[str] = None
+    fallback_published_at: Optional[datetime] = None
+    fallback_updated_at: Optional[datetime] = None
+
+    def __post_init__(self) -> None:
+        if not self.html.strip():
+            raise DomainValidationError("raw article html is required")
+        if not self.source_url.strip():
+            raise DomainValidationError("raw article source_url is required")
+        if not self.publisher.strip():
+            raise DomainValidationError("raw article publisher is required")
+        if not self.article_type.strip():
+            raise DomainValidationError("raw article article_type is required")
+        require_aware(self.observed_at, "raw article observed_at")
+        if self.fallback_published_at is not None:
+            require_aware(self.fallback_published_at, "fallback_published_at")
+        if self.fallback_updated_at is not None:
+            require_aware(self.fallback_updated_at, "fallback_updated_at")
+
+
+@dataclass(frozen=True)
+class NormalizedHtmlArticle:
+    """Deterministic source fields ready for the existing ingestion use case."""
+
+    canonical_source: str
+    title: str
+    body: str
+    language: str
+    published_at: Optional[datetime]
+    updated_at: Optional[datetime]
+    author: Optional[str]
+    description: Optional[str]
+    keywords: Optional[str]
+
+
+class _ArticleHtmlCollector(HTMLParser):
+    """Collect common publication metadata and visible paragraph text only."""
+
+    _SKIPPED_TAGS = {"script", "style", "noscript", "template"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.metadata: Dict[str, str] = {}
+        self.canonical_source: Optional[str] = None
+        self.html_language: Optional[str] = None
+        self.time_values: List[str] = []
+        self.json_ld_documents: List[str] = []
+        self.application_json_documents: List[str] = []
+        self.title_parts: List[str] = []
+        self.h1_parts: List[str] = []
+        self.paragraphs: List[Tuple[int, str]] = []
+        self._article_depth = 0
+        self._main_depth = 0
+        self._skip_depth = 0
+        self._in_title = False
+        self._in_h1 = False
+        self._paragraph_parts: Optional[List[str]] = None
+        self._paragraph_priority = 0
+        self._json_ld_parts: Optional[List[str]] = None
+        self._application_json_parts: Optional[List[str]] = None
+
+    def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
+        attributes = {key.lower(): value or "" for key, value in attrs}
+        tag = tag.lower()
+        if tag in self._SKIPPED_TAGS:
+            script_type = attributes.get("type", "").lower().split(";", 1)[0].strip()
+            if tag == "script" and script_type == "application/ld+json":
+                self._json_ld_parts = []
+            elif tag == "script" and script_type == "application/json":
+                self._application_json_parts = []
+            self._skip_depth += 1
+            return
+        if tag == "html" and attributes.get("lang"):
+            self.html_language = attributes["lang"].strip()
+        if tag == "meta":
+            key = (
+                attributes.get("property")
+                or attributes.get("name")
+                or attributes.get("itemprop")
+            )
+            if key and attributes.get("content"):
+                self.metadata[key.lower()] = attributes["content"]
+        if tag == "link" and "canonical" in attributes.get("rel", "").lower():
+            self.canonical_source = attributes.get("href", "").strip() or None
+        if tag == "time" and attributes.get("datetime"):
+            self.time_values.append(attributes["datetime"].strip())
+        if tag == "article":
+            self._article_depth += 1
+        elif tag == "main":
+            self._main_depth += 1
+        elif tag == "title":
+            self._in_title = True
+        elif tag == "h1":
+            self._in_h1 = True
+        elif tag == "p":
+            self._paragraph_parts = []
+            self._paragraph_priority = 3 if self._article_depth else 2 if self._main_depth else 1
+
+    def handle_endtag(self, tag: str) -> None:
+        tag = tag.lower()
+        if tag in self._SKIPPED_TAGS:
+            if tag == "script" and self._json_ld_parts is not None:
+                self.json_ld_documents.append("".join(self._json_ld_parts))
+                self._json_ld_parts = None
+            if tag == "script" and self._application_json_parts is not None:
+                self.application_json_documents.append(
+                    "".join(self._application_json_parts)
+                )
+                self._application_json_parts = None
+            self._skip_depth = max(0, self._skip_depth - 1)
+            return
+        if tag == "p" and self._paragraph_parts is not None:
+            text = _normalize_text(" ".join(self._paragraph_parts))
+            if text:
+                self.paragraphs.append((self._paragraph_priority, text))
+            self._paragraph_parts = None
+            self._paragraph_priority = 0
+        elif tag == "title":
+            self._in_title = False
+        elif tag == "h1":
+            self._in_h1 = False
+        elif tag == "article":
+            self._article_depth = max(0, self._article_depth - 1)
+        elif tag == "main":
+            self._main_depth = max(0, self._main_depth - 1)
+
+    def handle_data(self, data: str) -> None:
+        if self._skip_depth:
+            if self._json_ld_parts is not None:
+                self._json_ld_parts.append(data)
+            if self._application_json_parts is not None:
+                self._application_json_parts.append(data)
+            return
+        if self._in_title:
+            self.title_parts.append(data)
+        if self._in_h1:
+            self.h1_parts.append(data)
+        if self._paragraph_parts is not None:
+            self._paragraph_parts.append(data)
+
+
+def _normalize_text(value: str) -> str:
+    return " ".join(value.split())
+
+
+def _parse_source_timestamp(value: str, field_name: str) -> datetime:
+    normalized = value.strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as error:
+        raise DomainValidationError(f"{field_name} must be ISO-8601") from error
+    require_aware(parsed, field_name)
+    return parsed
+
+
+class HtmlArticleNormalizer:
+    """Normalize common publisher HTML conventions without semantic inference."""
+
+    _PUBLISHED_META_KEYS = ("article:published_time", "datepublished")
+    _UPDATED_META_KEYS = ("article:modified_time", "datemodified")
+    _TITLE_META_KEYS = ("og:title", "twitter:title")
+    _AUTHOR_META_KEYS = ("article:author", "author")
+    _DESCRIPTION_META_KEYS = ("og:description", "description", "twitter:description")
+    _KEYWORD_META_KEYS = ("keywords",)
+
+    def normalize(self, raw_article: RawHtmlArticle) -> NormalizedHtmlArticle:
+        collector = _ArticleHtmlCollector()
+        collector.feed(raw_article.html)
+        collector.close()
+
+        title = self._first_metadata(collector.metadata, self._TITLE_META_KEYS)
+        title = title or _normalize_text(" ".join(collector.title_parts))
+        title = title or _normalize_text(" ".join(collector.h1_parts))
+        if not title:
+            raise DomainValidationError("raw article html has no title")
+
+        body = self._body_from(collector.paragraphs)
+        if not body:
+            body = self._body_from_application_json(
+                collector.application_json_documents, raw_article.source_url
+            )
+        if not body:
+            raise DomainValidationError("raw article html has no visible paragraphs")
+
+        language = collector.html_language or raw_article.fallback_language
+        if not language or not language.strip():
+            raise DomainValidationError("raw article html has no language or fallback_language")
+
+        published_at = self._published_at(collector, raw_article)
+        updated_at = self._updated_at(collector, raw_article)
+        canonical_source = collector.canonical_source or raw_article.source_url
+        return NormalizedHtmlArticle(
+            canonical_source=canonical_source,
+            title=title,
+            body=body,
+            language=language.strip(),
+            published_at=published_at,
+            updated_at=updated_at,
+            author=self._first_metadata(collector.metadata, self._AUTHOR_META_KEYS),
+            description=self._first_metadata(
+                collector.metadata, self._DESCRIPTION_META_KEYS
+            ),
+            keywords=self._first_metadata(collector.metadata, self._KEYWORD_META_KEYS),
+        )
+
+    @staticmethod
+    def _first_metadata(metadata: Dict[str, str], keys: Tuple[str, ...]) -> Optional[str]:
+        for key in keys:
+            value = metadata.get(key)
+            if value:
+                return value
+        return None
+
+    @staticmethod
+    def _body_from(paragraphs: List[Tuple[int, str]]) -> str:
+        if not paragraphs:
+            return ""
+        highest_priority = max(priority for priority, _ in paragraphs)
+        return "\n\n".join(
+            text for priority, text in paragraphs if priority == highest_priority
+        )
+
+    @classmethod
+    def _body_from_application_json(
+        cls, documents: List[str], source_url: str
+    ) -> str:
+        """Read paragraph HTML from a matching server-supplied JSON payload.
+
+        Some applications deliver article content in an ``application/json``
+        hydration payload and let the browser render it later. The extraction
+        remains deterministic: JSON documents and objects are considered in
+        source order, and a candidate must identify the current source path,
+        declare ``type: article``, and contain a list of body blocks.
+        """
+
+        source_path = urlparse(source_url).path
+        for document in documents:
+            try:
+                payload = json.loads(document)
+            except json.JSONDecodeError:
+                continue
+            for value in cls._json_values_in_document_order(payload):
+                if not cls._is_matching_article_payload(value, source_path):
+                    continue
+                paragraphs = cls._paragraphs_from_body_blocks(value["body"])
+                if paragraphs:
+                    return "\n\n".join(paragraphs)
+        return ""
+
+    @classmethod
+    def _paragraphs_from_body_blocks(cls, blocks: List[Any]) -> Tuple[str, ...]:
+        paragraphs: List[str] = []
+        for block in blocks:
+            if not isinstance(block, dict) or not isinstance(block.get("value"), str):
+                continue
+            collector = _ArticleHtmlCollector()
+            collector.feed(block["value"])
+            collector.close()
+            paragraphs.extend(text for _, text in collector.paragraphs)
+        return tuple(paragraphs)
+
+    @staticmethod
+    def _is_matching_article_payload(value: Any, source_path: str) -> bool:
+        return (
+            isinstance(value, dict)
+            and isinstance(value.get("type"), str)
+            and value["type"].lower() == "article"
+            and value.get("path") == source_path
+            and isinstance(value.get("body"), list)
+        )
+
+    def _published_at(
+        self, collector: _ArticleHtmlCollector, raw_article: RawHtmlArticle
+    ) -> Optional[datetime]:
+        json_ld_published_value = self._json_ld_date_published(
+            collector.json_ld_documents
+        )
+        if json_ld_published_value is not None:
+            return _parse_source_timestamp(
+                json_ld_published_value, "JSON-LD Article datePublished"
+            )
+        published_value = self._first_metadata(
+            collector.metadata, ("article:published_time",)
+        )
+        if published_value:
+            return _parse_source_timestamp(published_value, "article:published_time")
+        published_value = self._first_metadata(collector.metadata, ("datepublished",))
+        if published_value:
+            return _parse_source_timestamp(published_value, "datePublished")
+        if collector.time_values:
+            return _parse_source_timestamp(collector.time_values[0], "published_at")
+        if raw_article.fallback_published_at is not None:
+            return raw_article.fallback_published_at
+        return None
+
+    @classmethod
+    def _json_ld_date_published(cls, documents: List[str]) -> Optional[str]:
+        """Return the first Article JSON-LD publication value in source order.
+
+        Malformed JSON-LD is not an Article candidate and is ignored. Once a
+        valid Article/NewsArticle object exposes ``datePublished``, its value
+        is authoritative and timestamp validation must either succeed or fail
+        explicitly; this method never falls back to a lower-priority source.
+        """
+
+        for document in documents:
+            try:
+                payload = json.loads(document)
+            except json.JSONDecodeError:
+                continue
+            for value in cls._json_values_in_document_order(payload):
+                if not cls._is_article(value) or "datePublished" not in value:
+                    continue
+                date_published = value["datePublished"]
+                if not isinstance(date_published, str) or not date_published.strip():
+                    raise DomainValidationError(
+                        "JSON-LD Article datePublished must be a non-empty string"
+                    )
+                return date_published.strip()
+        return None
+
+    @classmethod
+    def _json_values_in_document_order(cls, value: Any):
+        if isinstance(value, dict):
+            yield value
+            for child in value.values():
+                yield from cls._json_values_in_document_order(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from cls._json_values_in_document_order(child)
+
+    @staticmethod
+    def _is_article(value: Dict[str, Any]) -> bool:
+        raw_type = value.get("@type")
+        types = raw_type if isinstance(raw_type, list) else (raw_type,)
+        return any(
+            isinstance(item, str)
+            and item.rsplit("/", 1)[-1].rsplit("#", 1)[-1].lower()
+            in {"article", "newsarticle"}
+            for item in types
+        )
+
+    def _updated_at(
+        self, collector: _ArticleHtmlCollector, raw_article: RawHtmlArticle
+    ) -> Optional[datetime]:
+        updated_value = self._first_metadata(collector.metadata, self._UPDATED_META_KEYS)
+        if updated_value:
+            return _parse_source_timestamp(updated_value, "updated_at")
+        return raw_article.fallback_updated_at
+
+
+class RegisterRawHtmlArticle:
+    """Ingest raw HTML through the existing immutable source registration flow."""
+
+    def __init__(
+        self,
+        content_repository: ContentRepository,
+        normalizer: Optional[HtmlArticleNormalizer] = None,
+    ) -> None:
+        self._normalizer = normalizer or HtmlArticleNormalizer()
+        self._register_snapshot = RegisterSourceSnapshot(content_repository)
+
+    def execute(self, raw_article: RawHtmlArticle) -> RegistrationResult:
+        normalized = self._normalizer.normalize(raw_article)
+        return self._register_snapshot.execute(
+            SourceArticleSnapshot(
+                publisher=raw_article.publisher,
+                canonical_source=normalized.canonical_source,
+                original_language=normalized.language,
+                article_type=raw_article.article_type,
+                title=normalized.title,
+                body=normalized.body,
+                observed_at=raw_article.observed_at,
+                source_published_at=normalized.published_at,
+                source_updated_at=normalized.updated_at,
+                author=normalized.author,
+                description=normalized.description,
+                keywords=normalized.keywords,
+            )
+        )

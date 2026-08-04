@@ -15,3 +15,9 @@ dist/
 
 # Pytest
 .pytest_cache/
+
+# Presentation and office artifacts
+*.pptx
+*.ppt
+*.bak
+~$*

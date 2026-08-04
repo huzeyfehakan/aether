@@ -81,6 +81,85 @@ class RawHtmlIngestionTests(unittest.TestCase):
         self.assertEqual(result.article_version.description, "A source-provided description.")
         self.assertEqual(result.article_version.keywords, "politika, ekonomi,  haber")
 
+    def test_uses_only_the_document_head_title_and_ignores_svg_titles(self):
+        html = """
+            <html lang="en">
+              <head><title>Real Article Title</title></head>
+              <body>
+                <svg><title>Search icon</title></svg>
+                <article><p>Visible article paragraph.</p></article>
+              </body>
+            </html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(result.article_version.title, "Real Article Title")
+
+    def test_prefers_the_article_heading_over_an_unrelated_site_heading(self):
+        html = """
+            <html lang="en">
+              <head></head>
+              <body>
+                <header><h1>Publisher Site Name</h1></header>
+                <article>
+                  <h1>The Article Headline</h1>
+                  <p>Visible article paragraph.</p>
+                </article>
+              </body>
+            </html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(result.article_version.title, "The Article Headline")
+
+    def test_uses_the_first_canonical_link_and_ignores_later_or_blank_ones(self):
+        html = """
+            <html lang="en"><head>
+              <title>Canonical precedence</title>
+              <link rel="canonical" href="https://news.example.org/first" />
+              <link rel="canonical" href="" />
+              <link rel="canonical" href="https://news.example.org/second" />
+            </head><body><article><p>Visible article paragraph.</p></article></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(
+            result.article.canonical_source, "https://news.example.org/first"
+        )
+
+    def test_matches_canonical_rel_as_a_token_rather_than_a_substring(self):
+        html = """
+            <html lang="en"><head>
+              <title>Canonical rel tokens</title>
+              <link rel="noncanonical" href="https://wrong.example/ignored" />
+              <link rel="Canonical" href="https://news.example.org/story" />
+            </head><body><article><p>Visible article paragraph.</p></article></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(
+            result.article.canonical_source, "https://news.example.org/story"
+        )
+
+    def test_resolves_a_relative_canonical_href_against_the_source_url(self):
+        html = """
+            <html lang="en"><head>
+              <title>Relative canonical</title>
+              <link rel="canonical" href="/story-path" />
+            </head><body><article><p>Visible article paragraph.</p></article></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertTrue(result.version_created)
+        self.assertEqual(
+            result.article.canonical_source, "https://source.example.org/story-path"
+        )
+
     def test_uses_title_time_language_and_canonical_fallbacks(self):
         html = """
             <html>

@@ -5,7 +5,7 @@ from datetime import datetime
 from html.parser import HTMLParser
 import json
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from aether.application.ingestion.register_source_snapshot import (
     RegisterSourceSnapshot,
@@ -74,17 +74,23 @@ class _ArticleHtmlCollector(HTMLParser):
         self.json_ld_documents: List[str] = []
         self.application_json_documents: List[str] = []
         self.title_parts: List[str] = []
-        self.h1_parts: List[str] = []
+        self.headings: List[Tuple[int, str]] = []
         self.paragraphs: List[Tuple[int, str]] = []
         self._article_depth = 0
         self._main_depth = 0
+        self._head_depth = 0
         self._skip_depth = 0
         self._in_title = False
-        self._in_h1 = False
+        self._title_captured = False
+        self._heading_parts: Optional[List[str]] = None
+        self._heading_priority = 0
         self._paragraph_parts: Optional[List[str]] = None
         self._paragraph_priority = 0
         self._json_ld_parts: Optional[List[str]] = None
         self._application_json_parts: Optional[List[str]] = None
+
+    def _containment_priority(self) -> int:
+        return 3 if self._article_depth else 2 if self._main_depth else 1
 
     def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
         attributes = {key.lower(): value or "" for key, value in attrs}
@@ -107,21 +113,25 @@ class _ArticleHtmlCollector(HTMLParser):
             )
             if key and attributes.get("content"):
                 self.metadata[key.lower()] = attributes["content"]
-        if tag == "link" and "canonical" in attributes.get("rel", "").lower():
-            self.canonical_source = attributes.get("href", "").strip() or None
+        if tag == "link" and self.canonical_source is None:
+            if "canonical" in _rel_tokens(attributes.get("rel", "")):
+                self.canonical_source = attributes.get("href", "").strip() or None
         if tag == "time" and attributes.get("datetime"):
             self.time_values.append(attributes["datetime"].strip())
         if tag == "article":
             self._article_depth += 1
         elif tag == "main":
             self._main_depth += 1
-        elif tag == "title":
+        elif tag == "head":
+            self._head_depth += 1
+        elif tag == "title" and self._head_depth and not self._title_captured:
             self._in_title = True
         elif tag == "h1":
-            self._in_h1 = True
+            self._heading_parts = []
+            self._heading_priority = self._containment_priority()
         elif tag == "p":
             self._paragraph_parts = []
-            self._paragraph_priority = 3 if self._article_depth else 2 if self._main_depth else 1
+            self._paragraph_priority = self._containment_priority()
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
@@ -142,10 +152,17 @@ class _ArticleHtmlCollector(HTMLParser):
                 self.paragraphs.append((self._paragraph_priority, text))
             self._paragraph_parts = None
             self._paragraph_priority = 0
-        elif tag == "title":
+        elif tag == "h1" and self._heading_parts is not None:
+            text = _normalize_text(" ".join(self._heading_parts))
+            if text:
+                self.headings.append((self._heading_priority, text))
+            self._heading_parts = None
+            self._heading_priority = 0
+        elif tag == "title" and self._in_title:
             self._in_title = False
-        elif tag == "h1":
-            self._in_h1 = False
+            self._title_captured = True
+        elif tag == "head":
+            self._head_depth = max(0, self._head_depth - 1)
         elif tag == "article":
             self._article_depth = max(0, self._article_depth - 1)
         elif tag == "main":
@@ -160,14 +177,38 @@ class _ArticleHtmlCollector(HTMLParser):
             return
         if self._in_title:
             self.title_parts.append(data)
-        if self._in_h1:
-            self.h1_parts.append(data)
+        if self._heading_parts is not None:
+            self._heading_parts.append(data)
         if self._paragraph_parts is not None:
             self._paragraph_parts.append(data)
 
 
 def _normalize_text(value: str) -> str:
     return " ".join(value.split())
+
+
+def _rel_tokens(value: str) -> Tuple[str, ...]:
+    """Split an HTML ``rel`` attribute into its space-separated link types."""
+    return tuple(token.lower() for token in value.split())
+
+
+def canonical_url_from_html(html: str, base_url: Optional[str] = None) -> Optional[str]:
+    """Return the first declared canonical URL, resolved against ``base_url``.
+
+    This is the single canonical-link contract for the whole system: ``rel`` is
+    matched as a link-type token rather than a substring, the first non-blank
+    declaration in document order wins, and a relative href is resolved only
+    when a base URL is supplied.
+    """
+
+    collector = _ArticleHtmlCollector()
+    collector.feed(html)
+    collector.close()
+    if collector.canonical_source is None:
+        return None
+    if base_url is None:
+        return collector.canonical_source
+    return urljoin(base_url, collector.canonical_source)
 
 
 def _parse_source_timestamp(value: str, field_name: str) -> datetime:
@@ -197,7 +238,7 @@ class HtmlArticleNormalizer:
 
         title = self._first_metadata(collector.metadata, self._TITLE_META_KEYS)
         title = title or _normalize_text(" ".join(collector.title_parts))
-        title = title or _normalize_text(" ".join(collector.h1_parts))
+        title = title or self._innermost_heading(collector.headings)
         if not title:
             raise DomainValidationError("raw article html has no title")
 
@@ -215,7 +256,9 @@ class HtmlArticleNormalizer:
 
         published_at = self._published_at(collector, raw_article)
         updated_at = self._updated_at(collector, raw_article)
-        canonical_source = collector.canonical_source or raw_article.source_url
+        canonical_source = self._canonical_source(
+            collector.canonical_source, raw_article.source_url
+        )
         return NormalizedHtmlArticle(
             canonical_source=canonical_source,
             title=title,
@@ -229,6 +272,26 @@ class HtmlArticleNormalizer:
             ),
             keywords=self._first_metadata(collector.metadata, self._KEYWORD_META_KEYS),
         )
+
+    @staticmethod
+    def _canonical_source(canonical_href: Optional[str], source_url: str) -> str:
+        """Resolve the declared canonical link against the fetched source URL."""
+        if not canonical_href:
+            return source_url
+        return urljoin(source_url, canonical_href)
+
+    @staticmethod
+    def _innermost_heading(headings: List[Tuple[int, str]]) -> str:
+        """Return the first heading from the most article-specific container.
+
+        Headings are ranked exactly like paragraphs: article-contained first,
+        then main-contained, then any other. This keeps a site or section
+        heading from displacing the heading of the article being ingested.
+        """
+        if not headings:
+            return ""
+        highest_priority = max(priority for priority, _ in headings)
+        return next(text for priority, text in headings if priority == highest_priority)
 
     @staticmethod
     def _first_metadata(metadata: Dict[str, str], keys: Tuple[str, ...]) -> Optional[str]:

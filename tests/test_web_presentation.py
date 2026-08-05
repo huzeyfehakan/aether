@@ -1,5 +1,6 @@
 import sys
 import unittest
+from hashlib import sha256
 from pathlib import Path
 
 sys.path.insert(0, "src")
@@ -67,6 +68,45 @@ class WebPresentationTests(unittest.TestCase):
         html = """
             <html lang="en"><head><title>No canonical URL</title></head>
             <body><article><p>Visible article content.</p></article></body></html>
+        """
+
+        response = self.client.post(
+            "/analyze/file",
+            data={},
+            files={"file": ("article.html", html, "text/html")},
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(
+            response.json()["detail"],
+            "HTML file needs a source URL because no canonical URL was found",
+        )
+
+    def test_file_submission_resolves_the_same_canonical_link_as_ingestion(self):
+        html = """
+            <html lang="en"><head><title>Canonical agreement</title>
+              <link rel="canonical" href="https://news.example.org/first" />
+              <link rel="canonical" href="https://news.example.org/second" />
+            </head><body><article><p>Visible article content.</p></article></body></html>
+        """
+        expected_article_id = "article_" + sha256(
+            b"https://news.example.org/first"
+        ).hexdigest()
+
+        response = self.client.post(
+            "/analyze/file",
+            data={},
+            files={"file": ("article.html", html, "text/html")},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(f"Article ID: {expected_article_id}", response.json()["report"])
+
+    def test_file_submission_requires_a_source_url_for_a_relative_canonical(self):
+        html = """
+            <html lang="en"><head><title>Relative canonical</title>
+              <link rel="canonical" href="/story-path" />
+            </head><body><article><p>Visible article content.</p></article></body></html>
         """
 
         response = self.client.post(

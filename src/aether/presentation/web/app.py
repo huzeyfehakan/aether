@@ -1,7 +1,6 @@
 """Minimal web UI that composes the existing deterministic MVP use cases."""
 
 from datetime import datetime, timezone
-from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Dict, Optional, Protocol
 from urllib.parse import urlparse
@@ -20,6 +19,7 @@ from aether.application.analysis.build_article_analysis_report import BuildArtic
 from aether.application.ingestion.register_raw_html_article import (
     RawHtmlArticle,
     RegisterRawHtmlArticle,
+    canonical_url_from_html,
 )
 from aether.domain.common import DomainValidationError
 from aether.presentation.ai_readiness_report_renderers import (
@@ -32,21 +32,6 @@ class HtmlFetcher(Protocol):
 
     def fetch(self, url: str) -> str:
         ...
-
-
-class _CanonicalUrlCollector(HTMLParser):
-    """Read a source-provided canonical URL for the HTML-file input flow."""
-
-    def __init__(self) -> None:
-        super().__init__(convert_charrefs=True)
-        self.canonical_url: Optional[str] = None
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
-        if tag.lower() != "link" or self.canonical_url is not None:
-            return
-        attributes = {key.lower(): value or "" for key, value in attrs}
-        if "canonical" in attributes.get("rel", "").lower():
-            self.canonical_url = attributes.get("href", "").strip() or None
 
 
 class AIReadinessPipeline:
@@ -136,10 +121,20 @@ _TEMPLATE_PATH = Path(__file__).parent / "templates" / "index.html"
 
 
 def _canonical_url_from_html(html: str) -> Optional[str]:
-    collector = _CanonicalUrlCollector()
-    collector.feed(html)
-    collector.close()
-    return collector.canonical_url
+    """Reuse the ingestion canonical contract to derive a usable source URL.
+
+    An uploaded file has no base URL, so a relative canonical link cannot be
+    resolved here. Such a file is treated as having no usable canonical URL and
+    the caller asks for an explicit source URL instead.
+    """
+
+    canonical = canonical_url_from_html(html)
+    if canonical is None:
+        return None
+    parsed = urlparse(canonical)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return canonical
 
 
 def _publisher_from(source_url: str, publisher: Optional[str]) -> str:

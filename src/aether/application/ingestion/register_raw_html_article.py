@@ -65,6 +65,14 @@ class _ArticleHtmlCollector(HTMLParser):
 
     _SKIPPED_TAGS = {"script", "style", "noscript", "template"}
 
+    # HTML sectioning and link elements whose paragraphs are, by specification,
+    # not article prose: navigation, complementary content, page banners,
+    # footers, media captions, and link-wrapped teaser cards. Publishers place
+    # recommendation cards and legal boilerplate in these containers, and they
+    # otherwise share the article's container. This is markup semantics only:
+    # no class names, publisher names, or URL patterns are consulted.
+    _NON_BODY_TAGS = {"a", "aside", "figcaption", "footer", "header", "nav"}
+
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.metadata: Dict[str, str] = {}
@@ -80,12 +88,14 @@ class _ArticleHtmlCollector(HTMLParser):
         self._main_depth = 0
         self._head_depth = 0
         self._skip_depth = 0
+        self._non_body_depth = 0
         self._in_title = False
         self._title_captured = False
         self._heading_parts: Optional[List[str]] = None
         self._heading_priority = 0
         self._paragraph_parts: Optional[List[str]] = None
         self._paragraph_priority = 0
+        self._paragraph_is_body = True
         self._json_ld_parts: Optional[List[str]] = None
         self._application_json_parts: Optional[List[str]] = None
 
@@ -118,6 +128,8 @@ class _ArticleHtmlCollector(HTMLParser):
                 self.canonical_source = attributes.get("href", "").strip() or None
         if tag == "time" and attributes.get("datetime"):
             self.time_values.append(attributes["datetime"].strip())
+        if tag in self._NON_BODY_TAGS:
+            self._non_body_depth += 1
         if tag == "article":
             self._article_depth += 1
         elif tag == "main":
@@ -132,6 +144,7 @@ class _ArticleHtmlCollector(HTMLParser):
         elif tag == "p":
             self._paragraph_parts = []
             self._paragraph_priority = self._containment_priority()
+            self._paragraph_is_body = self._non_body_depth == 0
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
@@ -146,12 +159,15 @@ class _ArticleHtmlCollector(HTMLParser):
                 self._application_json_parts = None
             self._skip_depth = max(0, self._skip_depth - 1)
             return
+        if tag in self._NON_BODY_TAGS:
+            self._non_body_depth = max(0, self._non_body_depth - 1)
         if tag == "p" and self._paragraph_parts is not None:
             text = _normalize_text(" ".join(self._paragraph_parts))
-            if text:
+            if text and self._paragraph_is_body:
                 self.paragraphs.append((self._paragraph_priority, text))
             self._paragraph_parts = None
             self._paragraph_priority = 0
+            self._paragraph_is_body = True
         elif tag == "h1" and self._heading_parts is not None:
             text = _normalize_text(" ".join(self._heading_parts))
             if text:

@@ -1,6 +1,7 @@
 import sys
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
 
 sys.path.insert(0, "src")
 
@@ -15,6 +16,7 @@ from aether.domain.common import DomainValidationError  # noqa: E402
 
 
 OBSERVED_AT = datetime(2026, 7, 23, 9, 0, tzinfo=timezone.utc)
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 class RawHtmlIngestionTests(unittest.TestCase):
@@ -80,6 +82,62 @@ class RawHtmlIngestionTests(unittest.TestCase):
         self.assertEqual(result.article_version.author, "Ayşe Yılmaz")
         self.assertEqual(result.article_version.description, "A source-provided description.")
         self.assertEqual(result.article_version.keywords, "politika, ekonomi,  haber")
+
+    def test_excludes_link_wrapped_recommendation_cards_from_the_body(self):
+        """Recommendation cards share the article container on TRT Çocuk pages."""
+        html = (FIXTURES / "trt_ebeveyn_akademisi_makale.html").read_text(encoding="utf-8")
+
+        result = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url="https://ebeveynakademisi.trtcocuk.net.tr/makale/asiri-uyumlu-cocuklar-neyi-saklar-32449390",
+                publisher="TRT Çocuk Ebeveyn Akademisi",
+                article_type="news_report",
+                observed_at=OBSERVED_AT,
+            )
+        )
+
+        body = result.article_version.body
+        self.assertIn("Aşırı uyumlu çocuklar çoğu zaman", body)
+        self.assertIn("Bu uyumun ardında çoğu zaman", body)
+        self.assertNotIn("İşten sonra çocuğunuzla", body)
+        self.assertNotIn("Öfke sağlıklı", body)
+
+    def test_excludes_paragraphs_from_non_body_html_sections(self):
+        html = """
+            <html lang="en"><head><title>Sectioning</title></head>
+            <body>
+              <header><p>Site tagline.</p></header>
+              <nav><p>Navigation text.</p></nav>
+              <main>
+                <p>Real article prose.</p>
+                <aside><p>Sidebar promotion.</p></aside>
+                <figure><figcaption><p>Photo caption.</p></figcaption></figure>
+                <a href="/other"><p>Linked teaser card.</p></a>
+              </main>
+              <footer><p>Copyright notice.</p></footer>
+            </body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(result.article_version.body, "Real article prose.")
+
+    def test_keeps_inline_links_inside_body_paragraphs(self):
+        """A paragraph containing a link is prose; a paragraph inside a link is not."""
+        html = """
+            <html lang="en"><head><title>Inline links</title></head>
+            <body><main>
+              <p>Prose with an <a href="/source">inline citation</a> inside it.</p>
+            </main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(
+            result.article_version.body,
+            "Prose with an inline citation inside it.",
+        )
 
     def test_uses_only_the_document_head_title_and_ignores_svg_titles(self):
         html = """

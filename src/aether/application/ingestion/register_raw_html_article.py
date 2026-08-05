@@ -266,7 +266,7 @@ class HtmlArticleNormalizer:
         if not body:
             raise DomainValidationError("raw article html has no visible paragraphs")
 
-        language = collector.html_language or raw_article.fallback_language
+        language = self._language(collector, raw_article)
         if not language or not language.strip():
             raise DomainValidationError("raw article html has no language or fallback_language")
 
@@ -288,6 +288,53 @@ class HtmlArticleNormalizer:
             ),
             keywords=self._first_metadata(collector.metadata, self._KEYWORD_META_KEYS),
         )
+
+    @classmethod
+    def _language(
+        cls, collector: "_ArticleHtmlCollector", raw_article: RawHtmlArticle
+    ) -> Optional[str]:
+        """Resolve the document language from publisher-declared sources only.
+
+        The precedence is fixed: the ``lang`` attribute on ``<html>``, then the
+        Open Graph ``og:locale`` property, then a JSON-LD Article
+        ``inLanguage``, then the explicitly supplied fallback. Nothing is
+        inferred from the text, the host name, or the URL.
+        """
+        if collector.html_language and collector.html_language.strip():
+            return collector.html_language
+        locale = collector.metadata.get("og:locale")
+        if locale and locale.strip():
+            # og:locale uses language_TERRITORY; BCP 47 uses a hyphen. The
+            # separator is rewritten, the declared value is otherwise kept.
+            return locale.strip().replace("_", "-")
+        in_language = cls._json_ld_in_language(collector.json_ld_documents)
+        if in_language:
+            return in_language
+        return raw_article.fallback_language
+
+    @classmethod
+    def _json_ld_in_language(cls, documents: List[str]) -> Optional[str]:
+        """Return the first Article ``inLanguage`` value in document order."""
+        for value in cls._json_ld_article_values(documents, "inLanguage"):
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+            if isinstance(value, dict):
+                name = value.get("name")
+                if isinstance(name, str) and name.strip():
+                    return name.strip()
+        return None
+
+    @classmethod
+    def _json_ld_article_values(cls, documents: List[str], key: str):
+        """Yield ``key`` from each Article/NewsArticle object, in source order."""
+        for document in documents:
+            try:
+                payload = json.loads(document)
+            except json.JSONDecodeError:
+                continue
+            for value in cls._json_values_in_document_order(payload):
+                if cls._is_article(value) and key in value:
+                    yield value[key]
 
     @staticmethod
     def _canonical_source(canonical_href: Optional[str], source_url: str) -> str:

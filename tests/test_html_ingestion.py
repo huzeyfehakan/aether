@@ -139,6 +139,52 @@ class RawHtmlIngestionTests(unittest.TestCase):
             "Prose with an inline citation inside it.",
         )
 
+    def test_falls_back_to_open_graph_locale_when_html_has_no_lang(self):
+        """TRT Avaz declares the document language only through og:locale."""
+        html = (FIXTURES / "trt_avaz_haber.html").read_text(encoding="utf-8")
+
+        result = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url="https://www.trtavaz.com.tr/haber/tur/avrasyadan/aselsan-dan-2026-nin-ilk-yarisinda-rekor-buyume/6a72f74e6b61e0f45f28c685",
+                publisher="TRT Avaz",
+                article_type="news_report",
+                observed_at=OBSERVED_AT,
+            )
+        )
+
+        self.assertEqual(result.article.original_language, "tr-TR")
+        self.assertEqual([passage.language for passage in result.passages], ["tr-TR", "tr-TR"])
+
+    def test_falls_back_to_json_ld_in_language_when_no_lang_or_locale(self):
+        html = """
+            <html><head><title>JSON-LD language</title>
+              <script type="application/ld+json">
+                {"@context": "https://schema.org", "@type": "NewsArticle",
+                 "inLanguage": "en"}
+              </script>
+            </head><body><main><p>Visible article paragraph.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(result.article.original_language, "en")
+
+    def test_prefers_html_lang_over_locale_and_json_ld_language(self):
+        html = """
+            <html lang="tr"><head><title>Language precedence</title>
+              <meta property="og:locale" content="de_DE" />
+              <script type="application/ld+json">
+                {"@context": "https://schema.org", "@type": "Article",
+                 "inLanguage": "fr"}
+              </script>
+            </head><body><main><p>Visible article paragraph.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(result.article.original_language, "tr")
+
     def test_uses_only_the_document_head_title_and_ignores_svg_titles(self):
         html = """
             <html lang="en">

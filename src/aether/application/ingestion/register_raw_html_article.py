@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from html import unescape
 from html.parser import HTMLParser
 import json
 from typing import Any, Dict, List, Optional, Tuple
@@ -203,6 +204,18 @@ def _normalize_text(value: str) -> str:
     return " ".join(value.split())
 
 
+def _normalize_json_ld_text(value: str) -> str:
+    """Decode character references in a JSON-LD string value.
+
+    JSON-LD lives inside a ``<script>`` element, where the HTML parser does not
+    resolve character references. Every other text source in this module
+    arrives already decoded, so a single decode keeps JSON-LD values consistent
+    with them. Only one pass is applied: repeating it would corrupt text that
+    legitimately contains an escaped entity.
+    """
+    return _normalize_text(unescape(value))
+
+
 def _rel_tokens(value: str) -> Tuple[str, ...]:
     """Split an HTML ``rel`` attribute into its space-separated link types."""
     return tuple(token.lower() for token in value.split())
@@ -252,7 +265,12 @@ class HtmlArticleNormalizer:
         collector.feed(raw_article.html)
         collector.close()
 
+        # og:title outranks a JSON-LD headline deliberately. Both are declared
+        # by the publisher, but og:title arrives through the HTML parser with
+        # its character references already resolved, whereas a headline is only
+        # as well-formed as the publisher's own JSON-LD escaping.
         title = self._first_metadata(collector.metadata, self._TITLE_META_KEYS)
+        title = title or self._json_ld_text(collector.json_ld_documents, "headline")
         title = title or _normalize_text(" ".join(collector.title_parts))
         title = title or self._innermost_heading(collector.headings)
         if not title:
@@ -282,9 +300,13 @@ class HtmlArticleNormalizer:
             language=language.strip(),
             published_at=published_at,
             updated_at=updated_at,
-            author=self._first_metadata(collector.metadata, self._AUTHOR_META_KEYS),
-            description=self._first_metadata(
-                collector.metadata, self._DESCRIPTION_META_KEYS
+            author=(
+                self._json_ld_author(collector.json_ld_documents)
+                or self._first_metadata(collector.metadata, self._AUTHOR_META_KEYS)
+            ),
+            description=(
+                self._json_ld_text(collector.json_ld_documents, "description")
+                or self._first_metadata(collector.metadata, self._DESCRIPTION_META_KEYS)
             ),
             keywords=self._first_metadata(collector.metadata, self._KEYWORD_META_KEYS),
         )
@@ -311,6 +333,32 @@ class HtmlArticleNormalizer:
         if in_language:
             return in_language
         return raw_article.fallback_language
+
+    @classmethod
+    def _json_ld_text(cls, documents: List[str], key: str) -> Optional[str]:
+        """Return the first Article string value for ``key`` in document order."""
+        for value in cls._json_ld_article_values(documents, key):
+            if isinstance(value, str) and value.strip():
+                return _normalize_json_ld_text(value)
+        return None
+
+    @classmethod
+    def _json_ld_author(cls, documents: List[str]) -> Optional[str]:
+        """Return the first Article author name in document order.
+
+        Schema.org allows a bare string, a Person/Organization object, or a
+        list of either. Only the declared name is read; nothing is composed.
+        """
+        for value in cls._json_ld_article_values(documents, "author"):
+            candidates = value if isinstance(value, list) else [value]
+            for candidate in candidates:
+                if isinstance(candidate, str) and candidate.strip():
+                    return _normalize_text(candidate)
+                if isinstance(candidate, dict):
+                    name = candidate.get("name")
+                    if isinstance(name, str) and name.strip():
+                        return _normalize_text(name)
+        return None
 
     @classmethod
     def _json_ld_in_language(cls, documents: List[str]) -> Optional[str]:
@@ -496,6 +544,20 @@ class HtmlArticleNormalizer:
     def _updated_at(
         self, collector: _ArticleHtmlCollector, raw_article: RawHtmlArticle
     ) -> Optional[datetime]:
+        """Mirror the documented published-at precedence for the modified date.
+
+        A JSON-LD Article ``dateModified`` outranks the meta tags, matching the
+        precedence already documented for ``datePublished``. As with the
+        published date, a selected value must parse or fail explicitly; this
+        never falls back to a lower-priority source.
+        """
+        json_ld_updated_value = self._json_ld_text(
+            collector.json_ld_documents, "dateModified"
+        )
+        if json_ld_updated_value is not None:
+            return _parse_source_timestamp(
+                json_ld_updated_value, "JSON-LD Article dateModified"
+            )
         updated_value = self._first_metadata(collector.metadata, self._UPDATED_META_KEYS)
         if updated_value:
             return _parse_source_timestamp(updated_value, "updated_at")

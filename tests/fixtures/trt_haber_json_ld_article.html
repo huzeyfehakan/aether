@@ -1,0 +1,32 @@
+<!doctype html>
+<!--
+  Source-derived regression fixture:
+  https://www.trthaber.com/haber/gundem/12-maddelik-milli-dayanisma-teklifinin-detaylari-netlesti-953155.html
+  Captured for deterministic offline validation on 2026-08-05.
+  TRT Haber publishes an Organization JSON-LD block before the Article block and
+  carries its dates, byline, headline and description only in JSON-LD; no
+  article:published_time or article:modified_time meta tag is emitted.
+-->
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <title>12 Maddelik "Milli Dayanışma" Teklifinin detayları netleşti | TRT Haber</title>
+    <link rel="canonical" href="https://www.trthaber.com/haber/gundem/12-maddelik-milli-dayanisma-teklifinin-detaylari-netlesti-953155.html" />
+    <script type="application/ld+json">
+      {"@context": "https://schema.org", "@type": "Organization",
+       "name": "TRT Haber", "url": "https://www.trthaber.com/"}
+    </script>
+    <script type="application/ld+json">
+      {"@context": "https://schema.org", "@type": "NewsArticle",
+       "headline": "12 Maddelik Milli Dayanışma Teklifinin detayları netleşti",
+       "description": "Kanun teklifinin maddeleri ve süreç işleyişi belli oldu.",
+       "datePublished": "2026-08-05 12:43:00+03:00",
+       "dateModified": "2026-08-05 14:10:44+03:00",
+       "author": {"@type": "Organization", "name": "TRT Haber"}}
+    </script>
+  </head>
+  <body>
+    <p>Hazırlanan kanun teklifi metnine göre sürecin işleyişi netleşti.</p>
+    <p>Teklif 12 maddeden oluşuyor ve kapsamı ayrıntılı biçimde tanımlandı.</p>
+  </body>
+</html>

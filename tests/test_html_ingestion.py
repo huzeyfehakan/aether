@@ -185,6 +185,136 @@ class RawHtmlIngestionTests(unittest.TestCase):
 
         self.assertEqual(result.article.original_language, "tr")
 
+    def test_reads_headline_description_author_and_dates_from_json_ld(self):
+        """TRT Haber carries these fields only in JSON-LD, after an Organization block."""
+        html = (FIXTURES / "trt_haber_json_ld_article.html").read_text(encoding="utf-8")
+
+        result = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url="https://www.trthaber.com/haber/gundem/12-maddelik-milli-dayanisma-teklifinin-detaylari-netlesti-953155.html",
+                publisher="TRT Haber",
+                article_type="news_report",
+                observed_at=OBSERVED_AT,
+            )
+        )
+
+        version = result.article_version
+        self.assertEqual(
+            version.title, "12 Maddelik Milli Dayanışma Teklifinin detayları netleşti"
+        )
+        self.assertEqual(
+            version.description, "Kanun teklifinin maddeleri ve süreç işleyişi belli oldu."
+        )
+        self.assertEqual(version.author, "TRT Haber")
+        self.assertEqual(
+            version.source_published_at.isoformat(), "2026-08-05T12:43:00+03:00"
+        )
+        self.assertEqual(
+            version.source_updated_at.isoformat(), "2026-08-05T14:10:44+03:00"
+        )
+
+    def test_json_ld_author_accepts_string_and_list_forms(self):
+        for author_json, expected in (
+            ('"Ayşe Yılmaz"', "Ayşe Yılmaz"),
+            ('[{"@type": "Person", "name": "Ayşe Yılmaz"}]', "Ayşe Yılmaz"),
+            ('{"@type": "Person", "name": "Ayşe Yılmaz"}', "Ayşe Yılmaz"),
+        ):
+            with self.subTest(author=author_json):
+                html = f"""
+                    <html lang="tr"><head><title>Author shapes</title>
+                      <script type="application/ld+json">
+                        {{"@type": "Article", "author": {author_json}}}
+                      </script>
+                    </head><body><main><p>Görünür paragraf.</p></main></body></html>
+                """
+                result = RegisterRawHtmlArticle(InMemoryContentRepository()).execute(
+                    RawHtmlArticle(
+                        html=html,
+                        source_url=f"https://source.example.org/author-{len(author_json)}",
+                        publisher="TRT",
+                        article_type="news_report",
+                        observed_at=OBSERVED_AT,
+                    )
+                )
+                self.assertEqual(result.article_version.author, expected)
+
+    def test_json_ld_metadata_takes_precedence_over_meta_tags(self):
+        html = """
+            <html lang="tr"><head>
+              <title>Meta title</title>
+              <meta name="description" content="Meta description." />
+              <meta name="author" content="Meta author" />
+              <meta property="article:modified_time" content="2026-07-22T12:00:00+03:00" />
+              <script type="application/ld+json">
+                {"@type": "NewsArticle", "headline": "JSON-LD headline",
+                 "description": "JSON-LD description.", "author": "JSON-LD author",
+                 "dateModified": "2026-07-22T18:00:00+03:00"}
+              </script>
+            </head><body><main><p>Görünür paragraf.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        version = result.article_version
+        self.assertEqual(version.title, "JSON-LD headline")
+        self.assertEqual(version.description, "JSON-LD description.")
+        self.assertEqual(version.author, "JSON-LD author")
+        self.assertEqual(
+            version.source_updated_at.isoformat(), "2026-07-22T18:00:00+03:00"
+        )
+
+    def test_open_graph_title_outranks_a_json_ld_headline(self):
+        """og:title is decoded by the HTML parser; a headline may be mis-escaped."""
+        html = """
+            <html lang="tr"><head>
+              <title>Document title</title>
+              <meta property="og:title" content="Open Graph title" />
+              <script type="application/ld+json">
+                {"@type": "NewsArticle", "headline": "JSON-LD headline"}
+              </script>
+            </head><body><main><p>Görünür paragraf.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(result.article_version.title, "Open Graph title")
+
+    def test_decodes_character_references_inside_json_ld_values(self):
+        """JSON-LD sits in a script element, where the parser leaves entities raw."""
+        html = """
+            <html lang="tr"><head><title>Entities</title>
+              <script type="application/ld+json">
+                {"@type": "NewsArticle",
+                 "description": "&quot;Milli Dayan&#305;&#351;ma&quot; teklifi."}
+              </script>
+            </head><body><main><p>Görünür paragraf.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(
+            result.article_version.description, '"Milli Dayanışma" teklifi.'
+        )
+
+    def test_falls_back_to_meta_tags_when_json_ld_omits_a_field(self):
+        html = """
+            <html lang="tr"><head>
+              <title>Meta title</title>
+              <meta name="description" content="Meta description." />
+              <meta name="author" content="Meta author" />
+              <script type="application/ld+json">
+                {"@type": "NewsArticle", "headline": "JSON-LD headline"}
+              </script>
+            </head><body><main><p>Görünür paragraf.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(result.article_version.title, "JSON-LD headline")
+        self.assertEqual(result.article_version.description, "Meta description.")
+        self.assertEqual(result.article_version.author, "Meta author")
+
     def test_uses_only_the_document_head_title_and_ignores_svg_titles(self):
         html = """
             <html lang="en">

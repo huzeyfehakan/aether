@@ -7,14 +7,22 @@
   <article> element, a publication-date paragraph, an author paragraph, a legal
   notice, and link-wrapped recommendation cards inside the same container as the
   article prose.
-  The live page's JSON-LD carries a date-only datePublished, which ingestion does
-  not accept yet; it is omitted here so this fixture exercises body extraction.
+  The JSON-LD block reproduces the live page's date-only datePublished and
+  dateModified values, which Schema.org permits and which this publisher emits.
 -->
 <html lang="tr">
   <head>
     <meta charset="utf-8" />
     <title>Aşırı Uyumlu Çocuklar Neyi Saklar? - Ebeveyn Akademisi</title>
     <link rel="canonical" href="https://ebeveynakademisi.trtcocuk.net.tr/makale/asiri-uyumlu-cocuklar-neyi-saklar-32449390" />
+    <script type="application/ld+json">
+      {"@context": "https://schema.org", "@type": "NewsArticle",
+       "headline": "Aşırı Uyumlu Çocuklar Neyi Saklar?",
+       "description": "Aşırı uyumlu çocuklar çoğu zaman kolay çocuk olarak tanımlanır.",
+       "datePublished": "2026-08-03",
+       "dateModified": "2026-08-03",
+       "author": {"@type": "Organization", "name": "TRT Çocuk Ebeveyn Akademisi"}}
+    </script>
   </head>
   <body>
     <header><p>TRT Çocuk Ebeveyn Akademisi</p></header>

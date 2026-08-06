@@ -1,10 +1,11 @@
 """Deterministically normalize raw article HTML into existing source snapshots."""
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from html import unescape
 from html.parser import HTMLParser
 import json
+import re
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 
@@ -240,8 +241,33 @@ def canonical_url_from_html(html: str, base_url: Optional[str] = None) -> Option
     return urljoin(base_url, collector.canonical_source)
 
 
+# The ISO-8601 extended calendar date, matched exactly. The pattern is used in
+# preference to date.fromisoformat because that function accepts progressively
+# more ISO-8601 spellings from Python 3.11 onwards, which would make extraction
+# depend on the interpreter version rather than on the published value.
+_DATE_ONLY_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}\Z")
+
+
 def _parse_source_timestamp(value: str, field_name: str) -> datetime:
+    """Parse a publisher timestamp, normalizing a date-only value to midnight UTC.
+
+    Schema.org types ``datePublished`` and ``dateModified`` as Date or DateTime,
+    and publishers such as TRT Çocuk Ebeveyn Akademisi publish the Date form. A
+    date states no time of day, so it is anchored at midnight UTC. This records
+    an instant the publisher did not state, which is acceptable here because the
+    product exposes only the calendar date and whether one is available.
+
+    A value that does state a time of day without a timezone remains an error.
+    Unlike a date, it asserts a time in an unknown zone, so normalizing it would
+    silently move the instant by up to a day.
+    """
     normalized = value.strip().replace("Z", "+00:00")
+    if _DATE_ONLY_PATTERN.match(normalized):
+        try:
+            parsed_date = datetime.strptime(normalized, "%Y-%m-%d")
+        except ValueError as error:
+            raise DomainValidationError(f"{field_name} must be ISO-8601") from error
+        return parsed_date.replace(tzinfo=timezone.utc)
     try:
         parsed = datetime.fromisoformat(normalized)
     except ValueError as error:

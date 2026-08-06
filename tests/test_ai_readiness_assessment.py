@@ -47,12 +47,6 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             article_version_id="version-1",
             total_passage_count=structural_counts[0],
             total_word_count=structural_counts[1],
-            average_passage_length=0.0,
-            heading_count=None,
-            paragraph_count=structural_counts[2],
-            publication_date_available=metadata_available[2],
-            canonical_url_available=metadata_available[1],
-            language_available=metadata_available[4],
         )
         passage_quality = PassageQualityAnalysis(
             article_id="article-1",
@@ -82,11 +76,7 @@ class AIReadinessAssessmentTests(unittest.TestCase):
         self.assertEqual(
             assessment.metadata_completeness, CompletenessClassification.COMPLETE
         )
-        self.assertEqual(
-            assessment.structural_completeness, CompletenessClassification.COMPLETE
-        )
         self.assertTrue(assessment.observations.author_available)
-        self.assertEqual(assessment.observations.total_word_count, 10)
         self.assertFalse(hasattr(assessment, "score"))
 
     def test_classifies_partial_report_from_existing_raw_observations(self):
@@ -102,9 +92,6 @@ class AIReadinessAssessmentTests(unittest.TestCase):
         self.assertEqual(
             assessment.metadata_completeness, CompletenessClassification.PARTIAL
         )
-        self.assertEqual(
-            assessment.structural_completeness, CompletenessClassification.PARTIAL
-        )
 
     def test_classifies_missing_report_without_numeric_scoring(self):
         report = self.report(
@@ -118,9 +105,6 @@ class AIReadinessAssessmentTests(unittest.TestCase):
 
         self.assertEqual(
             assessment.metadata_completeness, CompletenessClassification.MISSING
-        )
-        self.assertEqual(
-            assessment.structural_completeness, CompletenessClassification.MISSING
         )
 
     def test_assessment_is_deterministic_and_immutable(self):

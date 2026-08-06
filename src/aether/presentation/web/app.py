@@ -156,7 +156,6 @@ def _report_view(report: Any) -> Dict[str, Any]:
     return {
         "assessment": {
             "metadata": assessment.metadata_completeness.value,
-            "structure": assessment.structural_completeness.value,
         },
         "metadata": (
             {"label": "Title", "available": metadata.title_available},
@@ -170,7 +169,6 @@ def _report_view(report: Any) -> Dict[str, Any]:
         "structure": {
             "passage_count": structure.total_passage_count,
             "word_count": structure.total_word_count,
-            "paragraph_count": structure.paragraph_count,
         },
         "retrieval": {
             "minimum_passage_word_count": passages.minimum_passage_word_count,
@@ -180,8 +178,6 @@ def _report_view(report: Any) -> Dict[str, Any]:
         "technical": {
             "article_id": report.article_identity.article_id,
             "article_version_id": report.article_identity.article_version_id,
-            "average_passage_length": structure.average_passage_length,
-            "heading_count": structure.heading_count,
         },
     }
 

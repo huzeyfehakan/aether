@@ -36,12 +36,6 @@ class AIReadinessReportRendererTests(unittest.TestCase):
                 article_version_id="version-1",
                 total_passage_count=1,
                 total_word_count=4,
-                average_passage_length=4.0,
-                heading_count=None,
-                paragraph_count=1,
-                publication_date_available=True,
-                canonical_url_available=True,
-                language_available=True,
             ),
             metadata_analysis=MetadataAnalysis(
                 article_id="article-1",
@@ -81,7 +75,6 @@ class AIReadinessReportRendererTests(unittest.TestCase):
 
         self.assertEqual(payload["article_identity"]["article_id"], "article-1")
         self.assertEqual(payload["structural_summary"]["total_word_count"], 4)
-        self.assertIsNone(payload["structural_summary"]["heading_count"])
         self.assertTrue(payload["metadata_summary"]["author_available"])
         self.assertNotIn("score", payload)
         self.assertNotIn("recommendations", payload)
@@ -95,7 +88,6 @@ class AIReadinessReportRendererTests(unittest.TestCase):
         self.assertIn("Metadata Summary", rendered)
         self.assertIn("Passage Quality Summary", rendered)
         self.assertIn("Assessment Summary", rendered)
-        self.assertIn("Heading Count: unavailable", rendered)
         self.assertIn("Metadata Completeness: partial", rendered)
 
     def test_markdown_renderer_includes_report_values_and_profile_table(self):

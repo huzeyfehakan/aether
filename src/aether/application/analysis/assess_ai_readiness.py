@@ -27,9 +27,6 @@ class AIReadinessObservations:
     language_available: bool
     author_available: bool
     description_available: bool
-    total_passage_count: int
-    total_word_count: int
-    paragraph_count: int
 
 
 @dataclass(frozen=True)
@@ -39,7 +36,6 @@ class AIReadinessAssessment:
     report: ArticleAnalysisReport
     observations: AIReadinessObservations
     metadata_completeness: CompletenessClassification
-    structural_completeness: CompletenessClassification
 
 
 class AssessAIReadiness:
@@ -51,13 +47,11 @@ class AssessAIReadiness:
             report=report,
             observations=observations,
             metadata_completeness=self._metadata_completeness(observations),
-            structural_completeness=self._structural_completeness(observations),
         )
 
     @staticmethod
     def _observations_from(report: ArticleAnalysisReport) -> AIReadinessObservations:
         metadata = report.metadata_analysis
-        structural = report.structural_analysis
         return AIReadinessObservations(
             title_available=metadata.title_available,
             canonical_url_available=metadata.canonical_url_available,
@@ -66,9 +60,6 @@ class AssessAIReadiness:
             language_available=metadata.language_available,
             author_available=metadata.author_available,
             description_available=metadata.description_available,
-            total_passage_count=structural.total_passage_count,
-            total_word_count=structural.total_word_count,
-            paragraph_count=structural.paragraph_count,
         )
 
     @staticmethod
@@ -90,17 +81,3 @@ class AssessAIReadiness:
             return CompletenessClassification.PARTIAL
         return CompletenessClassification.MISSING
 
-    @staticmethod
-    def _structural_completeness(
-        observations: AIReadinessObservations,
-    ) -> CompletenessClassification:
-        structural_counts = (
-            observations.total_passage_count,
-            observations.total_word_count,
-            observations.paragraph_count,
-        )
-        if all(count > 0 for count in structural_counts):
-            return CompletenessClassification.COMPLETE
-        if any(count > 0 for count in structural_counts):
-            return CompletenessClassification.PARTIAL
-        return CompletenessClassification.MISSING

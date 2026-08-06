@@ -131,14 +131,13 @@
         const assessment = view.assessment;
         const cards = [
           ['Metadata', assessment.metadata, 'Fields an AI system needs to identify and attribute this article'],
-          ['Structure', assessment.structure, 'Passages, words, and paragraphs are present'],
         ];
         document.querySelector('#assessment-grid').innerHTML = cards.map(([title, value, description]) => `<div class="assessment-card"><p>${description}</p><h3>${title}</h3>${statusBadge(value)}</div>`).join('');
         document.querySelector('#report-state').className = `badge ${assessment.metadata}`;
         document.querySelector('#report-state').textContent = 'Assessment available';
 
         const structure = view.structure;
-        document.querySelector('#structure-metrics').innerHTML = [metric('Passages', structure.passage_count), metric('Paragraphs', structure.paragraph_count), metric('Words', structure.word_count)].join('');
+        document.querySelector('#structure-metrics').innerHTML = [metric('Passages', structure.passage_count), metric('Words', structure.word_count)].join('');
 
         const missing = view.metadata.filter((field) => !field.available);
         document.querySelector('#metadata-summary').textContent = missing.length ? `${missing.length} metadata field${missing.length === 1 ? '' : 's'} missing from the stored article.` : 'All currently assessed metadata fields are available.';

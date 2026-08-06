@@ -20,9 +20,6 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
         "structural_summary": {
             "total_passage_count": report.structural_summary.total_passage_count,
             "total_word_count": report.structural_summary.total_word_count,
-            "average_passage_length": report.structural_summary.average_passage_length,
-            "heading_count": report.structural_summary.heading_count,
-            "paragraph_count": report.structural_summary.paragraph_count,
         },
         "metadata_summary": {
             "title_available": report.metadata_summary.title_available,
@@ -58,9 +55,6 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
             "metadata_completeness": (
                 report.assessment_summary.metadata_completeness.value
             ),
-            "structural_completeness": (
-                report.assessment_summary.structural_completeness.value
-            ),
         },
     }
 
@@ -90,9 +84,6 @@ class PlainTextAIReadinessReportRenderer:
             "Structural Summary",
             f"Total Passages: {structural.total_passage_count}",
             f"Total Words: {structural.total_word_count}",
-            f"Average Passage Length: {structural.average_passage_length}",
-            f"Heading Count: {_display_optional(structural.heading_count)}",
-            f"Paragraph Count: {structural.paragraph_count}",
             "",
             "Metadata Summary",
             f"Title Available: {metadata.title_available}",
@@ -111,7 +102,6 @@ class PlainTextAIReadinessReportRenderer:
             "",
             "Assessment Summary",
             f"Metadata Completeness: {assessment.metadata_completeness.value}",
-            f"Structural Completeness: {assessment.structural_completeness.value}",
         )
         return "\n".join(lines)
 
@@ -136,9 +126,6 @@ class MarkdownAIReadinessReportRenderer:
             "",
             f"- Total passages: {structural.total_passage_count}",
             f"- Total words: {structural.total_word_count}",
-            f"- Average passage length: {structural.average_passage_length}",
-            f"- Heading count: {_display_optional(structural.heading_count)}",
-            f"- Paragraph count: {structural.paragraph_count}",
             "",
             "## Metadata Summary",
             "",
@@ -172,7 +159,6 @@ class MarkdownAIReadinessReportRenderer:
                 "## Assessment Summary",
                 "",
                 f"- Metadata completeness: {assessment.metadata_completeness.value}",
-                f"- Structural completeness: {assessment.structural_completeness.value}",
             )
         )
         return "\n".join(lines)

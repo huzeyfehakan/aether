@@ -32,12 +32,6 @@ class AIReadinessReportTests(unittest.TestCase):
                 article_version_id="version-1",
                 total_passage_count=2,
                 total_word_count=12,
-                average_passage_length=6.0,
-                heading_count=None,
-                paragraph_count=2,
-                publication_date_available=True,
-                canonical_url_available=True,
-                language_available=True,
             ),
             metadata_analysis=MetadataAnalysis(
                 article_id="article-1",
@@ -81,15 +75,11 @@ class AIReadinessReportTests(unittest.TestCase):
         self.assertEqual(report.article_identity.article_id, "article-1")
         self.assertEqual(report.article_identity.article_version_id, "version-1")
         self.assertEqual(report.structural_summary.total_word_count, 12)
-        self.assertEqual(report.structural_summary.paragraph_count, 2)
         self.assertTrue(report.metadata_summary.title_available)
         self.assertTrue(report.metadata_summary.author_available)
         self.assertEqual(len(report.passage_quality_summary.passage_profiles), 2)
         self.assertEqual(
             report.assessment_summary.metadata_completeness.value, "partial"
-        )
-        self.assertEqual(
-            report.assessment_summary.structural_completeness.value, "complete"
         )
         self.assertFalse(hasattr(report, "score"))
         self.assertFalse(hasattr(report, "recommendations"))
@@ -112,10 +102,6 @@ class AIReadinessReportTests(unittest.TestCase):
         self.assertIs(
             report.assessment_summary.metadata_completeness,
             assessment.metadata_completeness,
-        )
-        self.assertIs(
-            report.assessment_summary.structural_completeness,
-            assessment.structural_completeness,
         )
 
 

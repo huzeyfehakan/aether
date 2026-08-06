@@ -20,9 +20,6 @@ class ArticleIdentitySummary:
 class StructuralSummary:
     total_passage_count: int
     total_word_count: int
-    average_passage_length: float
-    heading_count: Optional[int]
-    paragraph_count: int
 
 
 @dataclass(frozen=True)
@@ -48,7 +45,6 @@ class PassageQualitySummary:
 @dataclass(frozen=True)
 class AssessmentSummary:
     metadata_completeness: CompletenessClassification
-    structural_completeness: CompletenessClassification
 
 
 @dataclass(frozen=True)
@@ -78,9 +74,6 @@ class BuildAIReadinessReport:
             structural_summary=StructuralSummary(
                 total_passage_count=structural.total_passage_count,
                 total_word_count=structural.total_word_count,
-                average_passage_length=structural.average_passage_length,
-                heading_count=structural.heading_count,
-                paragraph_count=structural.paragraph_count,
             ),
             metadata_summary=MetadataSummary(
                 title_available=metadata.title_available,
@@ -100,6 +93,5 @@ class BuildAIReadinessReport:
             ),
             assessment_summary=AssessmentSummary(
                 metadata_completeness=assessment.metadata_completeness,
-                structural_completeness=assessment.structural_completeness,
             ),
         )

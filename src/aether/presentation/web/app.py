@@ -14,6 +14,7 @@ from aether.application.analysis.analyze_article_metadata import AnalyzeArticleM
 from aether.application.analysis.analyze_article_structure import AnalyzeArticleStructure
 from aether.application.analysis.analyze_content_duplication import AnalyzeContentDuplication
 from aether.application.analysis.analyze_passage_quality import AnalyzePassageQuality
+from aether.application.analysis.analyze_structured_data import AnalyzeStructuredData
 from aether.application.analysis.assess_ai_readiness import AssessAIReadiness
 from aether.application.analysis.build_ai_readiness_report import BuildAIReadinessReport
 from aether.application.analysis.build_article_analysis_report import BuildArticleAnalysisReport
@@ -26,8 +27,12 @@ from aether.domain.common import DomainValidationError
 from aether.presentation.ai_readiness_report_renderers import (
     PlainTextAIReadinessReportRenderer,
 )
+from aether.application.analysis.derive_editor_recommendations import (
+    RecommendationCategory,
+)
 from aether.presentation.editor_recommendation_text import (
     compared_articles_phrase,
+    missing_properties_phrase,
     recommendation_text,
     repeated_in_phrase,
 )
@@ -54,6 +59,7 @@ class AIReadinessPipeline:
             # corpus, so repeated text is reported once a second article
             # from the same publisher has been analysed.
             AnalyzeContentDuplication(repository),
+            AnalyzeStructuredData(repository),
         )
         self._assess_readiness = AssessAIReadiness()
         self._build_readiness_report = BuildAIReadinessReport()
@@ -156,6 +162,30 @@ def _publisher_from(source_url: str, publisher: Optional[str]) -> str:
     return hostname.removeprefix("www.")
 
 
+def _recommendation_views(report: Any, category) -> list:
+    """Shape one category of recommendations for display."""
+    views = []
+    for recommendation in report.editor_recommendations:
+        if recommendation.category is not category:
+            continue
+        text = recommendation_text(recommendation)
+        view = {
+            "headline": text.headline,
+            "why_it_matters": text.why_it_matters,
+            "what_to_do": text.what_to_do,
+        }
+        if recommendation.excerpt:
+            view["excerpt"] = recommendation.excerpt
+        if recommendation.other_article_count:
+            view["detail"] = repeated_in_phrase(recommendation.other_article_count)
+        if recommendation.missing_properties:
+            view["detail"] = missing_properties_phrase(
+                recommendation.missing_properties
+            )
+        views.append(view)
+    return views
+
+
 def _report_view(report: Any) -> Dict[str, Any]:
     """Expose existing report facts for the web UI without re-assessing them."""
 
@@ -185,27 +215,25 @@ def _report_view(report: Any) -> Dict[str, Any]:
             "median_passage_word_count": passages.median_passage_word_count,
             "maximum_passage_word_count": passages.maximum_passage_word_count,
         },
-        "reuse": (
+        "ai_visibility": (
+            None
+            if report.structured_data_summary is None
+            else {
+                "recommendations": _recommendation_views(
+                    report, RecommendationCategory.AI_VISIBILITY
+                ),
+            }
+        ),
+        "content_quality": (
             None
             if report.content_reuse_summary is None
             else {
                 "compared_articles": compared_articles_phrase(
                     report.content_reuse_summary.compared_article_count
                 ),
-                "recommendations": [
-                    {
-                        "headline": recommendation_text(recommendation).headline,
-                        "repeated_in": repeated_in_phrase(
-                            recommendation.other_article_count
-                        ),
-                        "excerpt": recommendation.excerpt,
-                        "why_it_matters": recommendation_text(
-                            recommendation
-                        ).why_it_matters,
-                        "what_to_do": recommendation_text(recommendation).what_to_do,
-                    }
-                    for recommendation in report.editor_recommendations
-                ],
+                "recommendations": _recommendation_views(
+                    report, RecommendationCategory.CONTENT_QUALITY
+                ),
             }
         ),
         "technical": {

@@ -37,11 +37,19 @@ class RecommendationCode(str, Enum):
     """The recommendations this MVP can justify from deterministic facts."""
 
     REPEATED_TEXT_IN_ARTICLE_BODY = "repeated_text_in_article_body"
+    NO_ARTICLE_STRUCTURED_DATA = "no_article_structured_data"
+    INCOMPLETE_ARTICLE_STRUCTURED_DATA = "incomplete_article_structured_data"
 
 
 _CATEGORIES = {
     RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY: (
         RecommendationCategory.CONTENT_QUALITY
+    ),
+    RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: (
+        RecommendationCategory.AI_VISIBILITY
+    ),
+    RecommendationCode.INCOMPLETE_ARTICLE_STRUCTURED_DATA: (
+        RecommendationCategory.AI_VISIBILITY
     ),
 }
 
@@ -51,9 +59,10 @@ class EditorRecommendation:
     """One improvement an editor can make, with the evidence behind it."""
 
     code: RecommendationCode
-    excerpt: str
-    passage_ids: Tuple[str, ...]
-    other_article_count: int
+    excerpt: str = ""
+    passage_ids: Tuple[str, ...] = ()
+    other_article_count: int = 0
+    missing_properties: Tuple[str, ...] = ()
 
     @property
     def category(self) -> RecommendationCategory:
@@ -64,6 +73,34 @@ class DeriveEditorRecommendations:
     """Derive editor-facing advice from an existing analysis report."""
 
     def execute(self, report: ArticleAnalysisReport) -> Tuple[EditorRecommendation, ...]:
+        return self._structured_data(report) + self._content_quality(report)
+
+    @staticmethod
+    def _structured_data(
+        report: ArticleAnalysisReport,
+    ) -> Tuple[EditorRecommendation, ...]:
+        analysis = report.structured_data_analysis
+        if analysis is None:
+            return ()
+        if not analysis.article_node_present:
+            return (
+                EditorRecommendation(
+                    code=RecommendationCode.NO_ARTICLE_STRUCTURED_DATA,
+                ),
+            )
+        if analysis.missing_article_properties:
+            return (
+                EditorRecommendation(
+                    code=RecommendationCode.INCOMPLETE_ARTICLE_STRUCTURED_DATA,
+                    missing_properties=analysis.missing_article_properties,
+                ),
+            )
+        return ()
+
+    @staticmethod
+    def _content_quality(
+        report: ArticleAnalysisReport,
+    ) -> Tuple[EditorRecommendation, ...]:
         duplication = report.content_duplication_analysis
         if duplication is None:
             return ()

@@ -4,9 +4,13 @@ import json
 from typing import Any, Dict
 
 from aether.application.analysis.build_ai_readiness_report import AIReadinessReport
+from aether.application.analysis.derive_editor_recommendations import (
+    RecommendationCategory,
+)
 from aether.presentation.editor_recommendation_text import (
     category_title,
     compared_articles_phrase,
+    missing_properties_phrase,
     recommendation_text,
     repeated_in_phrase,
 )
@@ -133,35 +137,64 @@ class PlainTextAIReadinessReportRenderer:
             "Assessment Summary",
             f"Metadata Completeness: {assessment.metadata_completeness.value}",
         )
-        return "\n".join(lines + self._recommendation_lines(report))
+        return "\n".join(list(lines) + list(self._recommendation_lines(report)))
 
     @staticmethod
     def _recommendation_lines(report: AIReadinessReport) -> tuple:
-        if report.content_reuse_summary is None:
-            return ()
-        lines = [
-            "",
-            "Content Quality",
-            compared_articles_phrase(
-                report.content_reuse_summary.compared_article_count
-            ),
-        ]
-        if not report.editor_recommendations:
-            if report.content_reuse_summary.compared_article_count:
-                lines.append("No repeated text was found in this article.")
-            return tuple(lines)
-        for recommendation in report.editor_recommendations:
-            text = recommendation_text(recommendation)
-            lines.extend(
-                (
-                    "",
-                    f"{text.headline}",
-                    f"  {repeated_in_phrase(recommendation.other_article_count)}",
-                    f'  "{recommendation.excerpt}"',
-                    f"  Why it matters: {text.why_it_matters}",
-                    f"  What to do: {text.what_to_do}",
+        lines = []
+        for category in (
+            RecommendationCategory.AI_VISIBILITY,
+            RecommendationCategory.CONTENT_QUALITY,
+        ):
+            in_category = [
+                recommendation
+                for recommendation in report.editor_recommendations
+                if recommendation.category is category
+            ]
+            if category is RecommendationCategory.CONTENT_QUALITY:
+                if report.content_reuse_summary is None:
+                    continue
+                lines.extend(
+                    (
+                        "",
+                        category_title(category),
+                        compared_articles_phrase(
+                            report.content_reuse_summary.compared_article_count
+                        ),
+                    )
                 )
-            )
+                if not in_category:
+                    if report.content_reuse_summary.compared_article_count:
+                        lines.append("No repeated text was found in this article.")
+                    continue
+            else:
+                if report.structured_data_summary is None:
+                    continue
+                lines.extend(("", category_title(category)))
+                if not in_category:
+                    lines.append(
+                        "Nothing to improve: this article declares itself completely."
+                    )
+                    continue
+            for recommendation in in_category:
+                text = recommendation_text(recommendation)
+                lines.extend(("", text.headline))
+                if recommendation.other_article_count:
+                    lines.append(
+                        f"  {repeated_in_phrase(recommendation.other_article_count)}"
+                    )
+                if recommendation.missing_properties:
+                    lines.append(
+                        f"  {missing_properties_phrase(recommendation.missing_properties)}"
+                    )
+                if recommendation.excerpt:
+                    lines.append(f'  "{recommendation.excerpt}"')
+                lines.extend(
+                    (
+                        f"  Why it matters: {text.why_it_matters}",
+                        f"  What to do: {text.what_to_do}",
+                    )
+                )
         return tuple(lines)
 
 

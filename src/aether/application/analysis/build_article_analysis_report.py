@@ -15,6 +15,10 @@ from aether.application.analysis.analyze_content_duplication import (
     AnalyzeContentDuplication,
     ContentDuplicationAnalysis,
 )
+from aether.application.analysis.analyze_structured_data import (
+    AnalyzeStructuredData,
+    StructuredDataAnalysis,
+)
 from aether.application.analysis.analyze_passage_quality import (
     AnalyzePassageQuality,
     PassageQualityAnalysis,
@@ -37,6 +41,7 @@ class ArticleAnalysisReport:
     metadata_analysis: MetadataAnalysis
     passage_quality_analysis: PassageQualityAnalysis
     content_duplication_analysis: Optional[ContentDuplicationAnalysis] = None
+    structured_data_analysis: Optional[StructuredDataAnalysis] = None
 
     def __post_init__(self) -> None:
         analyses = [
@@ -46,6 +51,8 @@ class ArticleAnalysisReport:
         ]
         if self.content_duplication_analysis is not None:
             analyses.append(self.content_duplication_analysis)
+        if self.structured_data_analysis is not None:
+            analyses.append(self.structured_data_analysis)
         article_ids = {analysis.article_id for analysis in analyses}
         version_ids = {analysis.article_version_id for analysis in analyses}
         if len(article_ids) != 1 or len(version_ids) != 1:
@@ -63,11 +70,13 @@ class BuildArticleAnalysisReport:
         metadata_analysis: AnalyzeArticleMetadata,
         passage_quality_analysis: AnalyzePassageQuality,
         content_duplication_analysis: Optional[AnalyzeContentDuplication] = None,
+        structured_data_analysis: Optional[AnalyzeStructuredData] = None,
     ) -> None:
         self._structure_analysis = structure_analysis
         self._metadata_analysis = metadata_analysis
         self._passage_quality_analysis = passage_quality_analysis
         self._content_duplication_analysis = content_duplication_analysis
+        self._structured_data_analysis = structured_data_analysis
 
     def execute(self, article: Article, article_version_id: str) -> ArticleAnalysisReport:
         return ArticleAnalysisReport(
@@ -79,6 +88,11 @@ class BuildArticleAnalysisReport:
             content_duplication_analysis=(
                 self._content_duplication_analysis.execute(article, article_version_id)
                 if self._content_duplication_analysis is not None
+                else None
+            ),
+            structured_data_analysis=(
+                self._structured_data_analysis.execute(article, article_version_id)
+                if self._structured_data_analysis is not None
                 else None
             ),
         )

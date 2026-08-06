@@ -98,7 +98,9 @@
 
         <div class="section"><h3>Retrieval shape</h3><p id="retrieval-summary">How the article divides into the passages an AI system would retrieve and cite.</p><div id="retrieval-metrics" class="metric-grid"></div></div>
 
-        <div class="section" id="reuse-section"><h3>Content Quality</h3><p id="reuse-compared"></p><div id="reuse-list"></div></div>
+        <div class="section" id="visibility-section"><h3>AI Visibility Recommendations</h3><p class="muted">What this article tells AI systems about itself.</p><div id="visibility-list"></div></div>
+
+        <div class="section" id="quality-section"><h3>Content Quality</h3><p id="quality-compared"></p><div id="quality-list"></div></div>
 
         <details class="technical"><summary>Technical details</summary><p class="help">Immutable identifiers and the existing plain-text report are retained for validation and troubleshooting.</p><pre id="report"></pre></details>
       </section>
@@ -151,14 +153,23 @@
         const retrieval = view.retrieval;
         const words = (value) => value === null ? 'unavailable' : `${value} words`;
         document.querySelector('#retrieval-metrics').innerHTML = [metric('Shortest passage', words(retrieval.minimum_passage_word_count)), metric('Median passage', words(retrieval.median_passage_word_count)), metric('Longest passage', words(retrieval.maximum_passage_word_count))].join('');
-        const reuse = view.reuse;
-        const reuseSection = document.querySelector('#reuse-section');
-        reuseSection.classList.toggle('hidden', !reuse);
-        if (reuse) {
-          document.querySelector('#reuse-compared').textContent = reuse.compared_articles;
-          document.querySelector('#reuse-list').innerHTML = reuse.recommendations.length
-            ? reuse.recommendations.map((item) => `<div class="recommendation"><h4>${item.headline}</h4><span class="repeat-count">${item.repeated_in}</span><blockquote>${item.excerpt}</blockquote><p><strong>Why it matters.</strong> ${item.why_it_matters}</p><p><strong>What to do.</strong> ${item.what_to_do}</p></div>`).join('')
-            : '<p class="muted">Nothing to improve here — no repeated text was found in this article.</p>';
+        const card = (item) => `<div class="recommendation"><h4>${item.headline}</h4>${item.detail ? `<span class="repeat-count">${item.detail}</span>` : ''}${item.excerpt ? `<blockquote>${item.excerpt}</blockquote>` : ''}<p><strong>Why it matters.</strong> ${item.why_it_matters}</p><p><strong>What to do.</strong> ${item.what_to_do}</p></div>`;
+
+        const visibility = view.ai_visibility;
+        document.querySelector('#visibility-section').classList.toggle('hidden', !visibility);
+        if (visibility) {
+          document.querySelector('#visibility-list').innerHTML = visibility.recommendations.length
+            ? visibility.recommendations.map(card).join('')
+            : '<p class="muted">Nothing to improve — this article declares itself completely.</p>';
+        }
+
+        const quality = view.content_quality;
+        document.querySelector('#quality-section').classList.toggle('hidden', !quality);
+        if (quality) {
+          document.querySelector('#quality-compared').textContent = quality.compared_articles;
+          document.querySelector('#quality-list').innerHTML = quality.recommendations.length
+            ? quality.recommendations.map(card).join('')
+            : '<p class="muted">No repeated text was found in this article.</p>';
         }
         document.querySelector('#report').textContent = rawReport;
       }

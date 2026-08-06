@@ -160,7 +160,7 @@ class WebPresentationTests(unittest.TestCase):
             )
             self.assertEqual(response.status_code, 200)
 
-        reuse = response.json()["view"]["reuse"]
+        reuse = response.json()["view"]["content_quality"]
         self.assertEqual(
             reuse["compared_articles"],
             "Checked against 1 other article from this publisher.",
@@ -171,15 +171,17 @@ class WebPresentationTests(unittest.TestCase):
             recommendation["headline"],
             "This paragraph also appears in your other articles",
         )
-        self.assertEqual(recommendation["repeated_in"], "Also appears in 1 other article")
+        self.assertEqual(recommendation["detail"], "Also appears in 1 other article")
         self.assertIn("outside the article body", recommendation["what_to_do"])
         self.assertIn("Bu icerik bilgilendirme", recommendation["excerpt"])
 
     def test_index_shows_the_content_quality_section(self):
         response = self.client.get("/")
 
-        self.assertIn('id="reuse-section"', response.text)
+        self.assertIn('id="quality-section"', response.text)
+        self.assertIn('id="visibility-section"', response.text)
         self.assertIn("Content Quality", response.text)
+        self.assertIn("AI Visibility Recommendations", response.text)
 
     def test_invalid_url_submission_returns_a_user_facing_validation_error(self):
         response = TestClient(create_app()).post(

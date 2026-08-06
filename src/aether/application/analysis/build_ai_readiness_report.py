@@ -53,6 +53,16 @@ class AssessmentSummary:
 
 
 @dataclass(frozen=True)
+class StructuredDataSummary:
+    """What this article declares about itself to machines."""
+
+    article_node_present: bool
+    declared_node_types: Tuple[str, ...]
+    declared_article_properties: Tuple[str, ...]
+    missing_article_properties: Tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ContentReuseSummary:
     """Text this article shares with the publisher's other articles.
 
@@ -76,6 +86,7 @@ class AIReadinessReport:
     passage_quality_summary: PassageQualitySummary
     assessment_summary: AssessmentSummary
     content_reuse_summary: Optional[ContentReuseSummary] = None
+    structured_data_summary: Optional[StructuredDataSummary] = None
     editor_recommendations: Tuple[EditorRecommendation, ...] = ()
 
 
@@ -122,7 +133,20 @@ class BuildAIReadinessReport:
                 metadata_completeness=assessment.metadata_completeness,
             ),
             content_reuse_summary=self._content_reuse_summary(report),
+            structured_data_summary=self._structured_data_summary(report),
             editor_recommendations=self._recommendations.execute(report),
+        )
+
+    @staticmethod
+    def _structured_data_summary(report) -> Optional[StructuredDataSummary]:
+        analysis = report.structured_data_analysis
+        if analysis is None:
+            return None
+        return StructuredDataSummary(
+            article_node_present=analysis.article_node_present,
+            declared_node_types=analysis.declared_node_types,
+            declared_article_properties=analysis.declared_article_properties,
+            missing_article_properties=analysis.missing_article_properties,
         )
 
     @staticmethod

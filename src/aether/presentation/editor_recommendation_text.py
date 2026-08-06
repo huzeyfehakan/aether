@@ -40,6 +40,29 @@ CATEGORY_TITLES: Dict[RecommendationCategory, str] = {
 
 
 _TEXT: Dict[RecommendationCode, RecommendationText] = {
+    RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: RecommendationText(
+        headline="This page does not identify itself as an article",
+        why_it_matters=(
+            "Schema.org is the shared vocabulary publishers use to tell "
+            "software what a page is. Without it, anything reading this page "
+            "has to infer from the layout that it is an article, who wrote it "
+            "and when it was published."
+        ),
+        what_to_do=(
+            "Add Schema.org Article markup to the page, declaring at least the "
+            "headline, publication date, author and publisher."
+        ),
+    ),
+    RecommendationCode.INCOMPLETE_ARTICLE_STRUCTURED_DATA: RecommendationText(
+        headline="Your article markup leaves some details undeclared",
+        why_it_matters=(
+            "The page identifies itself as an article, but does not declare "
+            "everything Schema.org provides for. Each undeclared detail is one "
+            "an AI system has to guess at from the page text instead of "
+            "reading it directly."
+        ),
+        what_to_do="Add the missing properties to the Article markup.",
+    ),
     RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY: RecommendationText(
         headline="This paragraph also appears in your other articles",
         why_it_matters=(
@@ -62,6 +85,27 @@ def recommendation_text(recommendation: EditorRecommendation) -> RecommendationT
 
 def category_title(category: RecommendationCategory) -> str:
     return CATEGORY_TITLES[category]
+
+
+#: Editor-facing names for the Schema.org properties this report checks.
+_PROPERTY_LABELS = {
+    "headline": "headline",
+    "description": "summary",
+    "datePublished": "publication date",
+    "dateModified": "last updated date",
+    "author": "author",
+    "publisher": "publisher",
+    "image": "image",
+    "inLanguage": "language",
+}
+
+
+def missing_properties_phrase(missing_properties) -> str:
+    """Name the undeclared details in words an editor recognises."""
+    labels = [_PROPERTY_LABELS.get(name, name) for name in missing_properties]
+    if len(labels) == 1:
+        return f"Not declared: {labels[0]}"
+    return "Not declared: " + ", ".join(labels[:-1]) + f" and {labels[-1]}"
 
 
 def repeated_in_phrase(other_article_count: int) -> str:

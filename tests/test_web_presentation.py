@@ -1,3 +1,4 @@
+import re
 import sys
 import unittest
 from hashlib import sha256
@@ -119,6 +120,31 @@ class WebPresentationTests(unittest.TestCase):
         self.assertEqual(
             response.json()["detail"],
             "HTML file needs a source URL because no canonical URL was found",
+        )
+
+    def test_page_shell_is_not_cached_so_it_cannot_outlive_the_payload(self):
+        """A cached shell running against a newer payload broke the report."""
+        response = self.client.get("/")
+
+        self.assertEqual(response.headers["cache-control"], "no-store")
+
+    def test_template_only_reads_view_fields_the_server_sends(self):
+        """Guards the drift that removing a report field previously caused."""
+        template = (
+            Path(__file__).parent.parent
+            / "src/aether/presentation/web/templates/index.html"
+        ).read_text(encoding="utf-8")
+        referenced = set(re.findall(r"view\.([a-z_]+)", template))
+
+        response = self.client.post(
+            "/analyze/url",
+            data={"url": "https://www.trtworld.com/article/3e946db45c45"},
+        )
+        provided = set(response.json()["view"])
+
+        self.assertTrue(
+            referenced <= provided,
+            f"template reads {sorted(referenced - provided)} which the view does not send",
         )
 
     def test_invalid_url_submission_returns_a_user_facing_validation_error(self):

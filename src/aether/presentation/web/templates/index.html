@@ -101,7 +101,7 @@
     </div>
 
     <script>
-      const titleCase = (value) => value.charAt(0).toUpperCase() + value.slice(1);
+      const titleCase = (value) => String(value || '').charAt(0).toUpperCase() + String(value || '').slice(1);
       const statusBadge = (value) => `<span class="badge ${value}">${titleCase(value)}</span>`;
       const metric = (label, value) => `<div class="metric-card"><p>${label}</p><strong>${value}</strong></div>`;
       const contentType = (form) => form.querySelector('[name="article_type_override"]').value || "news_report";
@@ -131,7 +131,7 @@
         const assessment = view.assessment;
         const cards = [
           ['Metadata', assessment.metadata, 'Fields an AI system needs to identify and attribute this article'],
-        ];
+        ].filter(([, value]) => Boolean(value));
         document.querySelector('#assessment-grid').innerHTML = cards.map(([title, value, description]) => `<div class="assessment-card"><p>${description}</p><h3>${title}</h3>${statusBadge(value)}</div>`).join('');
         document.querySelector('#report-state').className = `badge ${assessment.metadata}`;
         document.querySelector('#report-state').textContent = 'Assessment available';

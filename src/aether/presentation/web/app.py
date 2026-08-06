@@ -191,7 +191,15 @@ def create_app(fetcher: Optional[HtmlFetcher] = None) -> FastAPI:
 
     @app.get("/", response_class=FileResponse)
     def index() -> FileResponse:
-        return FileResponse(_TEMPLATE_PATH, media_type="text/html")
+        # The page shell and the analysis endpoints must never drift apart.
+        # Without an explicit directive a browser may heuristically cache this
+        # document and keep running script that reads fields the server has
+        # since stopped sending.
+        return FileResponse(
+            _TEMPLATE_PATH,
+            media_type="text/html",
+            headers={"Cache-Control": "no-store"},
+        )
 
     @app.get("/health")
     def health() -> dict[str, str]:

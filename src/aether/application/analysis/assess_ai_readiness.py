@@ -27,10 +27,6 @@ class AIReadinessObservations:
     language_available: bool
     author_available: bool
     description_available: bool
-    source_paragraph_count: int
-    covered_source_paragraph_count: int
-    source_paragraph_coverage_ratio: float
-    passage_ordinals_are_contiguous: bool
     total_passage_count: int
     total_word_count: int
     paragraph_count: int
@@ -43,7 +39,6 @@ class AIReadinessAssessment:
     report: ArticleAnalysisReport
     observations: AIReadinessObservations
     metadata_completeness: CompletenessClassification
-    passage_coverage: CompletenessClassification
     structural_completeness: CompletenessClassification
 
 
@@ -56,14 +51,12 @@ class AssessAIReadiness:
             report=report,
             observations=observations,
             metadata_completeness=self._metadata_completeness(observations),
-            passage_coverage=self._passage_coverage(observations),
             structural_completeness=self._structural_completeness(observations),
         )
 
     @staticmethod
     def _observations_from(report: ArticleAnalysisReport) -> AIReadinessObservations:
         metadata = report.metadata_analysis
-        passage_quality = report.passage_quality_analysis
         structural = report.structural_analysis
         return AIReadinessObservations(
             title_available=metadata.title_available,
@@ -73,10 +66,6 @@ class AssessAIReadiness:
             language_available=metadata.language_available,
             author_available=metadata.author_available,
             description_available=metadata.description_available,
-            source_paragraph_count=passage_quality.source_paragraph_count,
-            covered_source_paragraph_count=passage_quality.covered_source_paragraph_count,
-            source_paragraph_coverage_ratio=passage_quality.source_paragraph_coverage_ratio,
-            passage_ordinals_are_contiguous=passage_quality.passage_ordinals_are_contiguous,
             total_passage_count=structural.total_passage_count,
             total_word_count=structural.total_word_count,
             paragraph_count=structural.paragraph_count,
@@ -98,20 +87,6 @@ class AssessAIReadiness:
         if all(availability):
             return CompletenessClassification.COMPLETE
         if any(availability):
-            return CompletenessClassification.PARTIAL
-        return CompletenessClassification.MISSING
-
-    @staticmethod
-    def _passage_coverage(
-        observations: AIReadinessObservations,
-    ) -> CompletenessClassification:
-        if (
-            observations.source_paragraph_count > 0
-            and observations.source_paragraph_coverage_ratio == 1.0
-            and observations.passage_ordinals_are_contiguous
-        ):
-            return CompletenessClassification.COMPLETE
-        if observations.covered_source_paragraph_count > 0:
             return CompletenessClassification.PARTIAL
         return CompletenessClassification.MISSING
 

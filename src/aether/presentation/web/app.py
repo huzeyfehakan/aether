@@ -151,12 +151,11 @@ def _report_view(report: Any) -> Dict[str, Any]:
 
     metadata = report.metadata_summary
     structure = report.structural_summary
-    coverage = report.passage_quality_summary
+    passages = report.passage_quality_summary
     assessment = report.assessment_summary
     return {
         "assessment": {
             "metadata": assessment.metadata_completeness.value,
-            "coverage": assessment.passage_coverage.value,
             "structure": assessment.structural_completeness.value,
         },
         "metadata": (
@@ -173,20 +172,16 @@ def _report_view(report: Any) -> Dict[str, Any]:
             "word_count": structure.total_word_count,
             "paragraph_count": structure.paragraph_count,
         },
-        "coverage": {
-            "source_paragraph_count": coverage.source_paragraph_count,
-            "covered_source_paragraph_count": coverage.covered_source_paragraph_count,
-            "ratio": coverage.source_paragraph_coverage_ratio,
-            "ordinals_are_contiguous": coverage.passage_ordinals_are_contiguous,
+        "retrieval": {
+            "minimum_passage_word_count": passages.minimum_passage_word_count,
+            "median_passage_word_count": passages.median_passage_word_count,
+            "maximum_passage_word_count": passages.maximum_passage_word_count,
         },
         "technical": {
             "article_id": report.article_identity.article_id,
             "article_version_id": report.article_identity.article_version_id,
             "average_passage_length": structure.average_passage_length,
             "heading_count": structure.heading_count,
-            "minimum_passage_word_count": coverage.minimum_passage_word_count,
-            "maximum_passage_word_count": coverage.maximum_passage_word_count,
-            "median_passage_word_count": coverage.median_passage_word_count,
         },
     }
 

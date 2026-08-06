@@ -71,10 +71,6 @@ class AIReadinessReportTests(unittest.TestCase):
                 minimum_passage_word_count=6,
                 maximum_passage_word_count=6,
                 median_passage_word_count=6.0,
-                source_paragraph_count=2,
-                covered_source_paragraph_count=2,
-                source_paragraph_coverage_ratio=1.0,
-                passage_ordinals_are_contiguous=True,
             ),
         )
         return AssessAIReadiness().execute(report)
@@ -89,11 +85,9 @@ class AIReadinessReportTests(unittest.TestCase):
         self.assertTrue(report.metadata_summary.title_available)
         self.assertTrue(report.metadata_summary.author_available)
         self.assertEqual(len(report.passage_quality_summary.passage_profiles), 2)
-        self.assertEqual(report.passage_quality_summary.source_paragraph_coverage_ratio, 1.0)
         self.assertEqual(
             report.assessment_summary.metadata_completeness.value, "partial"
         )
-        self.assertEqual(report.assessment_summary.passage_coverage.value, "complete")
         self.assertEqual(
             report.assessment_summary.structural_completeness.value, "complete"
         )
@@ -118,10 +112,6 @@ class AIReadinessReportTests(unittest.TestCase):
         self.assertIs(
             report.assessment_summary.metadata_completeness,
             assessment.metadata_completeness,
-        )
-        self.assertIs(
-            report.assessment_summary.passage_coverage,
-            assessment.passage_coverage,
         )
         self.assertIs(
             report.assessment_summary.structural_completeness,

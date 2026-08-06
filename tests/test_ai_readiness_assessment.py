@@ -28,7 +28,6 @@ class AIReadinessAssessmentTests(unittest.TestCase):
         metadata_available,
         coverage_ratio,
         covered_paragraphs,
-        ordinals_contiguous,
         structural_counts,
     ):
         metadata = MetadataAnalysis(
@@ -62,10 +61,6 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             minimum_passage_word_count=None,
             maximum_passage_word_count=None,
             median_passage_word_count=None,
-            source_paragraph_count=2,
-            covered_source_paragraph_count=covered_paragraphs,
-            source_paragraph_coverage_ratio=coverage_ratio,
-            passage_ordinals_are_contiguous=ordinals_contiguous,
         )
         return ArticleAnalysisReport(
             structural_analysis=structural,
@@ -78,7 +73,6 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             metadata_available=(True, True, True, True, True, True, True),
             coverage_ratio=1.0,
             covered_paragraphs=2,
-            ordinals_contiguous=True,
             structural_counts=(2, 10, 2),
         )
 
@@ -89,13 +83,9 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             assessment.metadata_completeness, CompletenessClassification.COMPLETE
         )
         self.assertEqual(
-            assessment.passage_coverage, CompletenessClassification.COMPLETE
-        )
-        self.assertEqual(
             assessment.structural_completeness, CompletenessClassification.COMPLETE
         )
         self.assertTrue(assessment.observations.author_available)
-        self.assertEqual(assessment.observations.source_paragraph_coverage_ratio, 1.0)
         self.assertEqual(assessment.observations.total_word_count, 10)
         self.assertFalse(hasattr(assessment, "score"))
 
@@ -104,7 +94,6 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             metadata_available=(True, True, True, False, True, False, False),
             coverage_ratio=0.5,
             covered_paragraphs=1,
-            ordinals_contiguous=False,
             structural_counts=(0, 5, 1),
         )
 
@@ -112,9 +101,6 @@ class AIReadinessAssessmentTests(unittest.TestCase):
 
         self.assertEqual(
             assessment.metadata_completeness, CompletenessClassification.PARTIAL
-        )
-        self.assertEqual(
-            assessment.passage_coverage, CompletenessClassification.PARTIAL
         )
         self.assertEqual(
             assessment.structural_completeness, CompletenessClassification.PARTIAL
@@ -125,7 +111,6 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             metadata_available=(False, False, False, False, False, False, False),
             coverage_ratio=0.0,
             covered_paragraphs=0,
-            ordinals_contiguous=False,
             structural_counts=(0, 0, 0),
         )
 
@@ -133,9 +118,6 @@ class AIReadinessAssessmentTests(unittest.TestCase):
 
         self.assertEqual(
             assessment.metadata_completeness, CompletenessClassification.MISSING
-        )
-        self.assertEqual(
-            assessment.passage_coverage, CompletenessClassification.MISSING
         )
         self.assertEqual(
             assessment.structural_completeness, CompletenessClassification.MISSING
@@ -146,7 +128,6 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             metadata_available=(True, True, True, True, True, True, True),
             coverage_ratio=1.0,
             covered_paragraphs=2,
-            ordinals_contiguous=True,
             structural_counts=(2, 10, 2),
         )
 

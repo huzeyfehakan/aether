@@ -43,16 +43,11 @@ class PassageQualitySummary:
     minimum_passage_word_count: Optional[int]
     maximum_passage_word_count: Optional[int]
     median_passage_word_count: Optional[float]
-    source_paragraph_count: int
-    covered_source_paragraph_count: int
-    source_paragraph_coverage_ratio: float
-    passage_ordinals_are_contiguous: bool
 
 
 @dataclass(frozen=True)
 class AssessmentSummary:
     metadata_completeness: CompletenessClassification
-    passage_coverage: CompletenessClassification
     structural_completeness: CompletenessClassification
 
 
@@ -102,14 +97,9 @@ class BuildAIReadinessReport:
                 minimum_passage_word_count=passage_quality.minimum_passage_word_count,
                 maximum_passage_word_count=passage_quality.maximum_passage_word_count,
                 median_passage_word_count=passage_quality.median_passage_word_count,
-                source_paragraph_count=passage_quality.source_paragraph_count,
-                covered_source_paragraph_count=passage_quality.covered_source_paragraph_count,
-                source_paragraph_coverage_ratio=passage_quality.source_paragraph_coverage_ratio,
-                passage_ordinals_are_contiguous=passage_quality.passage_ordinals_are_contiguous,
             ),
             assessment_summary=AssessmentSummary(
                 metadata_completeness=assessment.metadata_completeness,
-                passage_coverage=assessment.passage_coverage,
                 structural_completeness=assessment.structural_completeness,
             ),
         )

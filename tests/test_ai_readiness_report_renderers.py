@@ -69,10 +69,6 @@ class AIReadinessReportRendererTests(unittest.TestCase):
                 minimum_passage_word_count=4,
                 maximum_passage_word_count=4,
                 median_passage_word_count=4.0,
-                source_paragraph_count=1,
-                covered_source_paragraph_count=1,
-                source_paragraph_coverage_ratio=1.0,
-                passage_ordinals_are_contiguous=True,
             ),
         )
         return BuildAIReadinessReport().execute(
@@ -87,9 +83,6 @@ class AIReadinessReportRendererTests(unittest.TestCase):
         self.assertEqual(payload["structural_summary"]["total_word_count"], 4)
         self.assertIsNone(payload["structural_summary"]["heading_count"])
         self.assertTrue(payload["metadata_summary"]["author_available"])
-        self.assertEqual(
-            payload["assessment_summary"]["passage_coverage"], "complete"
-        )
         self.assertNotIn("score", payload)
         self.assertNotIn("recommendations", payload)
 
@@ -115,7 +108,6 @@ class AIReadinessReportRendererTests(unittest.TestCase):
         self.assertIn("## Passage Quality Summary", rendered)
         self.assertIn("## Assessment Summary", rendered)
         self.assertIn("| `version-1:p0` | 0 | 4 | 20 |", rendered)
-        self.assertIn("- Passage coverage: complete", rendered)
 
     def test_renderers_are_deterministic(self):
         report = self.report()

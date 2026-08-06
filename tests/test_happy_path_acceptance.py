@@ -88,7 +88,6 @@ class HappyPathPublisherArticleAcceptanceTests(unittest.TestCase):
         self.assertIsNone(report.structural_summary.heading_count)
         self.assertTrue(all(vars(report.metadata_summary).values()))
         self.assertEqual(report.assessment_summary.metadata_completeness.value, "complete")
-        self.assertEqual(report.assessment_summary.passage_coverage.value, "complete")
         self.assertEqual(report.assessment_summary.structural_completeness.value, "complete")
 
         rendered = JsonAIReadinessReportRenderer().render(report)
@@ -97,7 +96,6 @@ class HappyPathPublisherArticleAcceptanceTests(unittest.TestCase):
         self.assertEqual(payload["metadata_summary"]["title_length"], 65)
         self.assertEqual(payload["assessment_summary"], {
             "metadata_completeness": "complete",
-            "passage_coverage": "complete",
             "structural_completeness": "complete",
         })
         self.assertNotIn("raw_html", rendered)

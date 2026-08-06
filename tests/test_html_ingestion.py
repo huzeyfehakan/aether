@@ -1,6 +1,7 @@
 import sys
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
 
 sys.path.insert(0, "src")
 
@@ -15,6 +16,7 @@ from aether.domain.common import DomainValidationError  # noqa: E402
 
 
 OBSERVED_AT = datetime(2026, 7, 23, 9, 0, tzinfo=timezone.utc)
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 class RawHtmlIngestionTests(unittest.TestCase):
@@ -80,6 +82,238 @@ class RawHtmlIngestionTests(unittest.TestCase):
         self.assertEqual(result.article_version.author, "Ayşe Yılmaz")
         self.assertEqual(result.article_version.description, "A source-provided description.")
         self.assertEqual(result.article_version.keywords, "politika, ekonomi,  haber")
+
+    def test_excludes_link_wrapped_recommendation_cards_from_the_body(self):
+        """Recommendation cards share the article container on TRT Çocuk pages."""
+        html = (FIXTURES / "trt_ebeveyn_akademisi_makale.html").read_text(encoding="utf-8")
+
+        result = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url="https://ebeveynakademisi.trtcocuk.net.tr/makale/asiri-uyumlu-cocuklar-neyi-saklar-32449390",
+                publisher="TRT Çocuk Ebeveyn Akademisi",
+                article_type="news_report",
+                observed_at=OBSERVED_AT,
+            )
+        )
+
+        body = result.article_version.body
+        self.assertIn("Aşırı uyumlu çocuklar çoğu zaman", body)
+        self.assertIn("Bu uyumun ardında çoğu zaman", body)
+        self.assertNotIn("İşten sonra çocuğunuzla", body)
+        self.assertNotIn("Öfke sağlıklı", body)
+
+    def test_excludes_paragraphs_from_non_body_html_sections(self):
+        html = """
+            <html lang="en"><head><title>Sectioning</title></head>
+            <body>
+              <header><p>Site tagline.</p></header>
+              <nav><p>Navigation text.</p></nav>
+              <main>
+                <p>Real article prose.</p>
+                <aside><p>Sidebar promotion.</p></aside>
+                <figure><figcaption><p>Photo caption.</p></figcaption></figure>
+                <a href="/other"><p>Linked teaser card.</p></a>
+              </main>
+              <footer><p>Copyright notice.</p></footer>
+            </body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(result.article_version.body, "Real article prose.")
+
+    def test_keeps_inline_links_inside_body_paragraphs(self):
+        """A paragraph containing a link is prose; a paragraph inside a link is not."""
+        html = """
+            <html lang="en"><head><title>Inline links</title></head>
+            <body><main>
+              <p>Prose with an <a href="/source">inline citation</a> inside it.</p>
+            </main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(
+            result.article_version.body,
+            "Prose with an inline citation inside it.",
+        )
+
+    def test_falls_back_to_open_graph_locale_when_html_has_no_lang(self):
+        """TRT Avaz declares the document language only through og:locale."""
+        html = (FIXTURES / "trt_avaz_haber.html").read_text(encoding="utf-8")
+
+        result = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url="https://www.trtavaz.com.tr/haber/tur/avrasyadan/aselsan-dan-2026-nin-ilk-yarisinda-rekor-buyume/6a72f74e6b61e0f45f28c685",
+                publisher="TRT Avaz",
+                article_type="news_report",
+                observed_at=OBSERVED_AT,
+            )
+        )
+
+        self.assertEqual(result.article.original_language, "tr-TR")
+        self.assertEqual([passage.language for passage in result.passages], ["tr-TR", "tr-TR"])
+
+    def test_falls_back_to_json_ld_in_language_when_no_lang_or_locale(self):
+        html = """
+            <html><head><title>JSON-LD language</title>
+              <script type="application/ld+json">
+                {"@context": "https://schema.org", "@type": "NewsArticle",
+                 "inLanguage": "en"}
+              </script>
+            </head><body><main><p>Visible article paragraph.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(result.article.original_language, "en")
+
+    def test_prefers_html_lang_over_locale_and_json_ld_language(self):
+        html = """
+            <html lang="tr"><head><title>Language precedence</title>
+              <meta property="og:locale" content="de_DE" />
+              <script type="application/ld+json">
+                {"@context": "https://schema.org", "@type": "Article",
+                 "inLanguage": "fr"}
+              </script>
+            </head><body><main><p>Visible article paragraph.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(result.article.original_language, "tr")
+
+    def test_reads_headline_description_author_and_dates_from_json_ld(self):
+        """TRT Haber carries these fields only in JSON-LD, after an Organization block."""
+        html = (FIXTURES / "trt_haber_json_ld_article.html").read_text(encoding="utf-8")
+
+        result = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url="https://www.trthaber.com/haber/gundem/12-maddelik-milli-dayanisma-teklifinin-detaylari-netlesti-953155.html",
+                publisher="TRT Haber",
+                article_type="news_report",
+                observed_at=OBSERVED_AT,
+            )
+        )
+
+        version = result.article_version
+        self.assertEqual(
+            version.title, "12 Maddelik Milli Dayanışma Teklifinin detayları netleşti"
+        )
+        self.assertEqual(
+            version.description, "Kanun teklifinin maddeleri ve süreç işleyişi belli oldu."
+        )
+        self.assertEqual(version.author, "TRT Haber")
+        self.assertEqual(
+            version.source_published_at.isoformat(), "2026-08-05T12:43:00+03:00"
+        )
+        self.assertEqual(
+            version.source_updated_at.isoformat(), "2026-08-05T14:10:44+03:00"
+        )
+
+    def test_json_ld_author_accepts_string_and_list_forms(self):
+        for author_json, expected in (
+            ('"Ayşe Yılmaz"', "Ayşe Yılmaz"),
+            ('[{"@type": "Person", "name": "Ayşe Yılmaz"}]', "Ayşe Yılmaz"),
+            ('{"@type": "Person", "name": "Ayşe Yılmaz"}', "Ayşe Yılmaz"),
+        ):
+            with self.subTest(author=author_json):
+                html = f"""
+                    <html lang="tr"><head><title>Author shapes</title>
+                      <script type="application/ld+json">
+                        {{"@type": "Article", "author": {author_json}}}
+                      </script>
+                    </head><body><main><p>Görünür paragraf.</p></main></body></html>
+                """
+                result = RegisterRawHtmlArticle(InMemoryContentRepository()).execute(
+                    RawHtmlArticle(
+                        html=html,
+                        source_url=f"https://source.example.org/author-{len(author_json)}",
+                        publisher="TRT",
+                        article_type="news_report",
+                        observed_at=OBSERVED_AT,
+                    )
+                )
+                self.assertEqual(result.article_version.author, expected)
+
+    def test_json_ld_metadata_takes_precedence_over_meta_tags(self):
+        html = """
+            <html lang="tr"><head>
+              <title>Meta title</title>
+              <meta name="description" content="Meta description." />
+              <meta name="author" content="Meta author" />
+              <meta property="article:modified_time" content="2026-07-22T12:00:00+03:00" />
+              <script type="application/ld+json">
+                {"@type": "NewsArticle", "headline": "JSON-LD headline",
+                 "description": "JSON-LD description.", "author": "JSON-LD author",
+                 "dateModified": "2026-07-22T18:00:00+03:00"}
+              </script>
+            </head><body><main><p>Görünür paragraf.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        version = result.article_version
+        self.assertEqual(version.title, "JSON-LD headline")
+        self.assertEqual(version.description, "JSON-LD description.")
+        self.assertEqual(version.author, "JSON-LD author")
+        self.assertEqual(
+            version.source_updated_at.isoformat(), "2026-07-22T18:00:00+03:00"
+        )
+
+    def test_open_graph_title_outranks_a_json_ld_headline(self):
+        """og:title is decoded by the HTML parser; a headline may be mis-escaped."""
+        html = """
+            <html lang="tr"><head>
+              <title>Document title</title>
+              <meta property="og:title" content="Open Graph title" />
+              <script type="application/ld+json">
+                {"@type": "NewsArticle", "headline": "JSON-LD headline"}
+              </script>
+            </head><body><main><p>Görünür paragraf.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(result.article_version.title, "Open Graph title")
+
+    def test_decodes_character_references_inside_json_ld_values(self):
+        """JSON-LD sits in a script element, where the parser leaves entities raw."""
+        html = """
+            <html lang="tr"><head><title>Entities</title>
+              <script type="application/ld+json">
+                {"@type": "NewsArticle",
+                 "description": "&quot;Milli Dayan&#305;&#351;ma&quot; teklifi."}
+              </script>
+            </head><body><main><p>Görünür paragraf.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(
+            result.article_version.description, '"Milli Dayanışma" teklifi.'
+        )
+
+    def test_falls_back_to_meta_tags_when_json_ld_omits_a_field(self):
+        html = """
+            <html lang="tr"><head>
+              <title>Meta title</title>
+              <meta name="description" content="Meta description." />
+              <meta name="author" content="Meta author" />
+              <script type="application/ld+json">
+                {"@type": "NewsArticle", "headline": "JSON-LD headline"}
+              </script>
+            </head><body><main><p>Görünür paragraf.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(result.article_version.title, "JSON-LD headline")
+        self.assertEqual(result.article_version.description, "Meta description.")
+        self.assertEqual(result.article_version.author, "Meta author")
 
     def test_uses_only_the_document_head_title_and_ignores_svg_titles(self):
         html = """

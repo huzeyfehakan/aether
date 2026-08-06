@@ -1,0 +1,42 @@
+<!doctype html>
+<!--
+  Source-derived regression fixture:
+  https://ebeveynakademisi.trtcocuk.net.tr/makale/asiri-uyumlu-cocuklar-neyi-saklar-32449390
+  Captured for deterministic offline validation on 2026-08-05.
+  Reduced to the structures the parser must handle: a <main>-only layout with no
+  <article> element, a publication-date paragraph, an author paragraph, a legal
+  notice, and link-wrapped recommendation cards inside the same container as the
+  article prose.
+  The live page's JSON-LD carries a date-only datePublished, which ingestion does
+  not accept yet; it is omitted here so this fixture exercises body extraction.
+-->
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Aşırı Uyumlu Çocuklar Neyi Saklar? - Ebeveyn Akademisi</title>
+    <link rel="canonical" href="https://ebeveynakademisi.trtcocuk.net.tr/makale/asiri-uyumlu-cocuklar-neyi-saklar-32449390" />
+  </head>
+  <body>
+    <header><p>TRT Çocuk Ebeveyn Akademisi</p></header>
+    <main>
+      <h1>Aşırı Uyumlu Çocuklar Neyi Saklar?</h1>
+      <div class="post__date"><p>3 Ağustos 2026</p></div>
+      <p class="post__text text">Aşırı uyumlu çocuklar çoğu zaman çevre tarafından kolay çocuk olarak tanımlanır.</p>
+      <p class="post__text text">Bu uyumun ardında çoğu zaman fark edilmeyen bir kaygı yatar.</p>
+      <div class="profile"><div class="profile-name"><p>Prof. Dr. Funda Gümüştaş</p></div></div>
+      <div class="notification">
+        <h5>Önemli Hatırlatma</h5>
+        <p>Bu içerik bilgilendirme amaçlı hazırlanmıştır.</p>
+      </div>
+      <div class="section-banner-other">
+        <a class="post" href="/makale/uc-dakika-kurali-17466175">
+          <div class="post-content"><p>İşten sonra çocuğunuzla ne kadar zaman geçiriyorsunuz?</p></div>
+        </a>
+        <a class="post" href="/makale/ofke-nasil-yonetilir-17466176">
+          <div class="post-content"><p>Öfke sağlıklı, işlevsel ve doğal bir duygudur.</p></div>
+        </a>
+      </div>
+    </main>
+    <footer><p>© 2026 trtcocuk.net.tr Tüm Hakları Saklıdır</p></footer>
+  </body>
+</html>

@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from html import unescape
 from html.parser import HTMLParser
 import json
 from typing import Any, Dict, List, Optional, Tuple
@@ -65,6 +66,14 @@ class _ArticleHtmlCollector(HTMLParser):
 
     _SKIPPED_TAGS = {"script", "style", "noscript", "template"}
 
+    # HTML sectioning and link elements whose paragraphs are, by specification,
+    # not article prose: navigation, complementary content, page banners,
+    # footers, media captions, and link-wrapped teaser cards. Publishers place
+    # recommendation cards and legal boilerplate in these containers, and they
+    # otherwise share the article's container. This is markup semantics only:
+    # no class names, publisher names, or URL patterns are consulted.
+    _NON_BODY_TAGS = {"a", "aside", "figcaption", "footer", "header", "nav"}
+
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.metadata: Dict[str, str] = {}
@@ -80,12 +89,14 @@ class _ArticleHtmlCollector(HTMLParser):
         self._main_depth = 0
         self._head_depth = 0
         self._skip_depth = 0
+        self._non_body_depth = 0
         self._in_title = False
         self._title_captured = False
         self._heading_parts: Optional[List[str]] = None
         self._heading_priority = 0
         self._paragraph_parts: Optional[List[str]] = None
         self._paragraph_priority = 0
+        self._paragraph_is_body = True
         self._json_ld_parts: Optional[List[str]] = None
         self._application_json_parts: Optional[List[str]] = None
 
@@ -118,6 +129,8 @@ class _ArticleHtmlCollector(HTMLParser):
                 self.canonical_source = attributes.get("href", "").strip() or None
         if tag == "time" and attributes.get("datetime"):
             self.time_values.append(attributes["datetime"].strip())
+        if tag in self._NON_BODY_TAGS:
+            self._non_body_depth += 1
         if tag == "article":
             self._article_depth += 1
         elif tag == "main":
@@ -132,6 +145,7 @@ class _ArticleHtmlCollector(HTMLParser):
         elif tag == "p":
             self._paragraph_parts = []
             self._paragraph_priority = self._containment_priority()
+            self._paragraph_is_body = self._non_body_depth == 0
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
@@ -146,12 +160,15 @@ class _ArticleHtmlCollector(HTMLParser):
                 self._application_json_parts = None
             self._skip_depth = max(0, self._skip_depth - 1)
             return
+        if tag in self._NON_BODY_TAGS:
+            self._non_body_depth = max(0, self._non_body_depth - 1)
         if tag == "p" and self._paragraph_parts is not None:
             text = _normalize_text(" ".join(self._paragraph_parts))
-            if text:
+            if text and self._paragraph_is_body:
                 self.paragraphs.append((self._paragraph_priority, text))
             self._paragraph_parts = None
             self._paragraph_priority = 0
+            self._paragraph_is_body = True
         elif tag == "h1" and self._heading_parts is not None:
             text = _normalize_text(" ".join(self._heading_parts))
             if text:
@@ -185,6 +202,18 @@ class _ArticleHtmlCollector(HTMLParser):
 
 def _normalize_text(value: str) -> str:
     return " ".join(value.split())
+
+
+def _normalize_json_ld_text(value: str) -> str:
+    """Decode character references in a JSON-LD string value.
+
+    JSON-LD lives inside a ``<script>`` element, where the HTML parser does not
+    resolve character references. Every other text source in this module
+    arrives already decoded, so a single decode keeps JSON-LD values consistent
+    with them. Only one pass is applied: repeating it would corrupt text that
+    legitimately contains an escaped entity.
+    """
+    return _normalize_text(unescape(value))
 
 
 def _rel_tokens(value: str) -> Tuple[str, ...]:
@@ -236,7 +265,12 @@ class HtmlArticleNormalizer:
         collector.feed(raw_article.html)
         collector.close()
 
+        # og:title outranks a JSON-LD headline deliberately. Both are declared
+        # by the publisher, but og:title arrives through the HTML parser with
+        # its character references already resolved, whereas a headline is only
+        # as well-formed as the publisher's own JSON-LD escaping.
         title = self._first_metadata(collector.metadata, self._TITLE_META_KEYS)
+        title = title or self._json_ld_text(collector.json_ld_documents, "headline")
         title = title or _normalize_text(" ".join(collector.title_parts))
         title = title or self._innermost_heading(collector.headings)
         if not title:
@@ -250,7 +284,7 @@ class HtmlArticleNormalizer:
         if not body:
             raise DomainValidationError("raw article html has no visible paragraphs")
 
-        language = collector.html_language or raw_article.fallback_language
+        language = self._language(collector, raw_article)
         if not language or not language.strip():
             raise DomainValidationError("raw article html has no language or fallback_language")
 
@@ -266,12 +300,89 @@ class HtmlArticleNormalizer:
             language=language.strip(),
             published_at=published_at,
             updated_at=updated_at,
-            author=self._first_metadata(collector.metadata, self._AUTHOR_META_KEYS),
-            description=self._first_metadata(
-                collector.metadata, self._DESCRIPTION_META_KEYS
+            author=(
+                self._json_ld_author(collector.json_ld_documents)
+                or self._first_metadata(collector.metadata, self._AUTHOR_META_KEYS)
+            ),
+            description=(
+                self._json_ld_text(collector.json_ld_documents, "description")
+                or self._first_metadata(collector.metadata, self._DESCRIPTION_META_KEYS)
             ),
             keywords=self._first_metadata(collector.metadata, self._KEYWORD_META_KEYS),
         )
+
+    @classmethod
+    def _language(
+        cls, collector: "_ArticleHtmlCollector", raw_article: RawHtmlArticle
+    ) -> Optional[str]:
+        """Resolve the document language from publisher-declared sources only.
+
+        The precedence is fixed: the ``lang`` attribute on ``<html>``, then the
+        Open Graph ``og:locale`` property, then a JSON-LD Article
+        ``inLanguage``, then the explicitly supplied fallback. Nothing is
+        inferred from the text, the host name, or the URL.
+        """
+        if collector.html_language and collector.html_language.strip():
+            return collector.html_language
+        locale = collector.metadata.get("og:locale")
+        if locale and locale.strip():
+            # og:locale uses language_TERRITORY; BCP 47 uses a hyphen. The
+            # separator is rewritten, the declared value is otherwise kept.
+            return locale.strip().replace("_", "-")
+        in_language = cls._json_ld_in_language(collector.json_ld_documents)
+        if in_language:
+            return in_language
+        return raw_article.fallback_language
+
+    @classmethod
+    def _json_ld_text(cls, documents: List[str], key: str) -> Optional[str]:
+        """Return the first Article string value for ``key`` in document order."""
+        for value in cls._json_ld_article_values(documents, key):
+            if isinstance(value, str) and value.strip():
+                return _normalize_json_ld_text(value)
+        return None
+
+    @classmethod
+    def _json_ld_author(cls, documents: List[str]) -> Optional[str]:
+        """Return the first Article author name in document order.
+
+        Schema.org allows a bare string, a Person/Organization object, or a
+        list of either. Only the declared name is read; nothing is composed.
+        """
+        for value in cls._json_ld_article_values(documents, "author"):
+            candidates = value if isinstance(value, list) else [value]
+            for candidate in candidates:
+                if isinstance(candidate, str) and candidate.strip():
+                    return _normalize_text(candidate)
+                if isinstance(candidate, dict):
+                    name = candidate.get("name")
+                    if isinstance(name, str) and name.strip():
+                        return _normalize_text(name)
+        return None
+
+    @classmethod
+    def _json_ld_in_language(cls, documents: List[str]) -> Optional[str]:
+        """Return the first Article ``inLanguage`` value in document order."""
+        for value in cls._json_ld_article_values(documents, "inLanguage"):
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+            if isinstance(value, dict):
+                name = value.get("name")
+                if isinstance(name, str) and name.strip():
+                    return name.strip()
+        return None
+
+    @classmethod
+    def _json_ld_article_values(cls, documents: List[str], key: str):
+        """Yield ``key`` from each Article/NewsArticle object, in source order."""
+        for document in documents:
+            try:
+                payload = json.loads(document)
+            except json.JSONDecodeError:
+                continue
+            for value in cls._json_values_in_document_order(payload):
+                if cls._is_article(value) and key in value:
+                    yield value[key]
 
     @staticmethod
     def _canonical_source(canonical_href: Optional[str], source_url: str) -> str:
@@ -433,6 +544,20 @@ class HtmlArticleNormalizer:
     def _updated_at(
         self, collector: _ArticleHtmlCollector, raw_article: RawHtmlArticle
     ) -> Optional[datetime]:
+        """Mirror the documented published-at precedence for the modified date.
+
+        A JSON-LD Article ``dateModified`` outranks the meta tags, matching the
+        precedence already documented for ``datePublished``. As with the
+        published date, a selected value must parse or fail explicitly; this
+        never falls back to a lower-priority source.
+        """
+        json_ld_updated_value = self._json_ld_text(
+            collector.json_ld_documents, "dateModified"
+        )
+        if json_ld_updated_value is not None:
+            return _parse_source_timestamp(
+                json_ld_updated_value, "JSON-LD Article dateModified"
+            )
         updated_value = self._first_metadata(collector.metadata, self._UPDATED_META_KEYS)
         if updated_value:
             return _parse_source_timestamp(updated_value, "updated_at")

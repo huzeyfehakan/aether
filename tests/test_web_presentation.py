@@ -163,7 +163,8 @@ class WebPresentationTests(unittest.TestCase):
         reuse = response.json()["view"]["editor"]
         self.assertEqual(
             reuse["compared_articles"],
-            "Checked against 1 other article from this publisher.",
+            "Compared against previously analyzed articles from this publisher "
+            "(1 article).",
         )
         self.assertEqual(len(reuse["recommendations"]), 1)
         recommendation = reuse["recommendations"][0]
@@ -171,9 +172,15 @@ class WebPresentationTests(unittest.TestCase):
             recommendation["headline"],
             "This paragraph also appears in your other articles",
         )
-        self.assertEqual(recommendation["detail"], "Also appears in 1 other article")
+        self.assertEqual(
+            recommendation["occurrences"][0]["detail"],
+            "Also appears in 1 other article",
+        )
         self.assertIn("outside the article body", recommendation["what_to_do"])
-        self.assertIn("Bu icerik bilgilendirme", recommendation["excerpt"])
+        self.assertEqual(len(recommendation["occurrences"]), 1)
+        self.assertIn(
+            "Bu icerik bilgilendirme", recommendation["occurrences"][0]["excerpt"]
+        )
 
     def test_index_shows_both_audience_sections(self):
         response = self.client.get("/")

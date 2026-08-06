@@ -117,9 +117,9 @@ class EditorRecommendationTests(unittest.TestCase):
 
     def test_states_how_many_articles_were_compared(self):
         for count, expected in (
-            (0, "No other articles from this publisher have been analysed yet"),
-            (1, "Checked against 1 other article"),
-            (4, "Checked against 4 other articles"),
+            (0, "No previously analyzed articles from this publisher"),
+            (1, "previously analyzed articles from this publisher (1 article)"),
+            (4, "previously analyzed articles from this publisher (4 articles)"),
         ):
             with self.subTest(count=count):
                 self.assertIn(expected, compared_articles_phrase(count))
@@ -132,8 +132,29 @@ class EditorRecommendationTests(unittest.TestCase):
 
         self.assertIn("Editor Recommendations", rendered)
         self.assertIn("Things you can change in this article now.", rendered)
-        self.assertIn("Checked against 1 other article from this publisher.", rendered)
+        self.assertIn(
+            "Compared against previously analyzed articles from this publisher "
+            "(1 article).",
+            rendered,
+        )
         self.assertIn("What to do:", rendered)
+
+    def test_repeated_paragraphs_share_one_explanation(self):
+        """Repeating the rationale per occurrence buries the occurrences."""
+        second_notice = "Yazan: Prof. Dr. Funda Gümüştaş"
+        first = self.ingest("birinci", ["Özgün paragraf.", NOTICE, second_notice])
+        self.ingest("ikinci", ["Başka özgün paragraf.", NOTICE, second_notice])
+
+        report = self.report_for(first)
+        rendered = PlainTextAIReadinessReportRenderer().render(report)
+
+        self.assertEqual(len(report.editor_recommendations), 2)
+        self.assertEqual(rendered.count("Why it matters: Repeated text"), 1)
+        self.assertEqual(
+            rendered.count("This paragraph also appears in your other articles"), 1
+        )
+        self.assertIn(NOTICE, rendered)
+        self.assertIn(second_notice, rendered)
 
     def test_content_quality_wording_makes_no_claim_about_ai_systems(self):
         """Repetition is a fact about the text, not evidence of model behaviour."""

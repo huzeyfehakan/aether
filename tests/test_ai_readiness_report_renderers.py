@@ -60,9 +60,6 @@ class AIReadinessReportRendererTests(unittest.TestCase):
                         character_count=20,
                     ),
                 ),
-                minimum_passage_word_count=4,
-                maximum_passage_word_count=4,
-                median_passage_word_count=4.0,
             ),
         )
         return BuildAIReadinessReport().execute(
@@ -85,9 +82,10 @@ class AIReadinessReportRendererTests(unittest.TestCase):
         self.assertIn("AI Readiness Report", rendered)
         self.assertIn("Article Identity", rendered)
         self.assertIn("Structural Summary", rendered)
-        self.assertIn("Metadata Summary", rendered)
-        self.assertIn("Passage Quality Summary", rendered)
-        self.assertIn("Assessment Summary", rendered)
+        self.assertIn("Extracted Metadata", rendered)
+        self.assertIn("Metadata Completeness: partial", rendered)
+        # Optional sections are absent when their analysis was not composed.
+        self.assertNotIn("Structured Data (Schema.org)", rendered)
         self.assertIn("Metadata Completeness: partial", rendered)
 
     def test_markdown_renderer_includes_report_values_and_profile_table(self):
@@ -96,9 +94,7 @@ class AIReadinessReportRendererTests(unittest.TestCase):
         self.assertIn("# AI Readiness Report", rendered)
         self.assertIn("## Article Identity", rendered)
         self.assertIn("## Structural Summary", rendered)
-        self.assertIn("## Metadata Summary", rendered)
-        self.assertIn("## Passage Quality Summary", rendered)
-        self.assertIn("## Assessment Summary", rendered)
+        self.assertIn("## Extracted Metadata", rendered)
         self.assertIn("| `version-1:p0` | 0 | 4 | 20 |", rendered)
 
     def test_renderers_are_deterministic(self):

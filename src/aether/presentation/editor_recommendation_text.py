@@ -130,14 +130,20 @@ def repeated_in_phrase(other_article_count: int) -> str:
 
 
 def compared_articles_phrase(compared_article_count: int) -> str:
-    """State the evidence a reuse finding rests on, always."""
+    """State the evidence a reuse finding rests on, always.
+
+    The wording names the limit plainly: the comparison covers articles that
+    have been analyzed before, not everything the publisher has ever
+    published. An editor who reads a small number here should read the finding
+    as narrow rather than as a statement about their whole site.
+    """
     if compared_article_count == 0:
         return (
-            "No other articles from this publisher have been analysed yet, so "
-            "repeated text could not be checked."
+            "No previously analyzed articles from this publisher, so repeated "
+            "text could not be checked."
         )
-    if compared_article_count == 1:
-        return "Checked against 1 other article from this publisher."
+    article_word = "article" if compared_article_count == 1 else "articles"
     return (
-        f"Checked against {compared_article_count} other articles from this publisher."
+        "Compared against previously analyzed articles from this publisher "
+        f"({compared_article_count} {article_word})."
     )

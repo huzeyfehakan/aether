@@ -164,27 +164,38 @@ def _publisher_from(source_url: str, publisher: Optional[str]) -> str:
 
 
 def _recommendation_views(report: Any, category) -> list:
-    """Shape one category of recommendations for display."""
-    views = []
+    """Shape one category of recommendations for display.
+
+    Findings of the same kind are grouped so their explanation is given once
+    and the occurrences are listed under it.
+    """
+    grouped: Dict[Any, Dict[str, Any]] = {}
     for recommendation in report.editor_recommendations:
         if recommendation.category is not category:
             continue
         text = recommendation_text(recommendation)
-        view = {
-            "headline": text.headline,
-            "why_it_matters": text.why_it_matters,
-            "what_to_do": text.what_to_do,
-        }
+        group = grouped.setdefault(
+            recommendation.code,
+            {
+                "headline": text.headline,
+                "why_it_matters": text.why_it_matters,
+                "what_to_do": text.what_to_do,
+                "occurrences": [],
+            },
+        )
+        occurrence: Dict[str, Any] = {}
         if recommendation.excerpt:
-            view["excerpt"] = recommendation.excerpt
+            occurrence["excerpt"] = recommendation.excerpt
         if recommendation.other_article_count:
-            view["detail"] = repeated_in_phrase(recommendation.other_article_count)
+            occurrence["detail"] = repeated_in_phrase(
+                recommendation.other_article_count
+            )
         if recommendation.missing_properties:
-            view["detail"] = missing_properties_phrase(
+            occurrence["detail"] = missing_properties_phrase(
                 recommendation.missing_properties
             )
-        views.append(view)
-    return views
+        group["occurrences"].append(occurrence)
+    return list(grouped.values())
 
 
 def _report_view(report: Any) -> Dict[str, Any]:
@@ -192,7 +203,6 @@ def _report_view(report: Any) -> Dict[str, Any]:
 
     metadata = report.metadata_summary
     structure = report.structural_summary
-    passages = report.passage_quality_summary
     assessment = report.assessment_summary
     return {
         "assessment": {
@@ -210,11 +220,6 @@ def _report_view(report: Any) -> Dict[str, Any]:
         "structure": {
             "passage_count": structure.total_passage_count,
             "word_count": structure.total_word_count,
-        },
-        "retrieval": {
-            "minimum_passage_word_count": passages.minimum_passage_word_count,
-            "median_passage_word_count": passages.median_passage_word_count,
-            "maximum_passage_word_count": passages.maximum_passage_word_count,
         },
         "editor": (
             None

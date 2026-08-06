@@ -62,9 +62,6 @@ class AIReadinessReportTests(unittest.TestCase):
                         character_count=34,
                     ),
                 ),
-                minimum_passage_word_count=6,
-                maximum_passage_word_count=6,
-                median_passage_word_count=6.0,
             ),
         )
         return AssessAIReadiness().execute(report)

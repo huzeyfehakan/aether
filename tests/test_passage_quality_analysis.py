@@ -56,9 +56,6 @@ class PassageQualityAnalysisTests(unittest.TestCase):
             [(profile.word_count, profile.character_count) for profile in analysis.passage_profiles],
             [(2, len("One two.")), (3, len("Three four five."))],
         )
-        self.assertEqual(analysis.minimum_passage_word_count, 2)
-        self.assertEqual(analysis.maximum_passage_word_count, 3)
-        self.assertEqual(analysis.median_passage_word_count, 2.5)
 
     def test_analysis_is_deterministic_and_immutable(self):
         registered = self.register_article(
@@ -74,7 +71,7 @@ class PassageQualityAnalysisTests(unittest.TestCase):
 
         self.assertEqual(first, second)
         with self.assertRaises(FrozenInstanceError):
-            first.minimum_passage_word_count = 100
+            first.passage_profiles = ()
 
     def test_rejects_article_version_from_a_different_article(self):
         first = self.register_article(

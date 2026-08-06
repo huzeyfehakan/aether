@@ -42,9 +42,6 @@ class MetadataSummary:
 @dataclass(frozen=True)
 class PassageQualitySummary:
     passage_profiles: Tuple[PassageProfile, ...]
-    minimum_passage_word_count: Optional[int]
-    maximum_passage_word_count: Optional[int]
-    median_passage_word_count: Optional[float]
 
 
 @dataclass(frozen=True)
@@ -125,9 +122,6 @@ class BuildAIReadinessReport:
             ),
             passage_quality_summary=PassageQualitySummary(
                 passage_profiles=passage_quality.passage_profiles,
-                minimum_passage_word_count=passage_quality.minimum_passage_word_count,
-                maximum_passage_word_count=passage_quality.maximum_passage_word_count,
-                median_passage_word_count=passage_quality.median_passage_word_count,
             ),
             assessment_summary=AssessmentSummary(
                 metadata_completeness=assessment.metadata_completeness,

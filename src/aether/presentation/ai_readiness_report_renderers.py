@@ -21,6 +21,15 @@ def _display_optional(value: Any) -> str:
     return "unavailable" if value is None else str(value)
 
 
+def _codes_in_order(recommendations) -> list:
+    """Distinct recommendation codes, keeping first-seen order."""
+    seen = []
+    for recommendation in recommendations:
+        if recommendation.code not in seen:
+            seen.append(recommendation.code)
+    return seen
+
+
 def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
     """Map report fields directly without deriving any new business information."""
     return {
@@ -52,15 +61,6 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
                 }
                 for profile in report.passage_quality_summary.passage_profiles
             ],
-            "minimum_passage_word_count": (
-                report.passage_quality_summary.minimum_passage_word_count
-            ),
-            "maximum_passage_word_count": (
-                report.passage_quality_summary.maximum_passage_word_count
-            ),
-            "median_passage_word_count": (
-                report.passage_quality_summary.median_passage_word_count
-            ),
         },
         "content_reuse": (
             None
@@ -120,7 +120,8 @@ class PlainTextAIReadinessReportRenderer:
             f"Total Passages: {structural.total_passage_count}",
             f"Total Words: {structural.total_word_count}",
             "",
-            "Metadata Summary",
+            "Extracted Metadata",
+            "What Aether could read from this page, from any source on it.",
             f"Title Available: {metadata.title_available}",
             f"Title Length: {metadata.title_length}",
             f"Canonical URL Available: {metadata.canonical_url_available}",
@@ -129,16 +130,39 @@ class PlainTextAIReadinessReportRenderer:
             f"Language Available: {metadata.language_available}",
             f"Author Available: {metadata.author_available}",
             f"Description Available: {metadata.description_available}",
-            "",
-            "Passage Quality Summary",
-            f"Minimum Passage Word Count: {_display_optional(passage_quality.minimum_passage_word_count)}",
-            f"Maximum Passage Word Count: {_display_optional(passage_quality.maximum_passage_word_count)}",
-            f"Median Passage Word Count: {_display_optional(passage_quality.median_passage_word_count)}",
-            "",
-            "Assessment Summary",
             f"Metadata Completeness: {assessment.metadata_completeness.value}",
-        )
+        ) + self._structured_data_lines(report)
         return "\n".join(list(lines) + list(self._recommendation_lines(report)))
+
+    @staticmethod
+    def _structured_data_lines(report: AIReadinessReport) -> tuple:
+        """Report the Schema.org declaration as a separate question.
+
+        Extracted metadata answers what could be read from the page at all.
+        This answers what the page formally declares to machines. A detail can
+        be readable and undeclared at once, so the two are stated apart rather
+        than left looking like a contradiction.
+        """
+        summary = report.structured_data_summary
+        if summary is None:
+            return ()
+        lines = [
+            "",
+            "Structured Data (Schema.org)",
+            "What this page formally declares to machines.",
+        ]
+        if not summary.article_node_present:
+            lines.append("Article markup: not present")
+            return tuple(lines)
+        lines.append("Article markup: present")
+        lines.append(
+            f"Declared: {len(summary.declared_article_properties)} properties"
+        )
+        if summary.missing_article_properties:
+            lines.append(
+                f"  {missing_properties_phrase(summary.missing_article_properties)}"
+            )
+        return tuple(lines)
 
     @staticmethod
     def _recommendation_lines(report: AIReadinessReport) -> tuple:
@@ -183,19 +207,25 @@ class PlainTextAIReadinessReportRenderer:
                         "Nothing to change: this article declares itself completely."
                     )
                     continue
-            for recommendation in in_category:
-                text = recommendation_text(recommendation)
+            # Findings of the same kind share one explanation. Repeating the
+            # same two paragraphs of rationale under every occurrence buries
+            # the occurrences themselves.
+            for code in _codes_in_order(in_category):
+                occurrences = [r for r in in_category if r.code is code]
+                text = recommendation_text(occurrences[0])
                 lines.extend(("", text.headline))
-                if recommendation.other_article_count:
-                    lines.append(
-                        f"  {repeated_in_phrase(recommendation.other_article_count)}"
-                    )
-                if recommendation.missing_properties:
-                    lines.append(
-                        f"  {missing_properties_phrase(recommendation.missing_properties)}"
-                    )
-                if recommendation.excerpt:
-                    lines.append(f'  "{recommendation.excerpt}"')
+                for occurrence in occurrences:
+                    detail = ""
+                    if occurrence.other_article_count:
+                        detail = repeated_in_phrase(occurrence.other_article_count)
+                    if occurrence.missing_properties:
+                        detail = missing_properties_phrase(
+                            occurrence.missing_properties
+                        )
+                    if detail:
+                        lines.append(f"  {detail}")
+                    if occurrence.excerpt:
+                        lines.append(f'  "{occurrence.excerpt}"')
                 lines.extend(
                     (
                         f"  Why it matters: {text.why_it_matters}",
@@ -226,7 +256,7 @@ class MarkdownAIReadinessReportRenderer:
             f"- Total passages: {structural.total_passage_count}",
             f"- Total words: {structural.total_word_count}",
             "",
-            "## Metadata Summary",
+            "## Extracted Metadata",
             "",
             f"- Title available: {metadata.title_available}",
             f"- Title length: {metadata.title_length}",
@@ -237,11 +267,6 @@ class MarkdownAIReadinessReportRenderer:
             f"- Author available: {metadata.author_available}",
             f"- Description available: {metadata.description_available}",
             "",
-            "## Passage Quality Summary",
-            "",
-            f"- Minimum passage word count: {_display_optional(passage_quality.minimum_passage_word_count)}",
-            f"- Maximum passage word count: {_display_optional(passage_quality.maximum_passage_word_count)}",
-            f"- Median passage word count: {_display_optional(passage_quality.median_passage_word_count)}",
             "",
             "### Passage Profiles",
             "",

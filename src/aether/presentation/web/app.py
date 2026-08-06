@@ -12,6 +12,7 @@ from aether.adapters.outbound.http_html_fetcher import HtmlFetchError, HttpHtmlF
 from aether.adapters.outbound.in_memory_content_repository import InMemoryContentRepository
 from aether.application.analysis.analyze_article_metadata import AnalyzeArticleMetadata
 from aether.application.analysis.analyze_article_structure import AnalyzeArticleStructure
+from aether.application.analysis.analyze_content_duplication import AnalyzeContentDuplication
 from aether.application.analysis.analyze_passage_quality import AnalyzePassageQuality
 from aether.application.analysis.assess_ai_readiness import AssessAIReadiness
 from aether.application.analysis.build_ai_readiness_report import BuildAIReadinessReport
@@ -24,6 +25,11 @@ from aether.application.ingestion.register_raw_html_article import (
 from aether.domain.common import DomainValidationError
 from aether.presentation.ai_readiness_report_renderers import (
     PlainTextAIReadinessReportRenderer,
+)
+from aether.presentation.editor_recommendation_text import (
+    compared_articles_phrase,
+    recommendation_text,
+    repeated_in_phrase,
 )
 
 
@@ -44,6 +50,10 @@ class AIReadinessPipeline:
             AnalyzeArticleStructure(repository),
             AnalyzeArticleMetadata(repository),
             AnalyzePassageQuality(repository),
+            # Corpus-aware: each analysed article joins this publisher's
+            # corpus, so repeated text is reported once a second article
+            # from the same publisher has been analysed.
+            AnalyzeContentDuplication(repository),
         )
         self._assess_readiness = AssessAIReadiness()
         self._build_readiness_report = BuildAIReadinessReport()
@@ -175,6 +185,29 @@ def _report_view(report: Any) -> Dict[str, Any]:
             "median_passage_word_count": passages.median_passage_word_count,
             "maximum_passage_word_count": passages.maximum_passage_word_count,
         },
+        "reuse": (
+            None
+            if report.content_reuse_summary is None
+            else {
+                "compared_articles": compared_articles_phrase(
+                    report.content_reuse_summary.compared_article_count
+                ),
+                "recommendations": [
+                    {
+                        "headline": recommendation_text(recommendation).headline,
+                        "repeated_in": repeated_in_phrase(
+                            recommendation.other_article_count
+                        ),
+                        "excerpt": recommendation.excerpt,
+                        "why_it_matters": recommendation_text(
+                            recommendation
+                        ).why_it_matters,
+                        "what_to_do": recommendation_text(recommendation).what_to_do,
+                    }
+                    for recommendation in report.editor_recommendations
+                ],
+            }
+        ),
         "technical": {
             "article_id": report.article_identity.article_id,
             "article_version_id": report.article_identity.article_version_id,

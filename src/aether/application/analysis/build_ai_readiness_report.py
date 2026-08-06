@@ -3,10 +3,15 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+from aether.application.analysis.analyze_content_duplication import RepeatedPassage
 from aether.application.analysis.analyze_passage_quality import PassageProfile
 from aether.application.analysis.assess_ai_readiness import (
     AIReadinessAssessment,
     CompletenessClassification,
+)
+from aether.application.analysis.derive_editor_recommendations import (
+    DeriveEditorRecommendations,
+    EditorRecommendation,
 )
 
 
@@ -48,6 +53,20 @@ class AssessmentSummary:
 
 
 @dataclass(frozen=True)
+class ContentReuseSummary:
+    """Text this article shares with the publisher's other articles.
+
+    ``compared_article_count`` accompanies every finding so an editor can see
+    how much evidence it rests on. Zero means no other article was available to
+    compare against, not that the article is free of repeated text.
+    """
+
+    compared_article_count: int
+    total_passage_count: int
+    repeated_passages: Tuple[RepeatedPassage, ...]
+
+
+@dataclass(frozen=True)
 class AIReadinessReport:
     """Final MVP output composed exclusively from an existing assessment."""
 
@@ -56,10 +75,18 @@ class AIReadinessReport:
     metadata_summary: MetadataSummary
     passage_quality_summary: PassageQualitySummary
     assessment_summary: AssessmentSummary
+    content_reuse_summary: Optional[ContentReuseSummary] = None
+    editor_recommendations: Tuple[EditorRecommendation, ...] = ()
 
 
 class BuildAIReadinessReport:
     """Create a presentation-ready immutable projection without new rules."""
+
+    def __init__(
+        self,
+        recommendations: Optional[DeriveEditorRecommendations] = None,
+    ) -> None:
+        self._recommendations = recommendations or DeriveEditorRecommendations()
 
     def execute(self, assessment: AIReadinessAssessment) -> AIReadinessReport:
         report = assessment.report
@@ -94,4 +121,17 @@ class BuildAIReadinessReport:
             assessment_summary=AssessmentSummary(
                 metadata_completeness=assessment.metadata_completeness,
             ),
+            content_reuse_summary=self._content_reuse_summary(report),
+            editor_recommendations=self._recommendations.execute(report),
+        )
+
+    @staticmethod
+    def _content_reuse_summary(report) -> Optional[ContentReuseSummary]:
+        duplication = report.content_duplication_analysis
+        if duplication is None:
+            return None
+        return ContentReuseSummary(
+            compared_article_count=duplication.compared_article_count,
+            total_passage_count=duplication.total_passage_count,
+            repeated_passages=duplication.repeated_passages,
         )

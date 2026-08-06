@@ -4,6 +4,12 @@ import json
 from typing import Any, Dict
 
 from aether.application.analysis.build_ai_readiness_report import AIReadinessReport
+from aether.presentation.editor_recommendation_text import (
+    category_title,
+    compared_articles_phrase,
+    recommendation_text,
+    repeated_in_phrase,
+)
 
 
 def _display_optional(value: Any) -> str:
@@ -51,6 +57,30 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
                 report.passage_quality_summary.median_passage_word_count
             ),
         },
+        "content_reuse": (
+            None
+            if report.content_reuse_summary is None
+            else {
+                "compared_article_count": (
+                    report.content_reuse_summary.compared_article_count
+                ),
+                "repeated_paragraph_count": len(
+                    report.content_reuse_summary.repeated_passages
+                ),
+                "total_paragraph_count": (
+                    report.content_reuse_summary.total_passage_count
+                ),
+            }
+        ),
+        "editor_recommendations": [
+            {
+                "category": recommendation.category.value,
+                "code": recommendation.code.value,
+                "excerpt": recommendation.excerpt,
+                "other_article_count": recommendation.other_article_count,
+            }
+            for recommendation in report.editor_recommendations
+        ],
         "assessment_summary": {
             "metadata_completeness": (
                 report.assessment_summary.metadata_completeness.value
@@ -103,7 +133,36 @@ class PlainTextAIReadinessReportRenderer:
             "Assessment Summary",
             f"Metadata Completeness: {assessment.metadata_completeness.value}",
         )
-        return "\n".join(lines)
+        return "\n".join(lines + self._recommendation_lines(report))
+
+    @staticmethod
+    def _recommendation_lines(report: AIReadinessReport) -> tuple:
+        if report.content_reuse_summary is None:
+            return ()
+        lines = [
+            "",
+            "Content Quality",
+            compared_articles_phrase(
+                report.content_reuse_summary.compared_article_count
+            ),
+        ]
+        if not report.editor_recommendations:
+            if report.content_reuse_summary.compared_article_count:
+                lines.append("No repeated text was found in this article.")
+            return tuple(lines)
+        for recommendation in report.editor_recommendations:
+            text = recommendation_text(recommendation)
+            lines.extend(
+                (
+                    "",
+                    f"{text.headline}",
+                    f"  {repeated_in_phrase(recommendation.other_article_count)}",
+                    f'  "{recommendation.excerpt}"',
+                    f"  Why it matters: {text.why_it_matters}",
+                    f"  What to do: {text.what_to_do}",
+                )
+            )
+        return tuple(lines)
 
 
 class MarkdownAIReadinessReportRenderer:

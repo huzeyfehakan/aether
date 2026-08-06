@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Mapping, Optional, Tuple
 
 from aether.domain.content import Article, ArticleVersion, Passage
+from aether.domain.source_data import ArticleVersionSourceData
 
 
 class ContentRepository(ABC):
@@ -49,4 +50,16 @@ class ContentRepository(ABC):
 
     @abstractmethod
     def save_passages(self, passages: Tuple[Passage, ...]) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def save_source_data(self, source_data: ArticleVersionSourceData) -> None:
+        """Persist what one article version declared to machines."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_source_data(
+        self, article_version_id: str
+    ) -> Optional[ArticleVersionSourceData]:
+        """Return the declared inventory for a version, if one was stored."""
         raise NotImplementedError

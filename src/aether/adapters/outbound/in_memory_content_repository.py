@@ -8,6 +8,7 @@ from typing import Dict, Mapping, Optional, Tuple
 
 from aether.domain.common import DomainValidationError
 from aether.domain.content import Article, ArticleVersion, Passage
+from aether.domain.source_data import ArticleVersionSourceData
 from aether.ports.outbound.content_repository import ContentRepository
 
 
@@ -17,6 +18,7 @@ class InMemoryContentRepository(ContentRepository):
         self._article_ids_by_source: Dict[str, str] = {}
         self._versions: Dict[str, ArticleVersion] = {}
         self._passages: Dict[str, Passage] = {}
+        self._source_data: Dict[str, ArticleVersionSourceData] = {}
 
     def find_article_by_canonical_source(self, canonical_source: str) -> Optional[Article]:
         article_id = self._article_ids_by_source.get(canonical_source)
@@ -69,6 +71,17 @@ class InMemoryContentRepository(ContentRepository):
             fingerprint: tuple(sorted(version_ids))
             for fingerprint, version_ids in occurrences.items()
         }
+
+    def save_source_data(self, source_data: ArticleVersionSourceData) -> None:
+        existing = self._source_data.get(source_data.article_version_id)
+        if existing is not None and existing != source_data:
+            raise DomainValidationError("article version source data is immutable")
+        self._source_data[source_data.article_version_id] = source_data
+
+    def get_source_data(
+        self, article_version_id: str
+    ) -> Optional[ArticleVersionSourceData]:
+        return self._source_data.get(article_version_id)
 
     def _publisher_of(self, article_version: ArticleVersion) -> Optional[str]:
         article = self._articles_by_id.get(article_version.article_id)

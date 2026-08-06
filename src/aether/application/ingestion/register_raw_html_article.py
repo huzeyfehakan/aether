@@ -15,6 +15,7 @@ from aether.application.ingestion.register_source_snapshot import (
     SourceArticleSnapshot,
 )
 from aether.domain.common import DomainValidationError, require_aware
+from aether.domain.source_data import StructuredDataNode
 from aether.ports.outbound.content_repository import ContentRepository
 
 
@@ -60,6 +61,7 @@ class NormalizedHtmlArticle:
     author: Optional[str]
     description: Optional[str]
     keywords: Optional[str]
+    structured_data_nodes: Tuple[StructuredDataNode, ...] = ()
 
 
 class _ArticleHtmlCollector(HTMLParser):
@@ -335,7 +337,52 @@ class HtmlArticleNormalizer:
                 or self._first_metadata(collector.metadata, self._DESCRIPTION_META_KEYS)
             ),
             keywords=self._first_metadata(collector.metadata, self._KEYWORD_META_KEYS),
+            structured_data_nodes=self._structured_data_nodes(
+                collector.json_ld_documents
+            ),
         )
+
+    @classmethod
+    def _structured_data_nodes(
+        cls, documents: List[str]
+    ) -> Tuple[StructuredDataNode, ...]:
+        """Inventory the typed nodes a page declares, in document order.
+
+        Only the node type and its property names are retained. Values are not,
+        because a structured-data check asks what a publisher declared, not what
+        the declaration said, and the values already reach the report through
+        the fields that read them.
+        """
+        nodes = []
+        for document in documents:
+            try:
+                payload = json.loads(document)
+            except json.JSONDecodeError:
+                continue
+            for value in cls._json_values_in_document_order(payload):
+                node_type = cls._node_type_of(value)
+                if node_type is None:
+                    continue
+                property_names = tuple(
+                    sorted(key for key in value if not key.startswith("@"))
+                )
+                nodes.append(
+                    StructuredDataNode(
+                        node_type=node_type, property_names=property_names
+                    )
+                )
+        return tuple(nodes)
+
+    @staticmethod
+    def _node_type_of(value: Any) -> Optional[str]:
+        if not isinstance(value, dict):
+            return None
+        raw_type = value.get("@type")
+        candidates = raw_type if isinstance(raw_type, list) else (raw_type,)
+        for item in candidates:
+            if isinstance(item, str) and item.strip():
+                return item.rsplit("/", 1)[-1].rsplit("#", 1)[-1].strip()
+        return None
 
     @classmethod
     def _language(
@@ -617,5 +664,6 @@ class RegisterRawHtmlArticle:
                 author=normalized.author,
                 description=normalized.description,
                 keywords=normalized.keywords,
+                structured_data_nodes=normalized.structured_data_nodes,
             )
         )

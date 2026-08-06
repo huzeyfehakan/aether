@@ -83,6 +83,48 @@ class RawHtmlIngestionTests(unittest.TestCase):
         self.assertEqual(result.article_version.description, "A source-provided description.")
         self.assertEqual(result.article_version.keywords, "politika, ekonomi,  haber")
 
+    def test_retains_an_inventory_of_declared_structured_data(self):
+        """What a page declares to machines survives text normalization."""
+        html = """
+            <html lang="tr"><head><title>Inventory</title>
+              <script type="application/ld+json">
+                {"@context": "https://schema.org", "@type": "NewsArticle",
+                 "headline": "Bir başlık", "datePublished": "2026-08-03T10:00:00+03:00",
+                 "author": {"@type": "Organization", "name": "TRT"}}
+              </script>
+            </head><body><main><p>Görünür paragraf.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+        source_data = self.repository.get_source_data(
+            result.article_version.article_version_id
+        )
+
+        types = [node.node_type for node in source_data.structured_data_nodes]
+        self.assertIn("NewsArticle", types)
+        self.assertIn("Organization", types)
+        article = next(
+            node for node in source_data.structured_data_nodes
+            if node.node_type == "NewsArticle"
+        )
+        self.assertEqual(
+            article.property_names, ("author", "datePublished", "headline")
+        )
+        self.assertTrue(article.declares("headline"))
+
+    def test_retains_an_empty_inventory_when_a_page_declares_nothing(self):
+        html = """
+            <html lang="tr"><head><title>No structured data</title></head>
+            <body><main><p>Görünür paragraf.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+        source_data = self.repository.get_source_data(
+            result.article_version.article_version_id
+        )
+
+        self.assertEqual(source_data.structured_data_nodes, ())
+
     def test_normalizes_date_only_json_ld_dates_to_midnight_utc(self):
         """TRT Çocuk Ebeveyn Akademisi publishes Schema.org Date, not DateTime."""
         html = (FIXTURES / "trt_ebeveyn_akademisi_makale.html").read_text(encoding="utf-8")

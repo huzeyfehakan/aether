@@ -35,7 +35,6 @@ class MetadataSummary:
     language_available: bool
     author_available: bool
     description_available: bool
-    keyword_available: bool
 
 
 @dataclass(frozen=True)
@@ -97,7 +96,6 @@ class BuildAIReadinessReport:
                 language_available=metadata.language_available,
                 author_available=metadata.author_available,
                 description_available=metadata.description_available,
-                keyword_available=metadata.keyword_available,
             ),
             passage_quality_summary=PassageQualitySummary(
                 passage_profiles=passage_quality.passage_profiles,

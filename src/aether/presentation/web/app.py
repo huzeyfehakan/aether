@@ -167,7 +167,6 @@ def _report_view(report: Any) -> Dict[str, Any]:
             {"label": "Language", "available": metadata.language_available},
             {"label": "Author", "available": metadata.author_available},
             {"label": "Description", "available": metadata.description_available},
-            {"label": "Keywords", "available": metadata.keyword_available},
         ),
         "structure": {
             "passage_count": structure.total_passage_count,

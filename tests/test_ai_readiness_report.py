@@ -50,7 +50,6 @@ class AIReadinessReportTests(unittest.TestCase):
                 language_available=True,
                 author_available=True,
                 description_available=True,
-                keyword_available=False,
             ),
             passage_quality_analysis=PassageQualityAnalysis(
                 article_id="article-1",
@@ -89,7 +88,6 @@ class AIReadinessReportTests(unittest.TestCase):
         self.assertEqual(report.structural_summary.paragraph_count, 2)
         self.assertTrue(report.metadata_summary.title_available)
         self.assertTrue(report.metadata_summary.author_available)
-        self.assertFalse(report.metadata_summary.keyword_available)
         self.assertEqual(len(report.passage_quality_summary.passage_profiles), 2)
         self.assertEqual(report.passage_quality_summary.source_paragraph_coverage_ratio, 1.0)
         self.assertEqual(

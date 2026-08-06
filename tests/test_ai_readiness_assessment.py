@@ -42,7 +42,6 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             language_available=metadata_available[4],
             author_available=metadata_available[5],
             description_available=metadata_available[6],
-            keyword_available=metadata_available[7],
         )
         structural = ArticleStructuralAnalysis(
             article_id="article-1",
@@ -76,7 +75,7 @@ class AIReadinessAssessmentTests(unittest.TestCase):
 
     def test_classifies_complete_report_and_preserves_raw_observations(self):
         report = self.report(
-            metadata_available=(True, True, True, True, True, True, True, True),
+            metadata_available=(True, True, True, True, True, True, True),
             coverage_ratio=1.0,
             covered_paragraphs=2,
             ordinals_contiguous=True,
@@ -102,7 +101,7 @@ class AIReadinessAssessmentTests(unittest.TestCase):
 
     def test_classifies_partial_report_from_existing_raw_observations(self):
         report = self.report(
-            metadata_available=(True, True, True, False, True, False, False, False),
+            metadata_available=(True, True, True, False, True, False, False),
             coverage_ratio=0.5,
             covered_paragraphs=1,
             ordinals_contiguous=False,
@@ -123,7 +122,7 @@ class AIReadinessAssessmentTests(unittest.TestCase):
 
     def test_classifies_missing_report_without_numeric_scoring(self):
         report = self.report(
-            metadata_available=(False, False, False, False, False, False, False, False),
+            metadata_available=(False, False, False, False, False, False, False),
             coverage_ratio=0.0,
             covered_paragraphs=0,
             ordinals_contiguous=False,
@@ -144,7 +143,7 @@ class AIReadinessAssessmentTests(unittest.TestCase):
 
     def test_assessment_is_deterministic_and_immutable(self):
         report = self.report(
-            metadata_available=(True, True, True, True, True, True, True, True),
+            metadata_available=(True, True, True, True, True, True, True),
             coverage_ratio=1.0,
             covered_paragraphs=2,
             ordinals_contiguous=True,

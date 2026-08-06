@@ -27,7 +27,6 @@ class AIReadinessObservations:
     language_available: bool
     author_available: bool
     description_available: bool
-    keyword_available: bool
     source_paragraph_count: int
     covered_source_paragraph_count: int
     source_paragraph_coverage_ratio: float
@@ -74,7 +73,6 @@ class AssessAIReadiness:
             language_available=metadata.language_available,
             author_available=metadata.author_available,
             description_available=metadata.description_available,
-            keyword_available=metadata.keyword_available,
             source_paragraph_count=passage_quality.source_paragraph_count,
             covered_source_paragraph_count=passage_quality.covered_source_paragraph_count,
             source_paragraph_coverage_ratio=passage_quality.source_paragraph_coverage_ratio,
@@ -96,7 +94,6 @@ class AssessAIReadiness:
             observations.language_available,
             observations.author_available,
             observations.description_available,
-            observations.keyword_available,
         )
         if all(availability):
             return CompletenessClassification.COMPLETE

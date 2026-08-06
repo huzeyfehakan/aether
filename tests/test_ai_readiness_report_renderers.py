@@ -54,7 +54,6 @@ class AIReadinessReportRendererTests(unittest.TestCase):
                 language_available=True,
                 author_available=True,
                 description_available=False,
-                keyword_available=False,
             ),
             passage_quality_analysis=PassageQualityAnalysis(
                 article_id="article-1",

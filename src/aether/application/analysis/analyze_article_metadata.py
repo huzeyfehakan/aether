@@ -12,6 +12,11 @@ class MetadataAnalysis:
     """Raw metadata facts available from the frozen source records.
 
     ``title_length`` is the Unicode character count of the stored, trimmed title.
+
+    Meta keywords are deliberately absent. Search engines stopped honouring the
+    tag long ago and it carries no signal for how an AI system understands,
+    retrieves, or cites an article. ``ArticleVersion`` still retains the value
+    as published, so nothing about the source record changes.
     """
 
     article_id: str
@@ -24,7 +29,6 @@ class MetadataAnalysis:
     language_available: bool
     author_available: bool
     description_available: bool
-    keyword_available: bool
 
 
 class AnalyzeArticleMetadata:
@@ -50,9 +54,6 @@ class AnalyzeArticleMetadata:
             author_available=bool(article_version.author and article_version.author.strip()),
             description_available=bool(
                 article_version.description and article_version.description.strip()
-            ),
-            keyword_available=bool(
-                article_version.keywords and article_version.keywords.strip()
             ),
         )
 

@@ -33,7 +33,6 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
             "language_available": report.metadata_summary.language_available,
             "author_available": report.metadata_summary.author_available,
             "description_available": report.metadata_summary.description_available,
-            "keyword_available": report.metadata_summary.keyword_available,
         },
         "passage_quality_summary": {
             "passage_profiles": [
@@ -115,7 +114,6 @@ class PlainTextAIReadinessReportRenderer:
             f"Language Available: {metadata.language_available}",
             f"Author Available: {metadata.author_available}",
             f"Description Available: {metadata.description_available}",
-            f"Keywords Available: {metadata.keyword_available}",
             "",
             "Passage Quality Summary",
             f"Minimum Passage Word Count: {_display_optional(passage_quality.minimum_passage_word_count)}",
@@ -168,7 +166,6 @@ class MarkdownAIReadinessReportRenderer:
             f"- Language available: {metadata.language_available}",
             f"- Author available: {metadata.author_available}",
             f"- Description available: {metadata.description_available}",
-            f"- Keywords available: {metadata.keyword_available}",
             "",
             "## Passage Quality Summary",
             "",

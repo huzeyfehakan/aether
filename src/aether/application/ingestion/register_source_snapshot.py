@@ -7,6 +7,7 @@ import json
 from typing import Optional, Tuple
 
 from aether.domain.content import Article, ArticleVersion, Passage
+from aether.domain.source_data import ArticleVersionSourceData, StructuredDataNode
 from aether.ports.outbound.content_repository import ContentRepository
 
 
@@ -27,6 +28,7 @@ class SourceArticleSnapshot:
     author: Optional[str] = None
     description: Optional[str] = None
     keywords: Optional[str] = None
+    structured_data_nodes: Tuple[StructuredDataNode, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -112,6 +114,14 @@ class RegisterSourceSnapshot:
         self._content_repository.save_article(updated_article)
         self._content_repository.save_article_version(version)
         self._content_repository.save_passages(passages)
+        # Declared structured data is retained alongside the version but stays
+        # out of the content fingerprint, which describes the article text.
+        self._content_repository.save_source_data(
+            ArticleVersionSourceData(
+                article_version_id=version.article_version_id,
+                structured_data_nodes=snapshot.structured_data_nodes,
+            )
+        )
         return RegistrationResult(
             article=updated_article,
             article_version=version,

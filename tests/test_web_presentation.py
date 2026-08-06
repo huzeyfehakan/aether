@@ -146,6 +146,49 @@ class WebPresentationTests(unittest.TestCase):
             referenced <= provided,
             f"template reads {sorted(referenced - provided)} which the view does not send",
         )
+    def test_web_view_separates_editor_and_technical_recommendations(self):
+        """A second article from the same publisher makes reuse visible."""
+        html = """
+            <html lang="tr"><head><title>{slug}</title></head>
+            <body><main><p>{unique}</p><p>Bu icerik bilgilendirme amacli hazirlanmistir.</p></main></body></html>
+        """
+        for slug, unique in (("birinci", "Ozgun paragraf."), ("ikinci", "Baska paragraf.")):
+            response = self.client.post(
+                "/analyze/file",
+                data={"source_url": f"https://ebeveynakademisi.trtcocuk.net.tr/makale/{slug}"},
+                files={"file": ("a.html", html.format(slug=slug, unique=unique), "text/html")},
+            )
+            self.assertEqual(response.status_code, 200)
+
+        reuse = response.json()["view"]["editor"]
+        self.assertEqual(
+            reuse["compared_articles"],
+            "Compared against previously analyzed articles from this publisher "
+            "(1 article).",
+        )
+        self.assertEqual(len(reuse["recommendations"]), 1)
+        recommendation = reuse["recommendations"][0]
+        self.assertEqual(
+            recommendation["headline"],
+            "This paragraph also appears in your other articles",
+        )
+        self.assertEqual(
+            recommendation["occurrences"][0]["detail"],
+            "Also appears in 1 other article",
+        )
+        self.assertIn("outside the article body", recommendation["what_to_do"])
+        self.assertEqual(len(recommendation["occurrences"]), 1)
+        self.assertIn(
+            "Bu icerik bilgilendirme", recommendation["occurrences"][0]["excerpt"]
+        )
+
+    def test_index_shows_both_audience_sections(self):
+        response = self.client.get("/")
+
+        self.assertIn('id="editor-section"', response.text)
+        self.assertIn('id="technical-section"', response.text)
+        self.assertIn("Editor Recommendations", response.text)
+        self.assertIn("Technical AI Readiness", response.text)
 
     def test_invalid_url_submission_returns_a_user_facing_validation_error(self):
         response = TestClient(create_app()).post(

@@ -1,8 +1,7 @@
-"""Measure the retrieval shape of stored Passages without scoring."""
+"""Per-paragraph size detail for one Article Version."""
 
 from dataclasses import dataclass
-from statistics import median
-from typing import Optional, Tuple
+from typing import Tuple
 
 from aether.domain.common import DomainValidationError
 from aether.domain.content import Article, Passage
@@ -21,21 +20,16 @@ class PassageProfile:
 
 @dataclass(frozen=True)
 class PassageQualityAnalysis:
-    """How the article divides into the units an AI system would retrieve.
+    """Per-paragraph size detail for the article.
 
-    Coverage of the stored body is deliberately absent. Passages are produced
-    by splitting that body, so any comparison between the two could only ever
-    report full coverage. It measured the pipeline against itself rather than
-    the article against its source, and editors read it as a promise that the
-    whole article had been captured.
+    Summary statistics over these lengths were removed: they described the
+    article without suggesting anything an editor could do about it, which is
+    the bar every part of the report has to clear.
     """
 
     article_id: str
     article_version_id: str
     passage_profiles: Tuple[PassageProfile, ...]
-    minimum_passage_word_count: Optional[int]
-    maximum_passage_word_count: Optional[int]
-    median_passage_word_count: Optional[float]
 
 
 class AnalyzePassageQuality:
@@ -62,15 +56,12 @@ class AnalyzePassageQuality:
         ordered_passages = tuple(
             sorted(passages, key=lambda passage: passage.ordinal_position)
         )
-        profiles = tuple(self._profile(passage) for passage in ordered_passages)
-        word_counts = tuple(profile.word_count for profile in profiles)
         return PassageQualityAnalysis(
             article_id=article.article_id,
             article_version_id=article_version.article_version_id,
-            passage_profiles=profiles,
-            minimum_passage_word_count=min(word_counts) if word_counts else None,
-            maximum_passage_word_count=max(word_counts) if word_counts else None,
-            median_passage_word_count=float(median(word_counts)) if word_counts else None,
+            passage_profiles=tuple(
+                self._profile(passage) for passage in ordered_passages
+            ),
         )
 
     @staticmethod

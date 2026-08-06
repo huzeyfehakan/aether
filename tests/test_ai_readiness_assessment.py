@@ -52,9 +52,6 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             article_id="article-1",
             article_version_id="version-1",
             passage_profiles=(),
-            minimum_passage_word_count=None,
-            maximum_passage_word_count=None,
-            median_passage_word_count=None,
         )
         return ArticleAnalysisReport(
             structural_analysis=structural,

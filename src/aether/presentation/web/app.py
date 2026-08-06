@@ -12,7 +12,9 @@ from aether.adapters.outbound.http_html_fetcher import HtmlFetchError, HttpHtmlF
 from aether.adapters.outbound.in_memory_content_repository import InMemoryContentRepository
 from aether.application.analysis.analyze_article_metadata import AnalyzeArticleMetadata
 from aether.application.analysis.analyze_article_structure import AnalyzeArticleStructure
+from aether.application.analysis.analyze_content_duplication import AnalyzeContentDuplication
 from aether.application.analysis.analyze_passage_quality import AnalyzePassageQuality
+from aether.application.analysis.analyze_structured_data import AnalyzeStructuredData
 from aether.application.analysis.assess_ai_readiness import AssessAIReadiness
 from aether.application.analysis.build_ai_readiness_report import BuildAIReadinessReport
 from aether.application.analysis.build_article_analysis_report import BuildArticleAnalysisReport
@@ -24,6 +26,16 @@ from aether.application.ingestion.register_raw_html_article import (
 from aether.domain.common import DomainValidationError
 from aether.presentation.ai_readiness_report_renderers import (
     PlainTextAIReadinessReportRenderer,
+)
+from aether.application.analysis.derive_editor_recommendations import (
+    RecommendationCategory,
+)
+from aether.presentation.editor_recommendation_text import (
+    category_subtitle,
+    compared_articles_phrase,
+    missing_properties_phrase,
+    recommendation_text,
+    repeated_in_phrase,
 )
 
 
@@ -44,6 +56,11 @@ class AIReadinessPipeline:
             AnalyzeArticleStructure(repository),
             AnalyzeArticleMetadata(repository),
             AnalyzePassageQuality(repository),
+            # Corpus-aware: each analysed article joins this publisher's
+            # corpus, so repeated text is reported once a second article
+            # from the same publisher has been analysed.
+            AnalyzeContentDuplication(repository),
+            AnalyzeStructuredData(repository),
         )
         self._assess_readiness = AssessAIReadiness()
         self._build_readiness_report = BuildAIReadinessReport()
@@ -146,12 +163,46 @@ def _publisher_from(source_url: str, publisher: Optional[str]) -> str:
     return hostname.removeprefix("www.")
 
 
+def _recommendation_views(report: Any, category) -> list:
+    """Shape one category of recommendations for display.
+
+    Findings of the same kind are grouped so their explanation is given once
+    and the occurrences are listed under it.
+    """
+    grouped: Dict[Any, Dict[str, Any]] = {}
+    for recommendation in report.editor_recommendations:
+        if recommendation.category is not category:
+            continue
+        text = recommendation_text(recommendation)
+        group = grouped.setdefault(
+            recommendation.code,
+            {
+                "headline": text.headline,
+                "why_it_matters": text.why_it_matters,
+                "what_to_do": text.what_to_do,
+                "occurrences": [],
+            },
+        )
+        occurrence: Dict[str, Any] = {}
+        if recommendation.excerpt:
+            occurrence["excerpt"] = recommendation.excerpt
+        if recommendation.other_article_count:
+            occurrence["detail"] = repeated_in_phrase(
+                recommendation.other_article_count
+            )
+        if recommendation.missing_properties:
+            occurrence["detail"] = missing_properties_phrase(
+                recommendation.missing_properties
+            )
+        group["occurrences"].append(occurrence)
+    return list(grouped.values())
+
+
 def _report_view(report: Any) -> Dict[str, Any]:
     """Expose existing report facts for the web UI without re-assessing them."""
 
     metadata = report.metadata_summary
     structure = report.structural_summary
-    passages = report.passage_quality_summary
     assessment = report.assessment_summary
     return {
         "assessment": {
@@ -170,11 +221,29 @@ def _report_view(report: Any) -> Dict[str, Any]:
             "passage_count": structure.total_passage_count,
             "word_count": structure.total_word_count,
         },
-        "retrieval": {
-            "minimum_passage_word_count": passages.minimum_passage_word_count,
-            "median_passage_word_count": passages.median_passage_word_count,
-            "maximum_passage_word_count": passages.maximum_passage_word_count,
-        },
+        "editor": (
+            None
+            if report.content_reuse_summary is None
+            else {
+                "subtitle": category_subtitle(RecommendationCategory.EDITOR),
+                "compared_articles": compared_articles_phrase(
+                    report.content_reuse_summary.compared_article_count
+                ),
+                "recommendations": _recommendation_views(
+                    report, RecommendationCategory.EDITOR
+                ),
+            }
+        ),
+        "technical": (
+            None
+            if report.structured_data_summary is None
+            else {
+                "subtitle": category_subtitle(RecommendationCategory.TECHNICAL),
+                "recommendations": _recommendation_views(
+                    report, RecommendationCategory.TECHNICAL
+                ),
+            }
+        ),
         "technical": {
             "article_id": report.article_identity.article_id,
             "article_version_id": report.article_identity.article_version_id,

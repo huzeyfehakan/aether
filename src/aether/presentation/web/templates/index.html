@@ -25,6 +25,8 @@
       .section { margin-top: 28px; } .section h3 { font-size: 1.02rem; margin: 0 0 6px; } .section > p { color: #647286; margin: 0 0 14px; }
       .metadata-table { border: 1px solid #e1e8f0; border-radius: 10px; border-spacing: 0; overflow: hidden; width: 100%; } .metadata-table td { border-bottom: 1px solid #e7edf3; padding: 11px 14px; } .metadata-table tr:last-child td { border-bottom: 0; } .metadata-table td:last-child { text-align: right; } .available { color: #176b3e; font-weight: 700; } .unavailable { color: #a3342b; font-weight: 700; }
       .missing-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; } .missing-item { background: #fff0ef; border-radius: 99px; color: #9c312b; font-size: .86rem; font-weight: 650; padding: 6px 10px; }
+      .recommendation { border: 1px solid #e0e8f1; border-left: 3px solid #0768d7; border-radius: 10px; margin-bottom: 12px; padding: 15px 17px; } .recommendation h4 { font-size: 1rem; margin: 0 0 6px; } .recommendation p { color: #4c5b6e; font-size: .9rem; line-height: 1.5; margin: 9px 0 0; } .recommendation strong { color: #24374d; }
+      .repeat-count { background: #eef3fa; border-radius: 99px; color: #3f5876; font-size: .8rem; font-weight: 680; padding: 3px 9px; } .recommendation blockquote { border-left: 2px solid #dbe3ec; color: #5d6b7e; font-style: italic; margin: 11px 0 0; padding: 2px 0 2px 12px; }
       .technical { margin-top: 28px; } .technical pre { background: #101d2c; border-radius: 10px; color: #dce9f7; margin: 14px 0 0; overflow: auto; padding: 16px; white-space: pre-wrap; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
       @media (max-width: 640px) { .shell { width: min(100% - 28px, 1120px); padding-top: 30px; } .form-panel, #report-card { padding: 19px; } .tabs { overflow-x: auto; } }
     </style>
@@ -94,7 +96,10 @@
 
         <div class="section"><h3>Metadata availability</h3><p id="metadata-summary">Source fields found in the article.</p><table class="metadata-table"><tbody id="metadata-table"></tbody></table><div id="missing-list" class="missing-list"></div></div>
 
-        <div class="section"><h3>Retrieval shape</h3><p id="retrieval-summary">How the article divides into the passages an AI system would retrieve and cite.</p><div id="retrieval-metrics" class="metric-grid"></div></div>
+        
+        <div class="section" id="editor-section"><h3>Editor Recommendations</h3><p class="muted" id="editor-subtitle"></p><p id="editor-compared"></p><div id="editor-list"></div></div>
+
+        <div class="section" id="technical-section"><h3>Technical AI Readiness</h3><p class="muted" id="technical-subtitle"></p><div id="technical-list"></div></div>
 
         <details class="technical"><summary>Technical details</summary><p class="help">Immutable identifiers and the existing plain-text report are retained for validation and troubleshooting.</p><pre id="report"></pre></details>
       </section>
@@ -144,9 +149,27 @@
         document.querySelector('#metadata-table').innerHTML = view.metadata.map((field) => `<tr><td>${field.label}</td><td class="${field.available ? 'available' : 'unavailable'}">${field.available ? 'Available' : 'Missing'}</td></tr>`).join('');
         document.querySelector('#missing-list').innerHTML = missing.map((field) => `<span class="missing-item">${field.label} missing</span>`).join('');
 
-        const retrieval = view.retrieval;
-        const words = (value) => value === null ? 'unavailable' : `${value} words`;
-        document.querySelector('#retrieval-metrics').innerHTML = [metric('Shortest passage', words(retrieval.minimum_passage_word_count)), metric('Median passage', words(retrieval.median_passage_word_count)), metric('Longest passage', words(retrieval.maximum_passage_word_count))].join('');
+        const occurrence = (o) => `${o.detail ? `<span class="repeat-count">${o.detail}</span>` : ''}${o.excerpt ? `<blockquote>${o.excerpt}</blockquote>` : ''}`;
+        const card = (item) => `<div class="recommendation"><h4>${item.headline}</h4>${item.occurrences.map(occurrence).join('')}<p><strong>Why it matters.</strong> ${item.why_it_matters}</p><p><strong>What to do.</strong> ${item.what_to_do}</p></div>`;
+
+        const editorFindings = view.editor;
+        document.querySelector('#editor-section').classList.toggle('hidden', !editorFindings);
+        if (editorFindings) {
+          document.querySelector('#editor-subtitle').textContent = editorFindings.subtitle;
+          document.querySelector('#editor-compared').textContent = editorFindings.compared_articles;
+          document.querySelector('#editor-list').innerHTML = editorFindings.recommendations.length
+            ? editorFindings.recommendations.map(card).join('')
+            : '<p class="muted">Nothing to change in this article.</p>';
+        }
+
+        const technical = view.technical;
+        document.querySelector('#technical-section').classList.toggle('hidden', !technical);
+        if (technical) {
+          document.querySelector('#technical-subtitle').textContent = technical.subtitle;
+          document.querySelector('#technical-list').innerHTML = technical.recommendations.length
+            ? technical.recommendations.map(card).join('')
+            : '<p class="muted">Nothing to change: this article declares itself completely.</p>';
+        }
         document.querySelector('#report').textContent = rawReport;
       }
 

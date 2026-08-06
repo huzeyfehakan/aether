@@ -79,8 +79,8 @@ class EditorRecommendationTests(unittest.TestCase):
         )
         return BuildAIReadinessReport().execute(AssessAIReadiness().execute(analysis))
 
-    def test_repeated_text_is_a_content_quality_recommendation(self):
-        """Repetition is measured in the text; it is not an AI visibility claim."""
+    def test_repeated_text_is_addressed_to_the_editor(self):
+        """The editor owns the article body and is the person who sees it."""
         first = self.ingest("birinci", ["Özgün paragraf.", NOTICE])
         self.ingest("ikinci", ["Başka özgün paragraf.", NOTICE])
 
@@ -92,7 +92,7 @@ class EditorRecommendationTests(unittest.TestCase):
             recommendation.code, RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY
         )
         self.assertEqual(
-            recommendation.category, RecommendationCategory.CONTENT_QUALITY
+            recommendation.category, RecommendationCategory.EDITOR
         )
         self.assertEqual(recommendation.excerpt, NOTICE)
         self.assertEqual(report.content_reuse_summary.compared_article_count, 1)
@@ -124,14 +124,14 @@ class EditorRecommendationTests(unittest.TestCase):
             with self.subTest(count=count):
                 self.assertIn(expected, compared_articles_phrase(count))
 
-    def test_rendered_report_files_repetition_under_content_quality(self):
+    def test_rendered_report_files_repetition_under_editor_recommendations(self):
         first = self.ingest("birinci", ["Özgün paragraf.", NOTICE])
         self.ingest("ikinci", ["Başka özgün paragraf.", NOTICE])
 
         rendered = PlainTextAIReadinessReportRenderer().render(self.report_for(first))
 
-        self.assertIn("Content Quality", rendered)
-        self.assertNotIn("AI Visibility", rendered)
+        self.assertIn("Editor Recommendations", rendered)
+        self.assertIn("Things you can change in this article now.", rendered)
         self.assertIn("Checked against 1 other article from this publisher.", rendered)
         self.assertIn("What to do:", rendered)
 
@@ -144,7 +144,7 @@ class EditorRecommendationTests(unittest.TestCase):
         text = recommendation_text(report.editor_recommendations[0])
         wording = " ".join((text.headline, text.why_it_matters, text.what_to_do)).lower()
 
-        for claim in ("ai system", "retrieval", "model", "ignored", "rank"):
+        for claim in ("retrieval", "ignored", "rank"):
             self.assertNotIn(claim, wording)
         for jargon in ("passage", "corpus", "fingerprint"):
             self.assertNotIn(jargon, wording)

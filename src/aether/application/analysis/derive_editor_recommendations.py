@@ -4,12 +4,12 @@ This is the one place where a finding becomes advice. Every recommendation
 answers a single question: what can the editor improve before publishing this
 article?
 
-Recommendations carry a category, because not every improvement is the same
-kind of improvement. Content quality describes the article itself and rests on
-what was measured in the text. AI visibility describes what the article
-declares to machines, and rests on a published specification that says what the
-declaration should contain. Keeping them apart stops a measured content fact
-from being presented as a claim about how an AI system behaves.
+Recommendations carry a category naming *who can act on them*. An editor can
+change what this article says today. Changing how the page is built -- its
+markup, its declarations, its template -- needs the CMS or engineering, and
+usually fixes every article at once rather than this one. Mixing the two buries
+the few things an editor can fix among many things they cannot, which is the
+fastest way to make a report ignored.
 
 Only a category, a code and the supporting facts are produced here. The wording
 belongs to presentation, which serves editors in their own language; putting
@@ -27,10 +27,10 @@ from aether.application.analysis.build_article_analysis_report import (
 
 
 class RecommendationCategory(str, Enum):
-    """What kind of improvement a recommendation describes."""
+    """Who can act on a recommendation."""
 
-    CONTENT_QUALITY = "content_quality"
-    AI_VISIBILITY = "ai_visibility"
+    EDITOR = "editor"
+    TECHNICAL = "technical"
 
 
 class RecommendationCode(str, Enum):
@@ -41,15 +41,18 @@ class RecommendationCode(str, Enum):
     INCOMPLETE_ARTICLE_STRUCTURED_DATA = "incomplete_article_structured_data"
 
 
+#: Structured data is declared by the page template, so correcting it is a CMS
+#: or engineering change that fixes every article at once.
+#:
+#: Repeated text is filed under the editor because the editor owns the article
+#: body and is the person who sees the paragraph. Whether the remedy is theirs
+#: or the CMS team's depends on how the text got there, which the markup does
+#: not reveal, so the advice names both paths rather than guessing.
 _CATEGORIES = {
-    RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY: (
-        RecommendationCategory.CONTENT_QUALITY
-    ),
-    RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: (
-        RecommendationCategory.AI_VISIBILITY
-    ),
+    RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY: RecommendationCategory.EDITOR,
+    RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: RecommendationCategory.TECHNICAL,
     RecommendationCode.INCOMPLETE_ARTICLE_STRUCTURED_DATA: (
-        RecommendationCategory.AI_VISIBILITY
+        RecommendationCategory.TECHNICAL
     ),
 }
 
@@ -73,10 +76,10 @@ class DeriveEditorRecommendations:
     """Derive editor-facing advice from an existing analysis report."""
 
     def execute(self, report: ArticleAnalysisReport) -> Tuple[EditorRecommendation, ...]:
-        return self._structured_data(report) + self._content_quality(report)
+        return self._editor(report) + self._technical(report)
 
     @staticmethod
-    def _structured_data(
+    def _technical(
         report: ArticleAnalysisReport,
     ) -> Tuple[EditorRecommendation, ...]:
         analysis = report.structured_data_analysis
@@ -98,7 +101,7 @@ class DeriveEditorRecommendations:
         return ()
 
     @staticmethod
-    def _content_quality(
+    def _editor(
         report: ArticleAnalysisReport,
     ) -> Tuple[EditorRecommendation, ...]:
         duplication = report.content_duplication_analysis

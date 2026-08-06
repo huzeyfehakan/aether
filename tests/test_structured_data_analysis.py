@@ -145,6 +145,46 @@ class StructuredDataAnalysisTests(unittest.TestCase):
         self.assertIn("inLanguage", analysis.missing_article_properties)
         self.assertNotIn("image", analysis.missing_article_properties)
 
+    def test_structured_data_findings_are_addressed_to_the_technical_audience(self):
+        """Declarations live in the page template, so an editor cannot fix them."""
+        from aether.application.analysis.analyze_article_metadata import (
+            AnalyzeArticleMetadata,
+        )
+        from aether.application.analysis.analyze_article_structure import (
+            AnalyzeArticleStructure,
+        )
+        from aether.application.analysis.analyze_passage_quality import (
+            AnalyzePassageQuality,
+        )
+        from aether.application.analysis.assess_ai_readiness import AssessAIReadiness
+        from aether.application.analysis.build_ai_readiness_report import (
+            BuildAIReadinessReport,
+        )
+        from aether.application.analysis.build_article_analysis_report import (
+            BuildArticleAnalysisReport,
+        )
+        from aether.application.analysis.derive_editor_recommendations import (
+            RecommendationCategory,
+        )
+
+        registration = self.ingest("bildirimsiz")
+        analysis = BuildArticleAnalysisReport(
+            AnalyzeArticleStructure(self.repository),
+            AnalyzeArticleMetadata(self.repository),
+            AnalyzePassageQuality(self.repository),
+            None,
+            AnalyzeStructuredData(self.repository),
+        ).execute(registration.article, registration.article_version.article_version_id)
+        report = BuildAIReadinessReport().execute(
+            AssessAIReadiness().execute(analysis)
+        )
+
+        self.assertEqual(len(report.editor_recommendations), 1)
+        self.assertEqual(
+            report.editor_recommendations[0].category,
+            RecommendationCategory.TECHNICAL,
+        )
+
     def test_rejects_an_article_version_from_a_different_article(self):
         first = self.ingest("birinci")
         second = self.ingest("ikinci")

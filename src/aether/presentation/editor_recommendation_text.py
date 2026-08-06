@@ -34,8 +34,17 @@ class RecommendationText:
 
 
 CATEGORY_TITLES: Dict[RecommendationCategory, str] = {
-    RecommendationCategory.CONTENT_QUALITY: "Content Quality",
-    RecommendationCategory.AI_VISIBILITY: "AI Visibility Recommendations",
+    RecommendationCategory.EDITOR: "Editor Recommendations",
+    RecommendationCategory.TECHNICAL: "Technical AI Readiness",
+}
+
+CATEGORY_SUBTITLES: Dict[RecommendationCategory, str] = {
+    RecommendationCategory.EDITOR: "Things you can change in this article now.",
+    RecommendationCategory.TECHNICAL: (
+        "Things that need a change to the page template or the CMS. These "
+        "usually apply to every article on the site, not just this one. Share "
+        "them with whoever maintains it."
+    ),
 }
 
 
@@ -71,8 +80,9 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
             "to this story."
         ),
         what_to_do=(
-            "If this is a standing notice such as a disclaimer or a byline, "
-            "consider publishing it outside the article body."
+            "If you added this text, consider removing or rewriting it. If it "
+            "appears automatically on every article, ask whoever maintains the "
+            "site to publish it outside the article body."
         ),
     ),
 }
@@ -85,6 +95,10 @@ def recommendation_text(recommendation: EditorRecommendation) -> RecommendationT
 
 def category_title(category: RecommendationCategory) -> str:
     return CATEGORY_TITLES[category]
+
+
+def category_subtitle(category: RecommendationCategory) -> str:
+    return CATEGORY_SUBTITLES[category]
 
 
 #: Editor-facing names for the Schema.org properties this report checks.

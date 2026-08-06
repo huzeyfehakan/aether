@@ -146,7 +146,7 @@ class WebPresentationTests(unittest.TestCase):
             referenced <= provided,
             f"template reads {sorted(referenced - provided)} which the view does not send",
         )
-    def test_web_view_surfaces_content_quality_recommendations(self):
+    def test_web_view_separates_editor_and_technical_recommendations(self):
         """A second article from the same publisher makes reuse visible."""
         html = """
             <html lang="tr"><head><title>{slug}</title></head>
@@ -160,7 +160,7 @@ class WebPresentationTests(unittest.TestCase):
             )
             self.assertEqual(response.status_code, 200)
 
-        reuse = response.json()["view"]["content_quality"]
+        reuse = response.json()["view"]["editor"]
         self.assertEqual(
             reuse["compared_articles"],
             "Checked against 1 other article from this publisher.",
@@ -175,13 +175,13 @@ class WebPresentationTests(unittest.TestCase):
         self.assertIn("outside the article body", recommendation["what_to_do"])
         self.assertIn("Bu icerik bilgilendirme", recommendation["excerpt"])
 
-    def test_index_shows_the_content_quality_section(self):
+    def test_index_shows_both_audience_sections(self):
         response = self.client.get("/")
 
-        self.assertIn('id="quality-section"', response.text)
-        self.assertIn('id="visibility-section"', response.text)
-        self.assertIn("Content Quality", response.text)
-        self.assertIn("AI Visibility Recommendations", response.text)
+        self.assertIn('id="editor-section"', response.text)
+        self.assertIn('id="technical-section"', response.text)
+        self.assertIn("Editor Recommendations", response.text)
+        self.assertIn("Technical AI Readiness", response.text)
 
     def test_invalid_url_submission_returns_a_user_facing_validation_error(self):
         response = TestClient(create_app()).post(

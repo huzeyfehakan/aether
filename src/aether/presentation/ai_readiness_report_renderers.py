@@ -8,6 +8,7 @@ from aether.application.analysis.derive_editor_recommendations import (
     RecommendationCategory,
 )
 from aether.presentation.editor_recommendation_text import (
+    category_subtitle,
     category_title,
     compared_articles_phrase,
     missing_properties_phrase,
@@ -142,22 +143,26 @@ class PlainTextAIReadinessReportRenderer:
     @staticmethod
     def _recommendation_lines(report: AIReadinessReport) -> tuple:
         lines = []
+        # The editor's own work comes first. Platform findings follow, because
+        # they are usually the same on every article and are not the reader's
+        # to fix.
         for category in (
-            RecommendationCategory.AI_VISIBILITY,
-            RecommendationCategory.CONTENT_QUALITY,
+            RecommendationCategory.EDITOR,
+            RecommendationCategory.TECHNICAL,
         ):
             in_category = [
                 recommendation
                 for recommendation in report.editor_recommendations
                 if recommendation.category is category
             ]
-            if category is RecommendationCategory.CONTENT_QUALITY:
+            if category is RecommendationCategory.EDITOR:
                 if report.content_reuse_summary is None:
                     continue
                 lines.extend(
                     (
                         "",
                         category_title(category),
+                        category_subtitle(category),
                         compared_articles_phrase(
                             report.content_reuse_summary.compared_article_count
                         ),
@@ -165,15 +170,17 @@ class PlainTextAIReadinessReportRenderer:
                 )
                 if not in_category:
                     if report.content_reuse_summary.compared_article_count:
-                        lines.append("No repeated text was found in this article.")
+                        lines.append("Nothing to change in this article.")
                     continue
             else:
                 if report.structured_data_summary is None:
                     continue
-                lines.extend(("", category_title(category)))
+                lines.extend(
+                    ("", category_title(category), category_subtitle(category))
+                )
                 if not in_category:
                     lines.append(
-                        "Nothing to improve: this article declares itself completely."
+                        "Nothing to change: this article declares itself completely."
                     )
                     continue
             for recommendation in in_category:

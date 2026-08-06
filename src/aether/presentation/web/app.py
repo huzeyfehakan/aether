@@ -31,6 +31,7 @@ from aether.application.analysis.derive_editor_recommendations import (
     RecommendationCategory,
 )
 from aether.presentation.editor_recommendation_text import (
+    category_subtitle,
     compared_articles_phrase,
     missing_properties_phrase,
     recommendation_text,
@@ -215,24 +216,26 @@ def _report_view(report: Any) -> Dict[str, Any]:
             "median_passage_word_count": passages.median_passage_word_count,
             "maximum_passage_word_count": passages.maximum_passage_word_count,
         },
-        "ai_visibility": (
-            None
-            if report.structured_data_summary is None
-            else {
-                "recommendations": _recommendation_views(
-                    report, RecommendationCategory.AI_VISIBILITY
-                ),
-            }
-        ),
-        "content_quality": (
+        "editor": (
             None
             if report.content_reuse_summary is None
             else {
+                "subtitle": category_subtitle(RecommendationCategory.EDITOR),
                 "compared_articles": compared_articles_phrase(
                     report.content_reuse_summary.compared_article_count
                 ),
                 "recommendations": _recommendation_views(
-                    report, RecommendationCategory.CONTENT_QUALITY
+                    report, RecommendationCategory.EDITOR
+                ),
+            }
+        ),
+        "technical": (
+            None
+            if report.structured_data_summary is None
+            else {
+                "subtitle": category_subtitle(RecommendationCategory.TECHNICAL),
+                "recommendations": _recommendation_views(
+                    report, RecommendationCategory.TECHNICAL
                 ),
             }
         ),

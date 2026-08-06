@@ -98,9 +98,9 @@
 
         <div class="section"><h3>Retrieval shape</h3><p id="retrieval-summary">How the article divides into the passages an AI system would retrieve and cite.</p><div id="retrieval-metrics" class="metric-grid"></div></div>
 
-        <div class="section" id="visibility-section"><h3>AI Visibility Recommendations</h3><p class="muted">What this article tells AI systems about itself.</p><div id="visibility-list"></div></div>
+        <div class="section" id="editor-section"><h3>Editor Recommendations</h3><p class="muted" id="editor-subtitle"></p><p id="editor-compared"></p><div id="editor-list"></div></div>
 
-        <div class="section" id="quality-section"><h3>Content Quality</h3><p id="quality-compared"></p><div id="quality-list"></div></div>
+        <div class="section" id="technical-section"><h3>Technical AI Readiness</h3><p class="muted" id="technical-subtitle"></p><div id="technical-list"></div></div>
 
         <details class="technical"><summary>Technical details</summary><p class="help">Immutable identifiers and the existing plain-text report are retained for validation and troubleshooting.</p><pre id="report"></pre></details>
       </section>
@@ -155,21 +155,23 @@
         document.querySelector('#retrieval-metrics').innerHTML = [metric('Shortest passage', words(retrieval.minimum_passage_word_count)), metric('Median passage', words(retrieval.median_passage_word_count)), metric('Longest passage', words(retrieval.maximum_passage_word_count))].join('');
         const card = (item) => `<div class="recommendation"><h4>${item.headline}</h4>${item.detail ? `<span class="repeat-count">${item.detail}</span>` : ''}${item.excerpt ? `<blockquote>${item.excerpt}</blockquote>` : ''}<p><strong>Why it matters.</strong> ${item.why_it_matters}</p><p><strong>What to do.</strong> ${item.what_to_do}</p></div>`;
 
-        const visibility = view.ai_visibility;
-        document.querySelector('#visibility-section').classList.toggle('hidden', !visibility);
-        if (visibility) {
-          document.querySelector('#visibility-list').innerHTML = visibility.recommendations.length
-            ? visibility.recommendations.map(card).join('')
-            : '<p class="muted">Nothing to improve — this article declares itself completely.</p>';
+        const editorFindings = view.editor;
+        document.querySelector('#editor-section').classList.toggle('hidden', !editorFindings);
+        if (editorFindings) {
+          document.querySelector('#editor-subtitle').textContent = editorFindings.subtitle;
+          document.querySelector('#editor-compared').textContent = editorFindings.compared_articles;
+          document.querySelector('#editor-list').innerHTML = editorFindings.recommendations.length
+            ? editorFindings.recommendations.map(card).join('')
+            : '<p class="muted">Nothing to change in this article.</p>';
         }
 
-        const quality = view.content_quality;
-        document.querySelector('#quality-section').classList.toggle('hidden', !quality);
-        if (quality) {
-          document.querySelector('#quality-compared').textContent = quality.compared_articles;
-          document.querySelector('#quality-list').innerHTML = quality.recommendations.length
-            ? quality.recommendations.map(card).join('')
-            : '<p class="muted">No repeated text was found in this article.</p>';
+        const technical = view.technical;
+        document.querySelector('#technical-section').classList.toggle('hidden', !technical);
+        if (technical) {
+          document.querySelector('#technical-subtitle').textContent = technical.subtitle;
+          document.querySelector('#technical-list').innerHTML = technical.recommendations.length
+            ? technical.recommendations.map(card).join('')
+            : '<p class="muted">Nothing to change: this article declares itself completely.</p>';
         }
         document.querySelector('#report').textContent = rawReport;
       }

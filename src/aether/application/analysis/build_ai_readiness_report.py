@@ -20,9 +20,6 @@ class ArticleIdentitySummary:
 class StructuralSummary:
     total_passage_count: int
     total_word_count: int
-    average_passage_length: float
-    heading_count: Optional[int]
-    paragraph_count: int
 
 
 @dataclass(frozen=True)
@@ -35,7 +32,6 @@ class MetadataSummary:
     language_available: bool
     author_available: bool
     description_available: bool
-    keyword_available: bool
 
 
 @dataclass(frozen=True)
@@ -44,17 +40,11 @@ class PassageQualitySummary:
     minimum_passage_word_count: Optional[int]
     maximum_passage_word_count: Optional[int]
     median_passage_word_count: Optional[float]
-    source_paragraph_count: int
-    covered_source_paragraph_count: int
-    source_paragraph_coverage_ratio: float
-    passage_ordinals_are_contiguous: bool
 
 
 @dataclass(frozen=True)
 class AssessmentSummary:
     metadata_completeness: CompletenessClassification
-    passage_coverage: CompletenessClassification
-    structural_completeness: CompletenessClassification
 
 
 @dataclass(frozen=True)
@@ -84,9 +74,6 @@ class BuildAIReadinessReport:
             structural_summary=StructuralSummary(
                 total_passage_count=structural.total_passage_count,
                 total_word_count=structural.total_word_count,
-                average_passage_length=structural.average_passage_length,
-                heading_count=structural.heading_count,
-                paragraph_count=structural.paragraph_count,
             ),
             metadata_summary=MetadataSummary(
                 title_available=metadata.title_available,
@@ -97,21 +84,14 @@ class BuildAIReadinessReport:
                 language_available=metadata.language_available,
                 author_available=metadata.author_available,
                 description_available=metadata.description_available,
-                keyword_available=metadata.keyword_available,
             ),
             passage_quality_summary=PassageQualitySummary(
                 passage_profiles=passage_quality.passage_profiles,
                 minimum_passage_word_count=passage_quality.minimum_passage_word_count,
                 maximum_passage_word_count=passage_quality.maximum_passage_word_count,
                 median_passage_word_count=passage_quality.median_passage_word_count,
-                source_paragraph_count=passage_quality.source_paragraph_count,
-                covered_source_paragraph_count=passage_quality.covered_source_paragraph_count,
-                source_paragraph_coverage_ratio=passage_quality.source_paragraph_coverage_ratio,
-                passage_ordinals_are_contiguous=passage_quality.passage_ordinals_are_contiguous,
             ),
             assessment_summary=AssessmentSummary(
                 metadata_completeness=assessment.metadata_completeness,
-                passage_coverage=assessment.passage_coverage,
-                structural_completeness=assessment.structural_completeness,
             ),
         )

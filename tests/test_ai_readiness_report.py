@@ -32,12 +32,6 @@ class AIReadinessReportTests(unittest.TestCase):
                 article_version_id="version-1",
                 total_passage_count=2,
                 total_word_count=12,
-                average_passage_length=6.0,
-                heading_count=None,
-                paragraph_count=2,
-                publication_date_available=True,
-                canonical_url_available=True,
-                language_available=True,
             ),
             metadata_analysis=MetadataAnalysis(
                 article_id="article-1",
@@ -50,7 +44,6 @@ class AIReadinessReportTests(unittest.TestCase):
                 language_available=True,
                 author_available=True,
                 description_available=True,
-                keyword_available=False,
             ),
             passage_quality_analysis=PassageQualityAnalysis(
                 article_id="article-1",
@@ -72,10 +65,6 @@ class AIReadinessReportTests(unittest.TestCase):
                 minimum_passage_word_count=6,
                 maximum_passage_word_count=6,
                 median_passage_word_count=6.0,
-                source_paragraph_count=2,
-                covered_source_paragraph_count=2,
-                source_paragraph_coverage_ratio=1.0,
-                passage_ordinals_are_contiguous=True,
             ),
         )
         return AssessAIReadiness().execute(report)
@@ -86,18 +75,11 @@ class AIReadinessReportTests(unittest.TestCase):
         self.assertEqual(report.article_identity.article_id, "article-1")
         self.assertEqual(report.article_identity.article_version_id, "version-1")
         self.assertEqual(report.structural_summary.total_word_count, 12)
-        self.assertEqual(report.structural_summary.paragraph_count, 2)
         self.assertTrue(report.metadata_summary.title_available)
         self.assertTrue(report.metadata_summary.author_available)
-        self.assertFalse(report.metadata_summary.keyword_available)
         self.assertEqual(len(report.passage_quality_summary.passage_profiles), 2)
-        self.assertEqual(report.passage_quality_summary.source_paragraph_coverage_ratio, 1.0)
         self.assertEqual(
             report.assessment_summary.metadata_completeness.value, "partial"
-        )
-        self.assertEqual(report.assessment_summary.passage_coverage.value, "complete")
-        self.assertEqual(
-            report.assessment_summary.structural_completeness.value, "complete"
         )
         self.assertFalse(hasattr(report, "score"))
         self.assertFalse(hasattr(report, "recommendations"))
@@ -120,14 +102,6 @@ class AIReadinessReportTests(unittest.TestCase):
         self.assertIs(
             report.assessment_summary.metadata_completeness,
             assessment.metadata_completeness,
-        )
-        self.assertIs(
-            report.assessment_summary.passage_coverage,
-            assessment.passage_coverage,
-        )
-        self.assertIs(
-            report.assessment_summary.structural_completeness,
-            assessment.structural_completeness,
         )
 
 

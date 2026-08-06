@@ -20,9 +20,6 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
         "structural_summary": {
             "total_passage_count": report.structural_summary.total_passage_count,
             "total_word_count": report.structural_summary.total_word_count,
-            "average_passage_length": report.structural_summary.average_passage_length,
-            "heading_count": report.structural_summary.heading_count,
-            "paragraph_count": report.structural_summary.paragraph_count,
         },
         "metadata_summary": {
             "title_available": report.metadata_summary.title_available,
@@ -33,7 +30,6 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
             "language_available": report.metadata_summary.language_available,
             "author_available": report.metadata_summary.author_available,
             "description_available": report.metadata_summary.description_available,
-            "keyword_available": report.metadata_summary.keyword_available,
         },
         "passage_quality_summary": {
             "passage_profiles": [
@@ -54,24 +50,10 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
             "median_passage_word_count": (
                 report.passage_quality_summary.median_passage_word_count
             ),
-            "source_paragraph_count": report.passage_quality_summary.source_paragraph_count,
-            "covered_source_paragraph_count": (
-                report.passage_quality_summary.covered_source_paragraph_count
-            ),
-            "source_paragraph_coverage_ratio": (
-                report.passage_quality_summary.source_paragraph_coverage_ratio
-            ),
-            "passage_ordinals_are_contiguous": (
-                report.passage_quality_summary.passage_ordinals_are_contiguous
-            ),
         },
         "assessment_summary": {
             "metadata_completeness": (
                 report.assessment_summary.metadata_completeness.value
-            ),
-            "passage_coverage": report.assessment_summary.passage_coverage.value,
-            "structural_completeness": (
-                report.assessment_summary.structural_completeness.value
             ),
         },
     }
@@ -102,9 +84,6 @@ class PlainTextAIReadinessReportRenderer:
             "Structural Summary",
             f"Total Passages: {structural.total_passage_count}",
             f"Total Words: {structural.total_word_count}",
-            f"Average Passage Length: {structural.average_passage_length}",
-            f"Heading Count: {_display_optional(structural.heading_count)}",
-            f"Paragraph Count: {structural.paragraph_count}",
             "",
             "Metadata Summary",
             f"Title Available: {metadata.title_available}",
@@ -115,21 +94,14 @@ class PlainTextAIReadinessReportRenderer:
             f"Language Available: {metadata.language_available}",
             f"Author Available: {metadata.author_available}",
             f"Description Available: {metadata.description_available}",
-            f"Keywords Available: {metadata.keyword_available}",
             "",
             "Passage Quality Summary",
             f"Minimum Passage Word Count: {_display_optional(passage_quality.minimum_passage_word_count)}",
             f"Maximum Passage Word Count: {_display_optional(passage_quality.maximum_passage_word_count)}",
             f"Median Passage Word Count: {_display_optional(passage_quality.median_passage_word_count)}",
-            f"Source Paragraph Count: {passage_quality.source_paragraph_count}",
-            f"Covered Source Paragraph Count: {passage_quality.covered_source_paragraph_count}",
-            f"Source Paragraph Coverage Ratio: {passage_quality.source_paragraph_coverage_ratio}",
-            f"Passage Ordinals Are Contiguous: {passage_quality.passage_ordinals_are_contiguous}",
             "",
             "Assessment Summary",
             f"Metadata Completeness: {assessment.metadata_completeness.value}",
-            f"Passage Coverage: {assessment.passage_coverage.value}",
-            f"Structural Completeness: {assessment.structural_completeness.value}",
         )
         return "\n".join(lines)
 
@@ -154,9 +126,6 @@ class MarkdownAIReadinessReportRenderer:
             "",
             f"- Total passages: {structural.total_passage_count}",
             f"- Total words: {structural.total_word_count}",
-            f"- Average passage length: {structural.average_passage_length}",
-            f"- Heading count: {_display_optional(structural.heading_count)}",
-            f"- Paragraph count: {structural.paragraph_count}",
             "",
             "## Metadata Summary",
             "",
@@ -168,17 +137,12 @@ class MarkdownAIReadinessReportRenderer:
             f"- Language available: {metadata.language_available}",
             f"- Author available: {metadata.author_available}",
             f"- Description available: {metadata.description_available}",
-            f"- Keywords available: {metadata.keyword_available}",
             "",
             "## Passage Quality Summary",
             "",
             f"- Minimum passage word count: {_display_optional(passage_quality.minimum_passage_word_count)}",
             f"- Maximum passage word count: {_display_optional(passage_quality.maximum_passage_word_count)}",
             f"- Median passage word count: {_display_optional(passage_quality.median_passage_word_count)}",
-            f"- Source paragraph count: {passage_quality.source_paragraph_count}",
-            f"- Covered source paragraph count: {passage_quality.covered_source_paragraph_count}",
-            f"- Source paragraph coverage ratio: {passage_quality.source_paragraph_coverage_ratio}",
-            f"- Passage ordinals are contiguous: {passage_quality.passage_ordinals_are_contiguous}",
             "",
             "### Passage Profiles",
             "",
@@ -195,8 +159,6 @@ class MarkdownAIReadinessReportRenderer:
                 "## Assessment Summary",
                 "",
                 f"- Metadata completeness: {assessment.metadata_completeness.value}",
-                f"- Passage coverage: {assessment.passage_coverage.value}",
-                f"- Structural completeness: {assessment.structural_completeness.value}",
             )
         )
         return "\n".join(lines)

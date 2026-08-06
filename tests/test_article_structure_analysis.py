@@ -57,12 +57,6 @@ class ArticleStructuralAnalysisTests(unittest.TestCase):
         )
         self.assertEqual(analysis.total_passage_count, 2)
         self.assertEqual(analysis.total_word_count, 5)
-        self.assertEqual(analysis.average_passage_length, 2.5)
-        self.assertEqual(analysis.paragraph_count, 2)
-        self.assertIsNone(analysis.heading_count)
-        self.assertTrue(analysis.publication_date_available)
-        self.assertTrue(analysis.canonical_url_available)
-        self.assertTrue(analysis.language_available)
 
     def test_analysis_is_deterministic_and_immutable(self):
         registered = self.register_article(
@@ -104,7 +98,6 @@ class ArticleStructuralAnalysisTests(unittest.TestCase):
         )
 
         self.assertEqual(analysis.total_word_count, 4)
-        self.assertEqual(analysis.average_passage_length, 4.0)
 
 
 if __name__ == "__main__":

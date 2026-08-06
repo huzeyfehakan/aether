@@ -81,7 +81,6 @@ class ArticleMetadataAnalysisTests(unittest.TestCase):
         self.assertTrue(analysis.language_available)
         self.assertTrue(analysis.author_available)
         self.assertTrue(analysis.description_available)
-        self.assertTrue(analysis.keyword_available)
 
     def test_reports_missing_modified_metadata_without_guessing(self):
         registered = self.register_article("https://example.org/news/story")
@@ -93,7 +92,6 @@ class ArticleMetadataAnalysisTests(unittest.TestCase):
         self.assertFalse(analysis.last_modified_date_available)
         self.assertFalse(analysis.author_available)
         self.assertFalse(analysis.description_available)
-        self.assertFalse(analysis.keyword_available)
 
     def test_reports_missing_publication_date_without_rejecting_the_article(self):
         registered = self.register_article(

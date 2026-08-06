@@ -62,7 +62,7 @@ class WebPresentationTests(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Passage Coverage: complete", response.json()["report"])
+        self.assertIn("Metadata Completeness: complete", response.json()["report"])
 
     def test_file_submission_requires_source_url_only_when_canonical_is_absent(self):
         html = """

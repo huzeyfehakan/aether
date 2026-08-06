@@ -36,12 +36,6 @@ class AIReadinessReportRendererTests(unittest.TestCase):
                 article_version_id="version-1",
                 total_passage_count=1,
                 total_word_count=4,
-                average_passage_length=4.0,
-                heading_count=None,
-                paragraph_count=1,
-                publication_date_available=True,
-                canonical_url_available=True,
-                language_available=True,
             ),
             metadata_analysis=MetadataAnalysis(
                 article_id="article-1",
@@ -54,7 +48,6 @@ class AIReadinessReportRendererTests(unittest.TestCase):
                 language_available=True,
                 author_available=True,
                 description_available=False,
-                keyword_available=False,
             ),
             passage_quality_analysis=PassageQualityAnalysis(
                 article_id="article-1",
@@ -70,10 +63,6 @@ class AIReadinessReportRendererTests(unittest.TestCase):
                 minimum_passage_word_count=4,
                 maximum_passage_word_count=4,
                 median_passage_word_count=4.0,
-                source_paragraph_count=1,
-                covered_source_paragraph_count=1,
-                source_paragraph_coverage_ratio=1.0,
-                passage_ordinals_are_contiguous=True,
             ),
         )
         return BuildAIReadinessReport().execute(
@@ -86,11 +75,7 @@ class AIReadinessReportRendererTests(unittest.TestCase):
 
         self.assertEqual(payload["article_identity"]["article_id"], "article-1")
         self.assertEqual(payload["structural_summary"]["total_word_count"], 4)
-        self.assertIsNone(payload["structural_summary"]["heading_count"])
         self.assertTrue(payload["metadata_summary"]["author_available"])
-        self.assertEqual(
-            payload["assessment_summary"]["passage_coverage"], "complete"
-        )
         self.assertNotIn("score", payload)
         self.assertNotIn("recommendations", payload)
 
@@ -103,7 +88,6 @@ class AIReadinessReportRendererTests(unittest.TestCase):
         self.assertIn("Metadata Summary", rendered)
         self.assertIn("Passage Quality Summary", rendered)
         self.assertIn("Assessment Summary", rendered)
-        self.assertIn("Heading Count: unavailable", rendered)
         self.assertIn("Metadata Completeness: partial", rendered)
 
     def test_markdown_renderer_includes_report_values_and_profile_table(self):
@@ -116,7 +100,6 @@ class AIReadinessReportRendererTests(unittest.TestCase):
         self.assertIn("## Passage Quality Summary", rendered)
         self.assertIn("## Assessment Summary", rendered)
         self.assertIn("| `version-1:p0` | 0 | 4 | 20 |", rendered)
-        self.assertIn("- Passage coverage: complete", rendered)
 
     def test_renderers_are_deterministic(self):
         report = self.report()

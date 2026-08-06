@@ -83,6 +83,72 @@ class RawHtmlIngestionTests(unittest.TestCase):
         self.assertEqual(result.article_version.description, "A source-provided description.")
         self.assertEqual(result.article_version.keywords, "politika, ekonomi,  haber")
 
+    def test_normalizes_date_only_json_ld_dates_to_midnight_utc(self):
+        """TRT Çocuk Ebeveyn Akademisi publishes Schema.org Date, not DateTime."""
+        html = (FIXTURES / "trt_ebeveyn_akademisi_makale.html").read_text(encoding="utf-8")
+
+        result = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url="https://ebeveynakademisi.trtcocuk.net.tr/makale/asiri-uyumlu-cocuklar-neyi-saklar-32449390",
+                publisher="TRT Çocuk Ebeveyn Akademisi",
+                article_type="news_report",
+                observed_at=OBSERVED_AT,
+            )
+        )
+
+        version = result.article_version
+        self.assertEqual(
+            version.source_published_at.isoformat(), "2026-08-03T00:00:00+00:00"
+        )
+        self.assertEqual(
+            version.source_updated_at.isoformat(), "2026-08-03T00:00:00+00:00"
+        )
+        self.assertEqual(result.article.initial_published_at, version.source_published_at)
+
+    def test_normalizes_a_date_only_meta_publication_date(self):
+        html = """
+            <html lang="tr"><head><title>Date-only meta</title>
+              <meta property="article:published_time" content="2026-08-03" />
+            </head><body><main><p>Görünür paragraf.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(
+            result.article_version.source_published_at.isoformat(),
+            "2026-08-03T00:00:00+00:00",
+        )
+
+    def test_still_rejects_a_time_of_day_without_a_timezone(self):
+        """A date carries no time; a naive datetime asserts one in an unknown zone."""
+        html = """
+            <html lang="en"><head><title>Naive datetime</title>
+              <script type="application/ld+json">
+                {"@type": "Article", "datePublished": "2026-08-03T10:00:00"}
+              </script>
+            </head><body><main><p>Visible article paragraph.</p></main></body></html>
+        """
+
+        with self.assertRaisesRegex(
+            DomainValidationError, "JSON-LD Article datePublished must be timezone-aware"
+        ):
+            self.register.execute(self.raw_article(html))
+
+    def test_rejects_a_malformed_date_only_value(self):
+        html = """
+            <html lang="en"><head><title>Impossible date</title>
+              <script type="application/ld+json">
+                {"@type": "Article", "datePublished": "2026-13-45"}
+              </script>
+            </head><body><main><p>Visible article paragraph.</p></main></body></html>
+        """
+
+        with self.assertRaisesRegex(
+            DomainValidationError, "JSON-LD Article datePublished must be ISO-8601"
+        ):
+            self.register.execute(self.raw_article(html))
+
     def test_excludes_link_wrapped_recommendation_cards_from_the_body(self):
         """Recommendation cards share the article container on TRT Çocuk pages."""
         html = (FIXTURES / "trt_ebeveyn_akademisi_makale.html").read_text(encoding="utf-8")

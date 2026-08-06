@@ -4,7 +4,7 @@ It deliberately rejects mutation of stored Article Versions and Passages,
 mirroring the immutable source-record requirement of the domain model.
 """
 
-from typing import Dict, Optional, Tuple
+from typing import Dict, Mapping, Optional, Tuple
 
 from aether.domain.common import DomainValidationError
 from aether.domain.content import Article, ArticleVersion, Passage
@@ -41,6 +41,38 @@ class InMemoryContentRepository(ContentRepository):
                 key=lambda passage: passage.ordinal_position,
             )
         )
+
+    def count_article_versions_for_publisher(self, publisher: str) -> int:
+        return sum(
+            1
+            for version in self._versions.values()
+            if self._publisher_of(version) == publisher
+        )
+
+    def find_passage_fingerprint_occurrences(
+        self, publisher: str, fingerprints: Tuple[str, ...]
+    ) -> Mapping[str, Tuple[str, ...]]:
+        wanted = set(fingerprints)
+        publisher_version_ids = {
+            version_id
+            for version_id, version in self._versions.items()
+            if self._publisher_of(version) == publisher
+        }
+        occurrences: Dict[str, set] = {fingerprint: set() for fingerprint in wanted}
+        for passage in self._passages.values():
+            if (
+                passage.content_fingerprint in wanted
+                and passage.article_version_id in publisher_version_ids
+            ):
+                occurrences[passage.content_fingerprint].add(passage.article_version_id)
+        return {
+            fingerprint: tuple(sorted(version_ids))
+            for fingerprint, version_ids in occurrences.items()
+        }
+
+    def _publisher_of(self, article_version: ArticleVersion) -> Optional[str]:
+        article = self._articles_by_id.get(article_version.article_id)
+        return article.publisher if article is not None else None
 
     def save_article(self, article: Article) -> None:
         existing = self._articles_by_id.get(article.article_id)

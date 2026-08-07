@@ -128,6 +128,47 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
             "dateModified property."
         ),
     ),
+    RecommendationCode.NO_TOP_LEVEL_HEADING: RecommendationText(
+        headline="This article has no main heading",
+        why_it_matters=(
+            "The main heading is what states, inside the article itself, what "
+            "the whole piece is about. Without one a reader skimming the page "
+            "has nothing to anchor on, and software reading it has to fall "
+            "back on the browser tab title, which often carries the site name "
+            "rather than the story."
+        ),
+        what_to_do=(
+            "Give the article a main heading at the top of the body, styled as "
+            "the largest heading level your CMS offers, rather than as bold "
+            "text."
+        ),
+    ),
+    RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS: RecommendationText(
+        headline="This article has more than one main heading",
+        why_it_matters=(
+            "When several headings claim to be the top of the article, nothing "
+            "reading the page can tell which one names the piece. The others "
+            "look like separate articles rather than sections of this one."
+        ),
+        what_to_do=(
+            "Keep one main heading for the article and demote the rest to "
+            "section headings."
+        ),
+    ),
+    RecommendationCode.SKIPPED_HEADING_LEVELS: RecommendationText(
+        headline="This article's headings skip a level",
+        why_it_matters=(
+            "Heading levels describe how sections sit inside one another. When "
+            "a level is skipped the outline has a gap, so a section reads as "
+            "though it belongs to a parent that was never written, and the "
+            "shape of the article is lost to anything that cannot see the "
+            "styling."
+        ),
+        what_to_do=(
+            "Use the next heading level down when starting a subsection, "
+            "rather than choosing a level for how it looks."
+        ),
+    ),
     RecommendationCode.TITLE_SOURCES_DISAGREE: RecommendationText(
         headline="This article gives more than one headline",
         why_it_matters=(

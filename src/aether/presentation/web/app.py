@@ -217,11 +217,8 @@ def _report_view(report: Any) -> Dict[str, Any]:
             "metadata": assessment.metadata_completeness.value,
         },
         "metadata": (
-            {"label": "Title", "available": metadata.title_available},
-            {"label": "Canonical URL", "available": metadata.canonical_url_available},
             {"label": "Publication date", "available": metadata.publication_date_available},
             {"label": "Last modified date", "available": metadata.last_modified_date_available},
-            {"label": "Language", "available": metadata.language_available},
             {"label": "Author", "available": metadata.author_available},
             {"label": "Description", "available": metadata.description_available},
         ),

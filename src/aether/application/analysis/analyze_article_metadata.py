@@ -13,6 +13,10 @@ class MetadataAnalysis:
 
     ``title_length`` is the Unicode character count of the stored, trimmed title.
 
+    Title, canonical URL and language are deliberately absent. The domain
+    refuses to construct an article without them, so reporting their
+    availability could only ever say "yes" and told an editor nothing.
+
     Meta keywords are deliberately absent. Search engines stopped honouring the
     tag long ago and it carries no signal for how an AI system understands,
     retrieves, or cites an article. ``ArticleVersion`` still retains the value
@@ -21,12 +25,9 @@ class MetadataAnalysis:
 
     article_id: str
     article_version_id: str
-    title_available: bool
     title_length: int
-    canonical_url_available: bool
     publication_date_available: bool
     last_modified_date_available: bool
-    language_available: bool
     author_available: bool
     description_available: bool
 
@@ -45,12 +46,9 @@ class AnalyzeArticleMetadata:
         return MetadataAnalysis(
             article_id=article.article_id,
             article_version_id=article_version.article_version_id,
-            title_available=bool(title),
             title_length=len(title),
-            canonical_url_available=bool(article.canonical_source.strip()),
             publication_date_available=article_version.source_published_at is not None,
             last_modified_date_available=article_version.source_updated_at is not None,
-            language_available=bool(article.original_language.strip()),
             author_available=bool(article_version.author and article_version.author.strip()),
             description_available=bool(
                 article_version.description and article_version.description.strip()

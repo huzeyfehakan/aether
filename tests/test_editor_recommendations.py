@@ -73,11 +73,89 @@ class EditorRecommendationTests(unittest.TestCase):
             )
         )
 
+    @staticmethod
+    def of_code(report, code):
+        return [r for r in report.editor_recommendations if r.code is code]
+
     def report_for(self, registration, with_duplication=True):
         analysis = self.build(with_duplication).execute(
             registration.article, registration.article_version.article_version_id
         )
         return BuildAIReadinessReport().execute(AssessAIReadiness().execute(analysis))
+
+    def test_recommends_the_metadata_an_editor_can_supply(self):
+        """Absence was measured and displayed, but never turned into advice."""
+        first = self.ingest("eksik", ["Özgün paragraf."])
+
+        report = self.report_for(first)
+        codes = {r.code for r in report.editor_recommendations}
+
+        for code in (
+            RecommendationCode.MISSING_PUBLICATION_DATE,
+            RecommendationCode.MISSING_AUTHOR,
+            RecommendationCode.MISSING_SUMMARY,
+        ):
+            self.assertIn(code, codes)
+            self.assertEqual(
+                self.of_code(report, code)[0].category, RecommendationCategory.EDITOR
+            )
+
+    def test_a_last_modified_date_is_addressed_to_the_technical_audience(self):
+        """A CMS stamps this on save; an editor has no field for it."""
+        first = self.ingest("eksik-tarih", ["Özgün paragraf."])
+
+        report = self.report_for(first)
+
+        recommendation = self.of_code(
+            report, RecommendationCode.MISSING_LAST_MODIFIED_DATE
+        )[0]
+        self.assertEqual(recommendation.category, RecommendationCategory.TECHNICAL)
+
+    def test_every_metadata_recommendation_names_a_concrete_action(self):
+        """Naming the gap is not advice; the editor must know what to do."""
+        first = self.ingest("eylem", ["Özgün paragraf."])
+        report = self.report_for(first)
+
+        for code in (
+            RecommendationCode.MISSING_PUBLICATION_DATE,
+            RecommendationCode.MISSING_AUTHOR,
+            RecommendationCode.MISSING_SUMMARY,
+        ):
+            with self.subTest(code=code):
+                text = recommendation_text(self.of_code(report, code)[0])
+                self.assertIn("cms", text.what_to_do.lower())
+                self.assertGreater(len(text.why_it_matters.split()), 20)
+                self.assertNotEqual(text.headline, text.what_to_do)
+
+    def test_makes_no_metadata_recommendation_when_the_field_is_present(self):
+        html = (
+            '<html lang="tr"><head><title>Başlık</title>'
+            '<meta name="author" content="Ayşe Yılmaz" />'
+            '<meta name="description" content="Bir özet." />'
+            '<meta property="article:published_time" content="2026-08-03T10:00:00+03:00" />'
+            '<meta property="article:modified_time" content="2026-08-04T10:00:00+03:00" />'
+            "</head><body><main><p>Özgün paragraf.</p></main></body></html>"
+        )
+        registration = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url="https://ebeveynakademisi.trtcocuk.net.tr/makale/tam",
+                publisher="TRT Çocuk Ebeveyn Akademisi",
+                article_type="news_report",
+                observed_at=OBSERVED_AT,
+            )
+        )
+
+        report = self.report_for(registration)
+        codes = {r.code for r in report.editor_recommendations}
+
+        for code in (
+            RecommendationCode.MISSING_PUBLICATION_DATE,
+            RecommendationCode.MISSING_AUTHOR,
+            RecommendationCode.MISSING_SUMMARY,
+            RecommendationCode.MISSING_LAST_MODIFIED_DATE,
+        ):
+            self.assertNotIn(code, codes)
 
     def test_repeated_text_is_addressed_to_the_editor(self):
         """The editor owns the article body and is the person who sees it."""
@@ -86,11 +164,11 @@ class EditorRecommendationTests(unittest.TestCase):
 
         report = self.report_for(first)
 
-        self.assertEqual(len(report.editor_recommendations), 1)
-        recommendation = report.editor_recommendations[0]
-        self.assertEqual(
-            recommendation.code, RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY
+        repeated = self.of_code(
+            report, RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY
         )
+        self.assertEqual(len(repeated), 1)
+        recommendation = repeated[0]
         self.assertEqual(
             recommendation.category, RecommendationCategory.EDITOR
         )
@@ -103,7 +181,9 @@ class EditorRecommendationTests(unittest.TestCase):
 
         report = self.report_for(first)
 
-        self.assertEqual(report.editor_recommendations, ())
+        self.assertEqual(
+            self.of_code(report, RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY), []
+        )
         self.assertEqual(report.content_reuse_summary.compared_article_count, 1)
 
     def test_report_omits_reuse_entirely_when_the_capability_is_not_used(self):
@@ -113,7 +193,9 @@ class EditorRecommendationTests(unittest.TestCase):
         report = self.report_for(first, with_duplication=False)
 
         self.assertIsNone(report.content_reuse_summary)
-        self.assertEqual(report.editor_recommendations, ())
+        self.assertEqual(
+            self.of_code(report, RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY), []
+        )
 
     def test_states_how_many_articles_were_compared(self):
         for count, expected in (
@@ -148,7 +230,9 @@ class EditorRecommendationTests(unittest.TestCase):
         report = self.report_for(first)
         rendered = PlainTextAIReadinessReportRenderer().render(report)
 
-        self.assertEqual(len(report.editor_recommendations), 2)
+        self.assertEqual(
+            len(self.of_code(report, RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY)), 2
+        )
         self.assertEqual(rendered.count("Why it matters: Repeated text"), 1)
         self.assertEqual(
             rendered.count("This paragraph also appears in your other articles"), 1
@@ -162,7 +246,9 @@ class EditorRecommendationTests(unittest.TestCase):
         self.ingest("ikinci", ["Başka özgün paragraf.", NOTICE])
         report = self.report_for(first)
 
-        text = recommendation_text(report.editor_recommendations[0])
+        text = recommendation_text(
+            self.of_code(report, RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY)[0]
+        )
         wording = " ".join((text.headline, text.why_it_matters, text.what_to_do)).lower()
 
         for claim in ("retrieval", "ignored", "rank"):

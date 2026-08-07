@@ -166,8 +166,11 @@ class WebPresentationTests(unittest.TestCase):
             "Compared against previously analyzed articles from this publisher "
             "(1 article).",
         )
-        self.assertEqual(len(reuse["recommendations"]), 1)
-        recommendation = reuse["recommendations"][0]
+        recommendation = next(
+            item
+            for item in reuse["recommendations"]
+            if item["headline"].startswith("This paragraph also appears")
+        )
         self.assertEqual(
             recommendation["headline"],
             "This paragraph also appears in your other articles",
@@ -241,7 +244,10 @@ class WebPresentationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         report = response.json()["report"]
         self.assertIn("Publication Date Available: False", report)
-        self.assertIn("Metadata Completeness: partial", report)
+        # With the always-true fields gone, a page carrying none of the four
+        # fields that can vary is correctly "missing" rather than "partial".
+        self.assertIn("Metadata Completeness: missing", report)
+        self.assertIn("This article does not say when it was published", report)
 
 
 if __name__ == "__main__":

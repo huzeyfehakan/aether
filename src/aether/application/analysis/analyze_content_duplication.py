@@ -38,10 +38,33 @@ class ContentDuplicationAnalysis:
     compared_article_count: int
     total_passage_count: int
     repeated_passages: Tuple[RepeatedPassage, ...]
+    total_word_count: int = 0
 
     @property
     def repeated_passage_count(self) -> int:
         return len(self.repeated_passages)
+
+    @property
+    def repeated_word_count(self) -> int:
+        return sum(passage.word_count for passage in self.repeated_passages)
+
+    @property
+    def unique_word_count(self) -> int:
+        return max(0, self.total_word_count - self.repeated_word_count)
+
+    @property
+    def is_mostly_repeated(self) -> bool:
+        """Whether more of the body is shared text than is the article's own.
+
+        Two measured quantities are compared against each other. No length is
+        judged and no constant is chosen: an article is reported only when the
+        words it shares with its publisher's other articles outweigh the words
+        that are its own. A short article made entirely of its own writing is
+        never reported, and a long one padded with standing notices is.
+        """
+        return bool(self.repeated_passages) and (
+            self.repeated_word_count > self.unique_word_count
+        )
 
 
 class AnalyzeContentDuplication:
@@ -92,6 +115,9 @@ class AnalyzeContentDuplication:
             total_passage_count=len(passages),
             # Most-repeated first, then document order, so the ordering is
             # stable and the clearest boilerplate surfaces first.
+            total_word_count=sum(
+                len(passage.text.split()) for passage in passages
+            ),
             repeated_passages=tuple(
                 sorted(
                     repeated,

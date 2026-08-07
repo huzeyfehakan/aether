@@ -184,6 +184,20 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
             "your CMS."
         ),
     ),
+    RecommendationCode.BODY_MOSTLY_REPEATED_TEXT: RecommendationText(
+        headline="Most of this article is text that appears in your other articles",
+        why_it_matters=(
+            "More of this article's words are shared with your other articles "
+            "than are its own. Anything reading the page to learn what this "
+            "piece says finds mostly text it has already seen elsewhere, with "
+            "little that belongs to this story."
+        ),
+        what_to_do=(
+            "Check that the article's own text is reaching the published page. "
+            "If standing notices such as a disclaimer or a byline make up most "
+            "of the body, they belong outside it."
+        ),
+    ),
     RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY: RecommendationText(
         headline="This paragraph also appears in your other articles",
         why_it_matters=(
@@ -248,6 +262,14 @@ _TITLE_SOURCE_LABELS = {
 
 def title_source_label(source: str) -> str:
     return _TITLE_SOURCE_LABELS.get(source, source)
+
+
+def shared_words_phrase(repeated_word_count: int, total_word_count: int) -> str:
+    """State the share as the two counts, so the reader judges rather than a rule."""
+    return (
+        f"{repeated_word_count} of {total_word_count} words in this article "
+        "also appear in your other articles"
+    )
 
 
 def repeated_in_phrase(other_article_count: int) -> str:

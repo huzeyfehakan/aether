@@ -139,6 +139,54 @@ class ContentDuplicationAnalysisTests(unittest.TestCase):
             repeated_text,
         )
 
+    def test_reports_a_body_that_is_mostly_shared_text(self):
+        """Two measured quantities are compared; no length is judged."""
+        long_notice = " ".join(["uyarı"] * 40)
+        first = self.ingest("kisa", ["Kısa özgün cümle.", long_notice])
+        self.ingest("ikinci", ["Başka özgün cümle.", long_notice])
+
+        analysis = self.analyze.execute(
+            first.article, first.article_version.article_version_id
+        )
+
+        self.assertTrue(analysis.is_mostly_repeated)
+        self.assertEqual(analysis.repeated_word_count, 40)
+        self.assertEqual(analysis.unique_word_count, 3)
+
+    def test_a_short_article_of_its_own_writing_is_not_reported(self):
+        """No word-count threshold: brevity alone is never a finding."""
+        first = self.ingest("kisa-ozgun", ["İki kelime."])
+        self.ingest("baska", ["Tamamen farklı bir cümle."])
+
+        analysis = self.analyze.execute(
+            first.article, first.article_version.article_version_id
+        )
+
+        self.assertFalse(analysis.is_mostly_repeated)
+        self.assertEqual(analysis.repeated_word_count, 0)
+
+    def test_a_long_article_with_a_little_boilerplate_is_not_reported(self):
+        notice = "Bu bir standart uyarı metnidir."
+        body = " ".join(["özgün"] * 60)
+        first = self.ingest("uzun", [body, notice])
+        self.ingest("uzun-iki", ["Başka gövde metni.", notice])
+
+        analysis = self.analyze.execute(
+            first.article, first.article_version.article_version_id
+        )
+
+        self.assertFalse(analysis.is_mostly_repeated)
+
+    def test_nothing_is_reported_without_another_article_to_compare(self):
+        only = self.ingest("tek", ["Kısa cümle.", "Başka cümle."])
+
+        analysis = self.analyze.execute(
+            only.article, only.article_version.article_version_id
+        )
+
+        self.assertFalse(analysis.is_mostly_repeated)
+        self.assertEqual(analysis.compared_article_count, 0)
+
     def test_rejects_an_article_version_from_a_different_article(self):
         first = self.ingest("birinci", ["Özgün paragraf."])
         second = self.ingest("ikinci", ["Başka paragraf."])

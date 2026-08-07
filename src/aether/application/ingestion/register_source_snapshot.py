@@ -7,7 +7,11 @@ import json
 from typing import Optional, Tuple
 
 from aether.domain.content import Article, ArticleVersion, Passage
-from aether.domain.source_data import ArticleVersionSourceData, StructuredDataNode
+from aether.domain.source_data import (
+    ArticleVersionSourceData,
+    DeclaredTitle,
+    StructuredDataNode,
+)
 from aether.ports.outbound.content_repository import ContentRepository
 
 
@@ -29,6 +33,7 @@ class SourceArticleSnapshot:
     description: Optional[str] = None
     keywords: Optional[str] = None
     structured_data_nodes: Tuple[StructuredDataNode, ...] = ()
+    declared_titles: Tuple[DeclaredTitle, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -120,6 +125,7 @@ class RegisterSourceSnapshot:
             ArticleVersionSourceData(
                 article_version_id=version.article_version_id,
                 structured_data_nodes=snapshot.structured_data_nodes,
+                declared_titles=snapshot.declared_titles,
             )
         )
         return RegistrationResult(

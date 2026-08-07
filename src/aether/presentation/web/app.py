@@ -15,6 +15,7 @@ from aether.application.analysis.analyze_article_structure import AnalyzeArticle
 from aether.application.analysis.analyze_content_duplication import AnalyzeContentDuplication
 from aether.application.analysis.analyze_passage_quality import AnalyzePassageQuality
 from aether.application.analysis.analyze_structured_data import AnalyzeStructuredData
+from aether.application.analysis.analyze_title_consistency import AnalyzeTitleConsistency
 from aether.application.analysis.assess_ai_readiness import AssessAIReadiness
 from aether.application.analysis.build_ai_readiness_report import BuildAIReadinessReport
 from aether.application.analysis.build_article_analysis_report import BuildArticleAnalysisReport
@@ -32,6 +33,7 @@ from aether.application.analysis.derive_editor_recommendations import (
 )
 from aether.presentation.editor_recommendation_text import (
     category_subtitle,
+    title_source_label,
     compared_articles_phrase,
     missing_properties_phrase,
     recommendation_text,
@@ -61,6 +63,7 @@ class AIReadinessPipeline:
             # from the same publisher has been analysed.
             AnalyzeContentDuplication(repository),
             AnalyzeStructuredData(repository),
+            AnalyzeTitleConsistency(repository),
         )
         self._assess_readiness = AssessAIReadiness()
         self._build_readiness_report = BuildAIReadinessReport()
@@ -194,6 +197,11 @@ def _recommendation_views(report: Any, category) -> list:
             occurrence["detail"] = missing_properties_phrase(
                 recommendation.missing_properties
             )
+        if recommendation.declared_values:
+            occurrence["declared"] = [
+                {"label": title_source_label(source), "value": value}
+                for source, value in recommendation.declared_values
+            ]
         group["occurrences"].append(occurrence)
     return list(grouped.values())
 

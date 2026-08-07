@@ -15,7 +15,7 @@ from aether.application.ingestion.register_source_snapshot import (
     SourceArticleSnapshot,
 )
 from aether.domain.common import DomainValidationError, require_aware
-from aether.domain.source_data import StructuredDataNode
+from aether.domain.source_data import DeclaredTitle, StructuredDataNode, TitleSource
 from aether.ports.outbound.content_repository import ContentRepository
 
 
@@ -62,6 +62,7 @@ class NormalizedHtmlArticle:
     description: Optional[str]
     keywords: Optional[str]
     structured_data_nodes: Tuple[StructuredDataNode, ...] = ()
+    declared_titles: Tuple[DeclaredTitle, ...] = ()
 
 
 class _ArticleHtmlCollector(HTMLParser):
@@ -340,6 +341,35 @@ class HtmlArticleNormalizer:
             structured_data_nodes=self._structured_data_nodes(
                 collector.json_ld_documents
             ),
+            declared_titles=self._declared_titles(collector),
+        )
+
+    @classmethod
+    def _declared_titles(
+        cls, collector: "_ArticleHtmlCollector"
+    ) -> Tuple[DeclaredTitle, ...]:
+        """Keep every title the page declared, not just the one that wins.
+
+        Ingestion selects a single title for the article record. A page that
+        states two different headlines is telling readers and machines
+        different things, and that is only visible if the losing declarations
+        survive.
+        """
+        candidates = (
+            (
+                TitleSource.DOCUMENT_TITLE,
+                _normalize_text(" ".join(collector.title_parts)),
+            ),
+            (TitleSource.OPEN_GRAPH, collector.metadata.get("og:title") or ""),
+            (
+                TitleSource.STRUCTURED_DATA,
+                cls._json_ld_text(collector.json_ld_documents, "headline") or "",
+            ),
+        )
+        return tuple(
+            DeclaredTitle(source=source, value=value)
+            for source, value in candidates
+            if value and value.strip()
         )
 
     @classmethod
@@ -665,5 +695,6 @@ class RegisterRawHtmlArticle:
                 description=normalized.description,
                 keywords=normalized.keywords,
                 structured_data_nodes=normalized.structured_data_nodes,
+                declared_titles=normalized.declared_titles,
             )
         )

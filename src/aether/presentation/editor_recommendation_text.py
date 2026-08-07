@@ -86,6 +86,21 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
             "your CMS."
         ),
     ),
+    RecommendationCode.DESCRIPTION_SOURCES_DISAGREE: RecommendationText(
+        headline="This article gives more than one summary",
+        why_it_matters=(
+            "The page states its summary in several places, and they do not "
+            "all say the same thing. Search results, social cards and software "
+            "reading the page may each show a different summary of the same "
+            "article. Formatting differences such as an added tagline or "
+            "punctuation are ignored here, so this is a genuine difference in "
+            "wording."
+        ),
+        what_to_do=(
+            "Decide which summary is correct and make the others match it in "
+            "your CMS."
+        ),
+    ),
     RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY: RecommendationText(
         headline="This paragraph also appears in your other articles",
         why_it_matters=(
@@ -141,6 +156,10 @@ _TITLE_SOURCE_LABELS = {
     "document_title": "Browser tab title",
     "open_graph": "Social sharing title",
     "structured_data": "Structured data headline",
+    "meta_description": "Search result summary",
+    "og_description": "Social sharing summary",
+    "twitter_description": "Twitter card summary",
+    "structured_data_description": "Structured data summary",
 }
 
 

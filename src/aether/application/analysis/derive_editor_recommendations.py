@@ -40,6 +40,7 @@ class RecommendationCode(str, Enum):
     NO_ARTICLE_STRUCTURED_DATA = "no_article_structured_data"
     INCOMPLETE_ARTICLE_STRUCTURED_DATA = "incomplete_article_structured_data"
     TITLE_SOURCES_DISAGREE = "title_sources_disagree"
+    DESCRIPTION_SOURCES_DISAGREE = "description_sources_disagree"
 
 
 #: Structured data is declared by the page template, so correcting it is a CMS
@@ -52,6 +53,7 @@ class RecommendationCode(str, Enum):
 _CATEGORIES = {
     RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY: RecommendationCategory.EDITOR,
     RecommendationCode.TITLE_SOURCES_DISAGREE: RecommendationCategory.EDITOR,
+    RecommendationCode.DESCRIPTION_SOURCES_DISAGREE: RecommendationCategory.EDITOR,
     RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: RecommendationCategory.TECHNICAL,
     RecommendationCode.INCOMPLETE_ARTICLE_STRUCTURED_DATA: (
         RecommendationCategory.TECHNICAL
@@ -112,17 +114,30 @@ class DeriveEditorRecommendations:
         report: ArticleAnalysisReport,
     ) -> Tuple[EditorRecommendation, ...]:
         analysis = report.title_consistency_analysis
-        if analysis is None or analysis.titles_agree:
+        if analysis is None:
             return ()
-        return (
-            EditorRecommendation(
-                code=RecommendationCode.TITLE_SOURCES_DISAGREE,
-                declared_values=tuple(
-                    (title.source.value, title.value)
-                    for title in analysis.declared_titles
-                ),
-            ),
-        )
+        found = []
+        if not analysis.titles_agree:
+            found.append(
+                EditorRecommendation(
+                    code=RecommendationCode.TITLE_SOURCES_DISAGREE,
+                    declared_values=tuple(
+                        (title.source.value, title.value)
+                        for title in analysis.declared_titles
+                    ),
+                )
+            )
+        if not analysis.descriptions_agree:
+            found.append(
+                EditorRecommendation(
+                    code=RecommendationCode.DESCRIPTION_SOURCES_DISAGREE,
+                    declared_values=tuple(
+                        (description.source.value, description.value)
+                        for description in analysis.declared_descriptions
+                    ),
+                )
+            )
+        return tuple(found)
 
     @staticmethod
     def _editor(

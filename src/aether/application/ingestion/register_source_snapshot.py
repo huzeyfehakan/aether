@@ -9,6 +9,7 @@ from typing import Optional, Tuple
 from aether.domain.content import Article, ArticleVersion, Passage
 from aether.domain.source_data import (
     ArticleVersionSourceData,
+    DeclaredDescription,
     DeclaredTitle,
     StructuredDataNode,
 )
@@ -34,6 +35,7 @@ class SourceArticleSnapshot:
     keywords: Optional[str] = None
     structured_data_nodes: Tuple[StructuredDataNode, ...] = ()
     declared_titles: Tuple[DeclaredTitle, ...] = ()
+    declared_descriptions: Tuple[DeclaredDescription, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -126,6 +128,7 @@ class RegisterSourceSnapshot:
                 article_version_id=version.article_version_id,
                 structured_data_nodes=snapshot.structured_data_nodes,
                 declared_titles=snapshot.declared_titles,
+                declared_descriptions=snapshot.declared_descriptions,
             )
         )
         return RegistrationResult(

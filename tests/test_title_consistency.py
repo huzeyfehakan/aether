@@ -11,17 +11,17 @@ from aether.adapters.outbound.in_memory_content_repository import (  # noqa: E40
 from aether.application.analysis.analyze_title_consistency import (  # noqa: E402
     AnalyzeTitleConsistency,
 )
-from aether.application.analysis.title_comparison import (  # noqa: E402
-    all_titles_agree,
-    normalize_title,
-    titles_agree,
+from aether.application.analysis.declared_text_comparison import (  # noqa: E402
+    all_declared_values_agree,
+    normalize_declared_text,
+    declared_values_agree,
 )
 from aether.application.ingestion.register_raw_html_article import (  # noqa: E402
     RawHtmlArticle,
     RegisterRawHtmlArticle,
 )
 from aether.domain.common import DomainValidationError  # noqa: E402
-from aether.domain.source_data import TitleSource  # noqa: E402
+from aether.domain.source_data import DescriptionSource, TitleSource  # noqa: E402
 
 
 OBSERVED_AT = datetime(2026, 8, 7, 9, 0, tzinfo=timezone.utc)
@@ -33,19 +33,19 @@ class TitleNormalizationTests(unittest.TestCase):
 
     def test_decodes_character_references(self):
         self.assertEqual(
-            normalize_title("&quot;Milli Dayanışma&quot; teklifi"),
+            normalize_declared_text("&quot;Milli Dayanışma&quot; teklifi"),
             '"milli dayanışma" teklifi',
         )
 
     def test_collapses_whitespace(self):
-        self.assertEqual(normalize_title("  Bir   Başlık \n"), "bir başlık")
+        self.assertEqual(normalize_declared_text("  Bir   Başlık \n"), "bir başlık")
 
     def test_folds_case_without_depending_on_locale(self):
-        self.assertEqual(normalize_title("BIR BASLIK"), normalize_title("bir baslik"))
+        self.assertEqual(normalize_declared_text("BIR BASLIK"), normalize_declared_text("bir baslik"))
 
     def test_drops_the_combining_dot_that_case_folding_introduces(self):
         """Folding a dotted capital I leaves a mark typed text never has."""
-        self.assertEqual(normalize_title("İstanbul"), normalize_title("istanbul"))
+        self.assertEqual(normalize_declared_text("İstanbul"), normalize_declared_text("istanbul"))
 
     def test_documents_the_turkish_dotless_i_limit(self):
         """Resolving I against ı needs a Turkish locale, which would break others.
@@ -54,22 +54,22 @@ class TitleNormalizationTests(unittest.TestCase):
         therefore be reported as different. This pins the behaviour so the limit
         is visible rather than surprising.
         """
-        self.assertNotEqual(normalize_title("BAŞLIK"), normalize_title("başlık"))
+        self.assertNotEqual(normalize_declared_text("BAŞLIK"), normalize_declared_text("başlık"))
 
     def test_writes_every_padded_separator_one_way(self):
         self.assertEqual(
-            normalize_title("Başlık | Site"), normalize_title("Başlık – Site")
+            normalize_declared_text("Başlık | Site"), normalize_declared_text("Başlık – Site")
         )
 
     def test_leaves_unpadded_punctuation_alone(self):
         """An unpadded hyphen is part of the headline, not a site separator."""
-        self.assertEqual(normalize_title("Ankara-Istanbul hattı"), "ankara-istanbul hattı")
+        self.assertEqual(normalize_declared_text("Ankara-Istanbul hattı"), "ankara-istanbul hattı")
 
 
 class TitleAgreementTests(unittest.TestCase):
     def test_ignores_a_site_name_appended_to_one_declaration(self):
         self.assertTrue(
-            titles_agree(
+            declared_values_agree(
                 "Aşırı Uyumlu Çocuklar Neyi Saklar? - Ebeveyn Akademisi",
                 "Aşırı Uyumlu Çocuklar Neyi Saklar?",
             )
@@ -77,7 +77,7 @@ class TitleAgreementTests(unittest.TestCase):
 
     def test_ignores_a_site_name_prepended_to_one_declaration(self):
         self.assertTrue(
-            titles_agree(
+            declared_values_agree(
                 "Five times Israel manipulated institutions",
                 "TRT World - Five times Israel manipulated institutions",
             )
@@ -85,7 +85,7 @@ class TitleAgreementTests(unittest.TestCase):
 
     def test_reports_a_genuinely_different_headline(self):
         self.assertFalse(
-            titles_agree(
+            declared_values_agree(
                 '12 Maddelik "Çerçeve Kanun" Teklifinin detayları netleşti - Son Dakika',
                 '12 Maddelik "Milli Dayanışma" Teklifinin detayları netleşti',
             )
@@ -93,13 +93,13 @@ class TitleAgreementTests(unittest.TestCase):
 
     def test_a_shared_site_name_is_not_a_shared_headline(self):
         """The site name must not pass as the headline, in either position."""
-        self.assertFalse(titles_agree("Story - Site", "Other - Site"))
-        self.assertFalse(titles_agree("Site - Story", "Site - Other"))
+        self.assertFalse(declared_values_agree("Story - Site", "Other - Site"))
+        self.assertFalse(declared_values_agree("Site - Story", "Site - Other"))
 
     def test_a_missing_declaration_is_not_a_disagreement(self):
-        self.assertTrue(titles_agree("Bir Başlık", ""))
-        self.assertTrue(all_titles_agree(()))
-        self.assertTrue(all_titles_agree(("Tek Başlık",)))
+        self.assertTrue(declared_values_agree("Bir Başlık", ""))
+        self.assertTrue(all_declared_values_agree(()))
+        self.assertTrue(all_declared_values_agree(("Tek Başlık",)))
 
     def test_compares_all_declarations_together_not_in_pairs(self):
         """One title may carry the site name first and another last."""
@@ -109,7 +109,7 @@ class TitleAgreementTests(unittest.TestCase):
             "Five times Israel manipulated institutions",
         )
 
-        self.assertTrue(all_titles_agree(declarations))
+        self.assertTrue(all_declared_values_agree(declarations))
 
 
 class TitleConsistencyAnalysisTests(unittest.TestCase):
@@ -118,8 +118,15 @@ class TitleConsistencyAnalysisTests(unittest.TestCase):
         self.register = RegisterRawHtmlArticle(self.repository)
         self.analyze = AnalyzeTitleConsistency(self.repository)
 
-    def ingest(self, slug, document_title, og_title=None, headline=None):
+    def ingest(self, slug, document_title, og_title=None, headline=None,
+               description=None, og_description=None):
         og = f'<meta property="og:title" content="{og_title}" />' if og_title else ""
+        og += f'<meta name="description" content="{description}" />' if description else ""
+        og += (
+            f'<meta property="og:description" content="{og_description}" />'
+            if og_description
+            else ""
+        )
         ld = (
             f'<script type="application/ld+json">{{"@type": "NewsArticle", '
             f'"headline": "{headline}"}}</script>'
@@ -197,6 +204,40 @@ class TitleConsistencyAnalysisTests(unittest.TestCase):
         # is formatting, not a different headline.
         self.assertEqual(analysis.declared_source_count, 2)
         self.assertTrue(analysis.titles_agree)
+
+    def test_reports_when_summaries_actually_differ(self):
+        analysis = self.analyze_slug(
+            "ozet-farkli",
+            document_title="Başlık",
+            description="Bu makale çocuk gelişimini anlatıyor.",
+            og_description="Tamamen farklı bir özet metni.",
+        )
+
+        self.assertEqual(analysis.declared_description_count, 2)
+        self.assertFalse(analysis.descriptions_agree)
+        self.assertEqual(
+            [d.source for d in analysis.declared_descriptions],
+            [DescriptionSource.META_DESCRIPTION, DescriptionSource.OPEN_GRAPH],
+        )
+
+    def test_ignores_a_tagline_appended_to_one_summary(self):
+        """TRT Çocuk appends a site tagline to the meta description only."""
+        analysis = self.analyze_slug(
+            "ozet-tagline",
+            document_title="Başlık",
+            description="Bir özet metni. - Çocuk gelişiminde bilmeniz gerekenler",
+            og_description="Bir özet metni.",
+        )
+
+        self.assertTrue(analysis.descriptions_agree)
+
+    def test_a_single_summary_cannot_disagree(self):
+        analysis = self.analyze_slug(
+            "ozet-tek", document_title="Başlık", description="Yalnız özet."
+        )
+
+        self.assertEqual(analysis.declared_description_count, 1)
+        self.assertTrue(analysis.descriptions_agree)
 
     def test_rejects_an_article_version_from_a_different_article(self):
         first = self.ingest("birinci", document_title="Bir")

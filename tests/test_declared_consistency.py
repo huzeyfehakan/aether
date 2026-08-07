@@ -8,8 +8,8 @@ sys.path.insert(0, "src")
 from aether.adapters.outbound.in_memory_content_repository import (  # noqa: E402
     InMemoryContentRepository,
 )
-from aether.application.analysis.analyze_title_consistency import (  # noqa: E402
-    AnalyzeTitleConsistency,
+from aether.application.analysis.analyze_declared_consistency import (  # noqa: E402
+    AnalyzeDeclaredConsistency,
 )
 from aether.application.analysis.declared_text_comparison import (  # noqa: E402
     all_declared_values_agree,
@@ -112,11 +112,11 @@ class TitleAgreementTests(unittest.TestCase):
         self.assertTrue(all_declared_values_agree(declarations))
 
 
-class TitleConsistencyAnalysisTests(unittest.TestCase):
+class DeclaredConsistencyAnalysisTests(unittest.TestCase):
     def setUp(self):
         self.repository = InMemoryContentRepository()
         self.register = RegisterRawHtmlArticle(self.repository)
-        self.analyze = AnalyzeTitleConsistency(self.repository)
+        self.analyze = AnalyzeDeclaredConsistency(self.repository)
 
     def ingest(self, slug, document_title, og_title=None, headline=None,
                description=None, og_description=None):

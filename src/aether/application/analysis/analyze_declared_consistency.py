@@ -1,4 +1,9 @@
-"""Check whether a page states one headline and one summary, or several."""
+"""Check whether a page states one headline and one summary, or several.
+
+A page declares its headline in the document title, in Open Graph and in
+structured data, and its summary in as many places again. Ingestion keeps one
+of each. This reads all of them and reports when they do not agree.
+"""
 
 from dataclasses import dataclass
 from typing import Tuple
@@ -11,7 +16,7 @@ from aether.ports.outbound.content_repository import ContentRepository
 
 
 @dataclass(frozen=True)
-class TitleConsistencyAnalysis:
+class DeclaredConsistencyAnalysis:
     """The titles a page declared, and whether they carry one headline.
 
     Formatting differences are not disagreements: the comparison decodes
@@ -36,7 +41,7 @@ class TitleConsistencyAnalysis:
         return len(self.declared_descriptions)
 
 
-class AnalyzeTitleConsistency:
+class AnalyzeDeclaredConsistency:
     """Compare every title one article version declared."""
 
     def __init__(self, content_repository: ContentRepository) -> None:
@@ -44,7 +49,7 @@ class AnalyzeTitleConsistency:
 
     def execute(
         self, article: Article, article_version_id: str
-    ) -> TitleConsistencyAnalysis:
+    ) -> DeclaredConsistencyAnalysis:
         article_version = self._content_repository.get_article_version(article_version_id)
         if article_version.article_id != article.article_id:
             raise DomainValidationError(
@@ -55,7 +60,7 @@ class AnalyzeTitleConsistency:
         described = (
             source_data.declared_descriptions if source_data is not None else ()
         )
-        return TitleConsistencyAnalysis(
+        return DeclaredConsistencyAnalysis(
             article_id=article.article_id,
             article_version_id=article_version.article_version_id,
             declared_titles=declared,

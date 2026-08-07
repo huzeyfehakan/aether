@@ -187,6 +187,64 @@ class StructuredDataAnalysisTests(unittest.TestCase):
         self.assertEqual(len(structured), 1)
         self.assertEqual(structured[0].category, RecommendationCategory.TECHNICAL)
 
+    def test_does_not_repeat_a_gap_the_metadata_finding_already_covers(self):
+        """Two findings on one gap is two weak recommendations, not one strong."""
+        from aether.application.analysis.analyze_article_metadata import (
+            AnalyzeArticleMetadata,
+        )
+        from aether.application.analysis.analyze_article_structure import (
+            AnalyzeArticleStructure,
+        )
+        from aether.application.analysis.analyze_passage_quality import (
+            AnalyzePassageQuality,
+        )
+        from aether.application.analysis.assess_ai_readiness import AssessAIReadiness
+        from aether.application.analysis.build_ai_readiness_report import (
+            BuildAIReadinessReport,
+        )
+        from aether.application.analysis.build_article_analysis_report import (
+            BuildArticleAnalysisReport,
+        )
+        from aether.application.analysis.derive_editor_recommendations import (
+            RecommendationCode,
+        )
+
+        # An Article node that declares neither an author nor a summary, on a
+        # page that carries neither either.
+        registration = self.ingest(
+            "eksik-yazar",
+            '{"@context": "https://schema.org", "@type": "NewsArticle",'
+            ' "headline": "Bir başlık", "publisher": "TRT", "image": "x",'
+            ' "inLanguage": "tr", "datePublished": "2026-08-03T10:00:00+03:00",'
+            ' "dateModified": "2026-08-04T10:00:00+03:00"}',
+        )
+        analysis = BuildArticleAnalysisReport(
+            AnalyzeArticleStructure(self.repository),
+            AnalyzeArticleMetadata(self.repository),
+            AnalyzePassageQuality(self.repository),
+            None,
+            AnalyzeStructuredData(self.repository),
+        ).execute(registration.article, registration.article_version.article_version_id)
+        report = BuildAIReadinessReport().execute(AssessAIReadiness().execute(analysis))
+        codes = [r.code for r in report.editor_recommendations]
+
+        # The article lacks an author entirely, so only the stronger finding
+        # is made; the structured-data list does not restate it.
+        self.assertIn(RecommendationCode.MISSING_AUTHOR, codes)
+        self.assertNotIn(
+            RecommendationCode.INCOMPLETE_ARTICLE_STRUCTURED_DATA, codes
+        )
+
+    def test_still_reports_a_property_the_page_has_but_does_not_declare(self):
+        """Having the data but not declaring it is a different, real finding."""
+        analysis = self.analyze_slug(
+            "beyan-eksik",
+            '{"@context": "https://schema.org", "@type": "NewsArticle",'
+            ' "headline": "Bir başlık"}',
+        )
+
+        self.assertIn("inLanguage", analysis.missing_article_properties)
+
     def test_rejects_an_article_version_from_a_different_article(self):
         first = self.ingest("birinci")
         second = self.ingest("ikinci")

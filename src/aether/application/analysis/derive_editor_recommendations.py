@@ -87,6 +87,30 @@ class EditorRecommendation:
         return _CATEGORIES[self.code]
 
 
+#: Schema.org Article properties that restate a field the metadata analysis
+#: already checks. When the underlying data is absent, the two findings are the
+#: same gap in different words, and the metadata one is the stronger of the
+#: pair: a publisher cannot declare a date they do not have. When the data is
+#: present but undeclared, only the structured-data finding applies, and it
+#: says something the metadata finding cannot.
+_PROPERTY_BEHIND_METADATA = {
+    "datePublished": "publication_date_available",
+    "dateModified": "last_modified_date_available",
+    "author": "author_available",
+    "description": "description_available",
+}
+
+
+def _absent_metadata_properties(report: ArticleAnalysisReport) -> frozenset:
+    """Schema.org properties whose underlying data the article also lacks."""
+    metadata = report.metadata_analysis
+    return frozenset(
+        name
+        for name, attribute in _PROPERTY_BEHIND_METADATA.items()
+        if not getattr(metadata, attribute)
+    )
+
+
 class DeriveEditorRecommendations:
     """Derive editor-facing advice from an existing analysis report."""
 
@@ -111,11 +135,16 @@ class DeriveEditorRecommendations:
                     code=RecommendationCode.NO_ARTICLE_STRUCTURED_DATA,
                 ),
             )
-        if analysis.missing_article_properties:
+        undeclared = tuple(
+            name
+            for name in analysis.missing_article_properties
+            if name not in _absent_metadata_properties(report)
+        )
+        if undeclared:
             return (
                 EditorRecommendation(
                     code=RecommendationCode.INCOMPLETE_ARTICLE_STRUCTURED_DATA,
-                    missing_properties=analysis.missing_article_properties,
+                    missing_properties=undeclared,
                 ),
             )
         return ()

@@ -51,7 +51,6 @@ class HeadingStructureTests(unittest.TestCase):
 
         self.assertEqual([h.level for h in analysis.headings], [1, 2])
         self.assertEqual(analysis.top_level_count, 1)
-        self.assertEqual(analysis.skipped_levels, ())
 
     def test_reports_an_article_with_no_main_heading(self):
         analysis = self.analyze_body(
@@ -67,25 +66,6 @@ class HeadingStructureTests(unittest.TestCase):
         )
 
         self.assertEqual(analysis.top_level_count, 2)
-
-    def test_reports_a_skipped_level(self):
-        analysis = self.analyze_body(
-            "atlama", "<h1>Ana başlık</h1><p>Metin.</p><h3>Alt bölüm</h3><p>Metin.</p>"
-        )
-
-        self.assertEqual(len(analysis.skipped_levels), 1)
-        self.assertEqual(analysis.skipped_levels[0].from_level, 1)
-        self.assertEqual(analysis.skipped_levels[0].to_level, 3)
-
-    def test_returning_to_a_higher_level_is_not_a_skip(self):
-        """Closing a subsection is ordinary, not a gap in the outline."""
-        analysis = self.analyze_body(
-            "geri-donus",
-            "<h1>Ana</h1><p>M.</p><h2>Bölüm</h2><p>M.</p><h3>Alt</h3><p>M.</p>"
-            "<h2>Başka bölüm</h2><p>M.</p>",
-        )
-
-        self.assertEqual(analysis.skipped_levels, ())
 
     def test_ignores_headings_outside_the_article(self):
         """A site banner heading is not the article's main heading."""
@@ -121,7 +101,6 @@ class HeadingStructureTests(unittest.TestCase):
         )
 
         self.assertEqual(analysis.top_level_count, 1)
-        self.assertEqual(analysis.skipped_levels, ())
         self.assertEqual(len(analysis.headings), 1)
 
     def test_rejects_an_article_version_from_a_different_article(self):

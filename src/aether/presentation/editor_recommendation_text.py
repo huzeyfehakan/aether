@@ -155,20 +155,6 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
             "section headings."
         ),
     ),
-    RecommendationCode.SKIPPED_HEADING_LEVELS: RecommendationText(
-        headline="This article's headings skip a level",
-        why_it_matters=(
-            "Heading levels describe how sections sit inside one another. When "
-            "a level is skipped the outline has a gap, so a section reads as "
-            "though it belongs to a parent that was never written, and the "
-            "shape of the article is lost to anything that cannot see the "
-            "styling."
-        ),
-        what_to_do=(
-            "Use the next heading level down when starting a subsection, "
-            "rather than choosing a level for how it looks."
-        ),
-    ),
     RecommendationCode.TITLE_SOURCES_DISAGREE: RecommendationText(
         headline="This article gives more than one headline",
         why_it_matters=(

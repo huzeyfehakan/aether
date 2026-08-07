@@ -45,6 +45,7 @@ class RecommendationCode(str, Enum):
     MISSING_AUTHOR = "missing_author"
     MISSING_SUMMARY = "missing_summary"
     MISSING_LAST_MODIFIED_DATE = "missing_last_modified_date"
+    BODY_MOSTLY_REPEATED_TEXT = "body_mostly_repeated_text"
     NO_TOP_LEVEL_HEADING = "no_top_level_heading"
     MULTIPLE_TOP_LEVEL_HEADINGS = "multiple_top_level_headings"
 
@@ -58,6 +59,7 @@ class RecommendationCode(str, Enum):
 #: not reveal, so the advice names both paths rather than guessing.
 _CATEGORIES = {
     RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY: RecommendationCategory.EDITOR,
+    RecommendationCode.BODY_MOSTLY_REPEATED_TEXT: RecommendationCategory.EDITOR,
     RecommendationCode.TITLE_SOURCES_DISAGREE: RecommendationCategory.EDITOR,
     RecommendationCode.DESCRIPTION_SOURCES_DISAGREE: RecommendationCategory.EDITOR,
     # Fields an editor fills in when writing the article.
@@ -85,6 +87,8 @@ class EditorRecommendation:
     passage_ids: Tuple[str, ...] = ()
     other_article_count: int = 0
     missing_properties: Tuple[str, ...] = ()
+    repeated_word_count: int = 0
+    total_word_count: int = 0
     declared_values: Tuple[Tuple[str, str], ...] = ()
 
     @property
@@ -237,7 +241,18 @@ class DeriveEditorRecommendations:
         duplication = report.content_duplication_analysis
         if duplication is None:
             return ()
-        return tuple(
+        whole_body = (
+            (
+                EditorRecommendation(
+                    code=RecommendationCode.BODY_MOSTLY_REPEATED_TEXT,
+                    repeated_word_count=duplication.repeated_word_count,
+                    total_word_count=duplication.total_word_count,
+                ),
+            )
+            if duplication.is_mostly_repeated
+            else ()
+        )
+        return whole_body + tuple(
             EditorRecommendation(
                 code=RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY,
                 excerpt=repeated.text,

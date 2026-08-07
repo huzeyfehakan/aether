@@ -1,12 +1,12 @@
-"""Check whether a page states one headline or several."""
+"""Check whether a page states one headline and one summary, or several."""
 
 from dataclasses import dataclass
 from typing import Tuple
 
-from aether.application.analysis.title_comparison import all_titles_agree
+from aether.application.analysis.declared_text_comparison import all_declared_values_agree
 from aether.domain.common import DomainValidationError
 from aether.domain.content import Article
-from aether.domain.source_data import DeclaredTitle
+from aether.domain.source_data import DeclaredDescription, DeclaredTitle
 from aether.ports.outbound.content_repository import ContentRepository
 
 
@@ -24,10 +24,16 @@ class TitleConsistencyAnalysis:
     article_version_id: str
     declared_titles: Tuple[DeclaredTitle, ...]
     titles_agree: bool
+    declared_descriptions: Tuple[DeclaredDescription, ...] = ()
+    descriptions_agree: bool = True
 
     @property
     def declared_source_count(self) -> int:
         return len(self.declared_titles)
+
+    @property
+    def declared_description_count(self) -> int:
+        return len(self.declared_descriptions)
 
 
 class AnalyzeTitleConsistency:
@@ -46,9 +52,16 @@ class AnalyzeTitleConsistency:
             )
         source_data = self._content_repository.get_source_data(article_version_id)
         declared = source_data.declared_titles if source_data is not None else ()
+        described = (
+            source_data.declared_descriptions if source_data is not None else ()
+        )
         return TitleConsistencyAnalysis(
             article_id=article.article_id,
             article_version_id=article_version.article_version_id,
             declared_titles=declared,
-            titles_agree=all_titles_agree(title.value for title in declared),
+            titles_agree=all_declared_values_agree(title.value for title in declared),
+            declared_descriptions=described,
+            descriptions_agree=all_declared_values_agree(
+                description.value for description in described
+            ),
         )

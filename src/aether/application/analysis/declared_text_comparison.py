@@ -1,4 +1,9 @@
-"""Decide whether two declared titles carry the same headline.
+"""Decide whether the values a page declares for one field say the same thing.
+
+A page states its title, and its summary, in several places at once. The same
+comparison serves both: publishers append a site name or a tagline to one
+declaration and not another, punctuate them differently, and escape them
+differently, none of which changes what the text says.
 
 A page states its title in several places and they rarely match character for
 character. One is entity-escaped, another is not; one carries the site name,
@@ -76,7 +81,7 @@ _CANONICAL_SEPARATOR = " - "
 _SEPARATORS = (" - ", " – ", " — ", " | ", " · ")
 
 
-def normalize_title(value: str) -> str:
+def normalize_declared_text(value: str) -> str:
     """Reduce a declared title to its comparable form.
 
     Character references are decoded because structured data lives inside a
@@ -122,7 +127,7 @@ def _forms(normalized: str) -> Set[str]:
     return forms
 
 
-def all_titles_agree(values: Iterable[str]) -> bool:
+def all_declared_values_agree(values: Iterable[str]) -> bool:
     """Whether every declared title states the same headline.
 
     Declarations are compared together rather than in pairs. A page may put
@@ -136,7 +141,7 @@ def all_titles_agree(values: Iterable[str]) -> bool:
     "Other - Site" share the form "site", but neither page ever declares "site"
     by itself, so they disagree.
     """
-    declared = [normalize_title(value) for value in values]
+    declared = [normalize_declared_text(value) for value in values]
     declared = [value for value in declared if value]
     if len(declared) < 2:
         return True
@@ -144,6 +149,6 @@ def all_titles_agree(values: Iterable[str]) -> bool:
     return bool(shared & set(declared))
 
 
-def titles_agree(first: str, second: str) -> bool:
+def declared_values_agree(first: str, second: str) -> bool:
     """Whether two declared titles state the same headline."""
-    return all_titles_agree((first, second))
+    return all_declared_values_agree((first, second))

@@ -15,7 +15,13 @@ from aether.application.ingestion.register_source_snapshot import (
     SourceArticleSnapshot,
 )
 from aether.domain.common import DomainValidationError, require_aware
-from aether.domain.source_data import DeclaredTitle, StructuredDataNode, TitleSource
+from aether.domain.source_data import (
+    DeclaredDescription,
+    DeclaredTitle,
+    DescriptionSource,
+    StructuredDataNode,
+    TitleSource,
+)
 from aether.ports.outbound.content_repository import ContentRepository
 
 
@@ -63,6 +69,7 @@ class NormalizedHtmlArticle:
     keywords: Optional[str]
     structured_data_nodes: Tuple[StructuredDataNode, ...] = ()
     declared_titles: Tuple[DeclaredTitle, ...] = ()
+    declared_descriptions: Tuple[DeclaredDescription, ...] = ()
 
 
 class _ArticleHtmlCollector(HTMLParser):
@@ -342,6 +349,33 @@ class HtmlArticleNormalizer:
                 collector.json_ld_documents
             ),
             declared_titles=self._declared_titles(collector),
+            declared_descriptions=self._declared_descriptions(collector),
+        )
+
+    @classmethod
+    def _declared_descriptions(
+        cls, collector: "_ArticleHtmlCollector"
+    ) -> Tuple[DeclaredDescription, ...]:
+        """Keep every summary the page declared, not just the one that wins."""
+        candidates = (
+            (
+                DescriptionSource.META_DESCRIPTION,
+                collector.metadata.get("description") or "",
+            ),
+            (DescriptionSource.OPEN_GRAPH, collector.metadata.get("og:description") or ""),
+            (
+                DescriptionSource.TWITTER,
+                collector.metadata.get("twitter:description") or "",
+            ),
+            (
+                DescriptionSource.STRUCTURED_DATA,
+                cls._json_ld_text(collector.json_ld_documents, "description") or "",
+            ),
+        )
+        return tuple(
+            DeclaredDescription(source=source, value=value)
+            for source, value in candidates
+            if value and value.strip()
         )
 
     @classmethod
@@ -696,5 +730,6 @@ class RegisterRawHtmlArticle:
                 keywords=normalized.keywords,
                 structured_data_nodes=normalized.structured_data_nodes,
                 declared_titles=normalized.declared_titles,
+                declared_descriptions=normalized.declared_descriptions,
             )
         )

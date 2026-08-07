@@ -48,6 +48,27 @@ class DeclaredTitle:
             raise DomainValidationError("declared title value is required")
 
 
+class DescriptionSource(str, Enum):
+    """Where in the page a summary was declared."""
+
+    META_DESCRIPTION = "meta_description"
+    OPEN_GRAPH = "og_description"
+    TWITTER = "twitter_description"
+    STRUCTURED_DATA = "structured_data_description"
+
+
+@dataclass(frozen=True)
+class DeclaredDescription:
+    """One summary a page declared, kept with the place it was declared."""
+
+    source: DescriptionSource
+    value: str
+
+    def __post_init__(self) -> None:
+        if not self.value or not self.value.strip():
+            raise DomainValidationError("declared description value is required")
+
+
 @dataclass(frozen=True)
 class StructuredDataNode:
     """One typed node a source declared, and the properties it carries."""
@@ -78,10 +99,12 @@ class ArticleVersionSourceData:
     article_version_id: str
     structured_data_nodes: Tuple[StructuredDataNode, ...] = ()
     declared_titles: Tuple[DeclaredTitle, ...] = ()
+    declared_descriptions: Tuple[DeclaredDescription, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.article_version_id or not self.article_version_id.strip():
             raise DomainValidationError("source data article_version_id is required")
-        sources = [title.source for title in self.declared_titles]
-        if len(set(sources)) != len(sources):
-            raise DomainValidationError("each title source may be declared once")
+        for declared in (self.declared_titles, self.declared_descriptions):
+            sources = [item.source for item in declared]
+            if len(set(sources)) != len(sources):
+                raise DomainValidationError("each source may be declared once")

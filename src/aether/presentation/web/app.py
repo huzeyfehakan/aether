@@ -267,7 +267,11 @@ def _report_view(report: Any) -> Dict[str, Any]:
                 ),
             }
         ),
-        "technical": {
+        # Named "identity", not "technical". It previously shared a key with
+        # the technical recommendations above and, being second, silently
+        # replaced them: the section rendered from a block that had no
+        # recommendations in it at all.
+        "identity": {
             "article_id": report.article_identity.article_id,
             "article_version_id": report.article_identity.article_version_id,
         },

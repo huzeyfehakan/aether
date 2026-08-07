@@ -128,23 +128,54 @@ class WebPresentationTests(unittest.TestCase):
 
         self.assertEqual(response.headers["cache-control"], "no-store")
 
-    def test_template_only_reads_view_fields_the_server_sends(self):
-        """Guards the drift that removing a report field previously caused."""
-        template = (
+    def _template(self):
+        return (
             Path(__file__).parent.parent
             / "src/aether/presentation/web/templates/index.html"
         ).read_text(encoding="utf-8")
-        referenced = set(re.findall(r"view\.([a-z_]+)", template))
 
+    def _analysed_view(self):
         response = self.client.post(
             "/analyze/url",
             data={"url": "https://www.trtworld.com/article/3e946db45c45"},
         )
-        provided = set(response.json()["view"])
+        self.assertEqual(response.status_code, 200)
+        return response.json()["view"]
+
+    def test_template_only_reads_view_fields_the_server_sends(self):
+        """Guards the drift that removing a report field previously caused."""
+        referenced = set(re.findall(r"view\.([a-z_]+)", self._template()))
+        provided = set(self._analysed_view())
 
         self.assertTrue(
             referenced <= provided,
             f"template reads {sorted(referenced - provided)} which the view does not send",
+        )
+
+    def test_template_only_reads_nested_view_fields_the_server_sends(self):
+        """A top-level key existing is not enough; its contents must match too.
+
+        A duplicate key in the view once let the identity block silently
+        replace the technical recommendations. The top-level name was still
+        present, so a shallow check passed while the page crashed reading a
+        field inside it.
+        """
+        template = self._template()
+        view = self._analysed_view()
+
+        missing = []
+        for alias, key in re.findall(r"const (\w+) = view\.([a-z_]+);", template):
+            block = view.get(key)
+            if not isinstance(block, dict):
+                continue
+            for field in set(re.findall(rf"\b{alias}\.([a-z_]+)", template)):
+                if field not in block:
+                    missing.append(f"view.{key}.{field}")
+
+        self.assertEqual(
+            missing,
+            [],
+            f"template reads {sorted(missing)} which the view does not send",
         )
     def test_web_view_separates_editor_and_technical_recommendations(self):
         """A second article from the same publisher makes reuse visible."""

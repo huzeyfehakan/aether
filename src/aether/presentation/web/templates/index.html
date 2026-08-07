@@ -89,6 +89,13 @@
 
       <p id="status" role="alert"></p>
 
+      <section id="outcome-card" class="panel hidden" aria-live="polite">
+        <div class="report-heading"><div><div class="eyebrow">Analysis complete</div><h2 id="outcome-headline"></h2></div></div>
+        <p id="outcome-happened"></p>
+        <ul id="outcome-evidence" class="muted"></ul>
+        <div class="recommendation"><p><strong>What to do.</strong> <span id="outcome-action"></span></p></div>
+      </section>
+
       <section id="report-card" class="panel hidden" aria-live="polite">
         <div class="report-heading"><div><div class="eyebrow">Analysis complete</div><h2>AI Readiness Report</h2></div><span id="report-state" class="badge partial">Assessment available</span></div>
         <div id="assessment-grid" class="assessment-grid"></div>
@@ -184,7 +191,18 @@
           try {
             const response = await fetch(form.dataset.endpoint, { method: 'POST', body: payload });
             const data = await response.json(); if (!response.ok) throw new Error(data.detail || 'Analysis failed');
-            renderReport(data.view, data.report); status.textContent = ''; reportCard.classList.remove('hidden'); reportCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const outcomeCard = document.querySelector('#outcome-card');
+            outcomeCard.classList.add('hidden');
+            status.textContent = '';
+            if (data.outcome) {
+              document.querySelector('#outcome-headline').textContent = data.outcome.headline;
+              document.querySelector('#outcome-happened').textContent = data.outcome.what_happened;
+              document.querySelector('#outcome-evidence').innerHTML = data.outcome.evidence.map((e) => `<li>${e}</li>`).join('');
+              document.querySelector('#outcome-action').textContent = data.outcome.what_to_do;
+              outcomeCard.classList.remove('hidden'); outcomeCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              return;
+            }
+            renderReport(data.view, data.report); reportCard.classList.remove('hidden'); reportCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
           } catch (error) { status.textContent = error.message; }
           finally { button.disabled = false; }
         });

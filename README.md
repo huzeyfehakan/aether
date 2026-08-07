@@ -139,6 +139,9 @@ layer decides *which* recommendation applies and emits a code; presentation
 decides *how it reads*. That keeps copy out of use cases and leaves room for a
 Turkish edition of the same findings.
 
+[`docs/handoff.md`](docs/handoff.md) records the design principles, the ideas
+deliberately rejected, and the questions to ask when editor feedback arrives.
+
 See [`docs/architecture.md`](docs/architecture.md) for layer responsibilities,
 and [`docs/body-extraction.md`](docs/body-extraction.md) and
 [`docs/publication-date-extraction.md`](docs/publication-date-extraction.md)

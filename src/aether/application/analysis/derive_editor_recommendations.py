@@ -45,6 +45,9 @@ class RecommendationCode(str, Enum):
     MISSING_AUTHOR = "missing_author"
     MISSING_SUMMARY = "missing_summary"
     MISSING_LAST_MODIFIED_DATE = "missing_last_modified_date"
+    NO_TOP_LEVEL_HEADING = "no_top_level_heading"
+    MULTIPLE_TOP_LEVEL_HEADINGS = "multiple_top_level_headings"
+    SKIPPED_HEADING_LEVELS = "skipped_heading_levels"
 
 
 #: Structured data is declared by the page template, so correcting it is a CMS
@@ -62,6 +65,10 @@ _CATEGORIES = {
     RecommendationCode.MISSING_PUBLICATION_DATE: RecommendationCategory.EDITOR,
     RecommendationCode.MISSING_AUTHOR: RecommendationCategory.EDITOR,
     RecommendationCode.MISSING_SUMMARY: RecommendationCategory.EDITOR,
+    # Editors write the headings inside an article.
+    RecommendationCode.NO_TOP_LEVEL_HEADING: RecommendationCategory.EDITOR,
+    RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS: RecommendationCategory.EDITOR,
+    RecommendationCode.SKIPPED_HEADING_LEVELS: RecommendationCategory.EDITOR,
     # The CMS stamps this on save; an editor has no field for it.
     RecommendationCode.MISSING_LAST_MODIFIED_DATE: RecommendationCategory.TECHNICAL,
     RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: RecommendationCategory.TECHNICAL,
@@ -117,6 +124,7 @@ class DeriveEditorRecommendations:
     def execute(self, report: ArticleAnalysisReport) -> Tuple[EditorRecommendation, ...]:
         return (
             self._missing_metadata(report)
+            + self._heading_structure(report)
             + self._title_consistency(report)
             + self._editor(report)
             + self._technical(report)
@@ -172,6 +180,37 @@ class DeriveEditorRecommendations:
         return tuple(
             EditorRecommendation(code=code) for available, code in missing if not available
         )
+
+    @staticmethod
+    def _heading_structure(
+        report: ArticleAnalysisReport,
+    ) -> Tuple[EditorRecommendation, ...]:
+        analysis = report.heading_structure_analysis
+        if analysis is None:
+            return ()
+        found = []
+        if analysis.top_level_count == 0:
+            found.append(
+                EditorRecommendation(code=RecommendationCode.NO_TOP_LEVEL_HEADING)
+            )
+        elif analysis.top_level_count > 1:
+            found.append(
+                EditorRecommendation(
+                    code=RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS,
+                    other_article_count=analysis.top_level_count,
+                )
+            )
+        if analysis.skipped_levels:
+            found.append(
+                EditorRecommendation(
+                    code=RecommendationCode.SKIPPED_HEADING_LEVELS,
+                    missing_properties=tuple(
+                        f"H{skip.from_level} to H{skip.to_level}"
+                        for skip in analysis.skipped_levels
+                    ),
+                )
+            )
+        return tuple(found)
 
     @staticmethod
     def _title_consistency(

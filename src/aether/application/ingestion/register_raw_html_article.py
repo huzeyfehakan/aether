@@ -17,6 +17,7 @@ from aether.application.ingestion.register_source_snapshot import (
 from aether.domain.common import DomainValidationError, require_aware
 from aether.domain.source_data import (
     DeclaredDescription,
+    DeclaredHeading,
     DeclaredTitle,
     DescriptionSource,
     StructuredDataNode,
@@ -70,6 +71,7 @@ class NormalizedHtmlArticle:
     structured_data_nodes: Tuple[StructuredDataNode, ...] = ()
     declared_titles: Tuple[DeclaredTitle, ...] = ()
     declared_descriptions: Tuple[DeclaredDescription, ...] = ()
+    declared_headings: Tuple[DeclaredHeading, ...] = ()
 
 
 class _ArticleHtmlCollector(HTMLParser):
@@ -94,7 +96,8 @@ class _ArticleHtmlCollector(HTMLParser):
         self.json_ld_documents: List[str] = []
         self.application_json_documents: List[str] = []
         self.title_parts: List[str] = []
-        self.headings: List[Tuple[int, str]] = []
+        # (containment priority, heading level, text)
+        self.headings: List[Tuple[int, int, str]] = []
         self.paragraphs: List[Tuple[int, str]] = []
         self._article_depth = 0
         self._main_depth = 0
@@ -105,6 +108,8 @@ class _ArticleHtmlCollector(HTMLParser):
         self._title_captured = False
         self._heading_parts: Optional[List[str]] = None
         self._heading_priority = 0
+        self._heading_level = 0
+        self._heading_is_body = True
         self._paragraph_parts: Optional[List[str]] = None
         self._paragraph_priority = 0
         self._paragraph_is_body = True
@@ -150,9 +155,11 @@ class _ArticleHtmlCollector(HTMLParser):
             self._head_depth += 1
         elif tag == "title" and self._head_depth and not self._title_captured:
             self._in_title = True
-        elif tag == "h1":
+        elif tag in _HEADING_TAGS:
             self._heading_parts = []
             self._heading_priority = self._containment_priority()
+            self._heading_level = int(tag[1])
+            self._heading_is_body = self._non_body_depth == 0
         elif tag == "p":
             self._paragraph_parts = []
             self._paragraph_priority = self._containment_priority()
@@ -180,12 +187,16 @@ class _ArticleHtmlCollector(HTMLParser):
             self._paragraph_parts = None
             self._paragraph_priority = 0
             self._paragraph_is_body = True
-        elif tag == "h1" and self._heading_parts is not None:
+        elif tag in _HEADING_TAGS and self._heading_parts is not None:
             text = _normalize_text(" ".join(self._heading_parts))
-            if text:
-                self.headings.append((self._heading_priority, text))
+            if text and self._heading_is_body:
+                self.headings.append(
+                    (self._heading_priority, self._heading_level, text)
+                )
             self._heading_parts = None
             self._heading_priority = 0
+            self._heading_level = 0
+            self._heading_is_body = True
         elif tag == "title" and self._in_title:
             self._in_title = False
             self._title_captured = True
@@ -209,6 +220,10 @@ class _ArticleHtmlCollector(HTMLParser):
             self._heading_parts.append(data)
         if self._paragraph_parts is not None:
             self._paragraph_parts.append(data)
+
+
+#: Heading tags, in outline order.
+_HEADING_TAGS = ("h1", "h2", "h3", "h4", "h5", "h6")
 
 
 def _normalize_text(value: str) -> str:
@@ -350,6 +365,25 @@ class HtmlArticleNormalizer:
             ),
             declared_titles=self._declared_titles(collector),
             declared_descriptions=self._declared_descriptions(collector),
+            declared_headings=self._declared_headings(collector),
+        )
+
+    @staticmethod
+    def _declared_headings(
+        collector: "_ArticleHtmlCollector",
+    ) -> Tuple[DeclaredHeading, ...]:
+        """Headings from the article's own container, in document order.
+
+        The same containment ranking that selects body paragraphs selects
+        headings, so a site banner heading is not mistaken for the article's.
+        """
+        if not collector.headings:
+            return ()
+        top = max(priority for priority, _, _ in collector.headings)
+        return tuple(
+            DeclaredHeading(level=level, text=text)
+            for priority, level, text in collector.headings
+            if priority == top
         )
 
     @classmethod
@@ -529,7 +563,7 @@ class HtmlArticleNormalizer:
         return urljoin(source_url, canonical_href)
 
     @staticmethod
-    def _innermost_heading(headings: List[Tuple[int, str]]) -> str:
+    def _innermost_heading(headings: List[Tuple[int, int, str]]) -> str:
         """Return the first heading from the most article-specific container.
 
         Headings are ranked exactly like paragraphs: article-contained first,
@@ -538,8 +572,13 @@ class HtmlArticleNormalizer:
         """
         if not headings:
             return ""
-        highest_priority = max(priority for priority, _ in headings)
-        return next(text for priority, text in headings if priority == highest_priority)
+        top_level = [item for item in headings if item[1] == 1]
+        if not top_level:
+            return ""
+        highest_priority = max(priority for priority, _, _ in top_level)
+        return next(
+            text for priority, _, text in top_level if priority == highest_priority
+        )
 
     @staticmethod
     def _first_metadata(metadata: Dict[str, str], keys: Tuple[str, ...]) -> Optional[str]:
@@ -731,5 +770,6 @@ class RegisterRawHtmlArticle:
                 structured_data_nodes=normalized.structured_data_nodes,
                 declared_titles=normalized.declared_titles,
                 declared_descriptions=normalized.declared_descriptions,
+                declared_headings=normalized.declared_headings,
             )
         )

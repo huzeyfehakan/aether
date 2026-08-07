@@ -14,6 +14,7 @@ from aether.application.analysis.analyze_article_metadata import AnalyzeArticleM
 from aether.application.analysis.analyze_article_structure import AnalyzeArticleStructure
 from aether.application.analysis.analyze_content_duplication import AnalyzeContentDuplication
 from aether.application.analysis.analyze_passage_quality import AnalyzePassageQuality
+from aether.application.analysis.analyze_heading_structure import AnalyzeHeadingStructure
 from aether.application.analysis.analyze_structured_data import AnalyzeStructuredData
 from aether.application.analysis.analyze_title_consistency import AnalyzeTitleConsistency
 from aether.application.analysis.assess_ai_readiness import AssessAIReadiness
@@ -69,6 +70,7 @@ class AIReadinessPipeline:
             AnalyzeContentDuplication(repository),
             AnalyzeStructuredData(repository),
             AnalyzeTitleConsistency(repository),
+            AnalyzeHeadingStructure(repository),
         )
         self._assess_page = AssessPageContent()
         self._assess_readiness = AssessAIReadiness()

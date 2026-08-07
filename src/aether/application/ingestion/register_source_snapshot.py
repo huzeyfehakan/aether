@@ -10,6 +10,7 @@ from aether.domain.content import Article, ArticleVersion, Passage
 from aether.domain.source_data import (
     ArticleVersionSourceData,
     DeclaredDescription,
+    DeclaredHeading,
     DeclaredTitle,
     StructuredDataNode,
 )
@@ -36,6 +37,7 @@ class SourceArticleSnapshot:
     structured_data_nodes: Tuple[StructuredDataNode, ...] = ()
     declared_titles: Tuple[DeclaredTitle, ...] = ()
     declared_descriptions: Tuple[DeclaredDescription, ...] = ()
+    declared_headings: Tuple[DeclaredHeading, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -129,6 +131,7 @@ class RegisterSourceSnapshot:
                 structured_data_nodes=snapshot.structured_data_nodes,
                 declared_titles=snapshot.declared_titles,
                 declared_descriptions=snapshot.declared_descriptions,
+                declared_headings=snapshot.declared_headings,
             )
         )
         return RegistrationResult(

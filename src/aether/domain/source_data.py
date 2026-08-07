@@ -48,6 +48,20 @@ class DeclaredTitle:
             raise DomainValidationError("declared title value is required")
 
 
+@dataclass(frozen=True)
+class DeclaredHeading:
+    """One heading from the article body, with its outline level."""
+
+    level: int
+    text: str
+
+    def __post_init__(self) -> None:
+        if not 1 <= self.level <= 6:
+            raise DomainValidationError("heading level must be between 1 and 6")
+        if not self.text or not self.text.strip():
+            raise DomainValidationError("declared heading text is required")
+
+
 class DescriptionSource(str, Enum):
     """Where in the page a summary was declared."""
 
@@ -100,6 +114,7 @@ class ArticleVersionSourceData:
     structured_data_nodes: Tuple[StructuredDataNode, ...] = ()
     declared_titles: Tuple[DeclaredTitle, ...] = ()
     declared_descriptions: Tuple[DeclaredDescription, ...] = ()
+    declared_headings: Tuple[DeclaredHeading, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.article_version_id or not self.article_version_id.strip():

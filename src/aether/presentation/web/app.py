@@ -19,12 +19,17 @@ from aether.application.analysis.analyze_title_consistency import AnalyzeTitleCo
 from aether.application.analysis.assess_ai_readiness import AssessAIReadiness
 from aether.application.analysis.build_ai_readiness_report import BuildAIReadinessReport
 from aether.application.analysis.build_article_analysis_report import BuildArticleAnalysisReport
+from aether.application.ingestion.assess_page_content import (
+    AssessPageContent,
+    PageAssessment,
+)
 from aether.application.ingestion.register_raw_html_article import (
     RawHtmlArticle,
     RegisterRawHtmlArticle,
     canonical_url_from_html,
 )
 from aether.domain.common import DomainValidationError
+from aether.presentation.page_outcome_text import outcome_view
 from aether.presentation.ai_readiness_report_renderers import (
     PlainTextAIReadinessReportRenderer,
 )
@@ -65,6 +70,7 @@ class AIReadinessPipeline:
             AnalyzeStructuredData(repository),
             AnalyzeTitleConsistency(repository),
         )
+        self._assess_page = AssessPageContent()
         self._assess_readiness = AssessAIReadiness()
         self._build_readiness_report = BuildAIReadinessReport()
         self._renderer = PlainTextAIReadinessReportRenderer()
@@ -81,6 +87,11 @@ class AIReadinessPipeline:
         parsed_fallback_published_at = self._parse_fallback_timestamp(
             fallback_published_at
         )
+        # Decide first whether this page can be analysed at all, so a page
+        # that was never an article gets an explanation rather than an error.
+        assessment = self._assess_page.execute(html)
+        if not assessment.is_analyzable:
+            return assessment
         registration = self._register_article.execute(
             RawHtmlArticle(
                 html=html,
@@ -256,6 +267,23 @@ def _report_view(report: Any) -> Dict[str, Any]:
     }
 
 
+def _analysis_response(result: Any) -> Dict[str, Any]:
+    """Shape either a finished report or an explained non-article outcome.
+
+    A page that could not be analysed is a result, not a failure. It returns
+    with the same status as any other analysis and carries an explanation in
+    place of a report.
+    """
+    outcome = outcome_view(result) if isinstance(result, PageAssessment) else None
+    if outcome is not None:
+        return {"report": None, "view": None, "outcome": outcome}
+    return {
+        "report": PlainTextAIReadinessReportRenderer().render(result),
+        "view": _report_view(result),
+        "outcome": None,
+    }
+
+
 def create_app(fetcher: Optional[HtmlFetcher] = None) -> FastAPI:
     """Create the standalone demonstration web application."""
 
@@ -298,10 +326,7 @@ def create_app(fetcher: Optional[HtmlFetcher] = None) -> FastAPI:
                 fallback_language,
                 fallback_published_at,
             )
-            return {
-                "report": PlainTextAIReadinessReportRenderer().render(report),
-                "view": _report_view(report),
-            }
+            return _analysis_response(report)
         except (HtmlFetchError, DomainValidationError) as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
@@ -330,10 +355,7 @@ def create_app(fetcher: Optional[HtmlFetcher] = None) -> FastAPI:
                 fallback_language,
                 fallback_published_at,
             )
-            return {
-                "report": PlainTextAIReadinessReportRenderer().render(report),
-                "view": _report_view(report),
-            }
+            return _analysis_response(report)
         except UnicodeDecodeError as error:
             raise HTTPException(
                 status_code=422, detail="HTML file must be UTF-8 encoded"

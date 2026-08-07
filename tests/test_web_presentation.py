@@ -193,6 +193,69 @@ class WebPresentationTests(unittest.TestCase):
         self.assertIn("Editor Recommendations", response.text)
         self.assertIn("Technical AI Readiness", response.text)
 
+    def test_a_page_with_no_article_text_is_explained_not_rejected(self):
+        """A video or listing page is an expected outcome, not an error."""
+        html = """
+            <html lang="tr"><head><title>Video</title>
+              <meta property="og:type" content="website" />
+            </head><body><main><div>Video oynatıcı</div></main></body></html>
+        """
+
+        response = self.client.post(
+            "/analyze/file",
+            data={"source_url": "https://www.trtspor.com.tr/videolar/x"},
+            files={"file": ("v.html", html, "text/html")},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        outcome = response.json()["outcome"]
+        self.assertEqual(outcome["outcome"], "no_article_text_found")
+        self.assertIn("No article text was found", outcome["headline"])
+        self.assertIn("nothing is wrong", outcome["what_to_do"])
+        self.assertIsNone(response.json()["report"])
+
+    def test_an_article_whose_text_cannot_be_read_is_named_as_a_problem(self):
+        """A page declaring itself an article with no text contradicts itself."""
+        html = """
+            <html lang="tr"><head><title>Makale</title>
+              <script type="application/ld+json">
+                {"@type": "NewsArticle", "headline": "Bir başlık"}
+              </script>
+            </head><body><main><div>İçerik tarayıcıda yükleniyor</div></main></body></html>
+        """
+
+        response = self.client.post(
+            "/analyze/file",
+            data={"source_url": "https://publisher.example/makale"},
+            files={"file": ("a.html", html, "text/html")},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        outcome = response.json()["outcome"]
+        self.assertEqual(outcome["outcome"], "article_text_unreadable")
+        self.assertIn("says it is an article", outcome["headline"])
+        self.assertIn("maintains the site", outcome["what_to_do"])
+
+    def test_no_outcome_exposes_parser_wording(self):
+        """An editor never sees why the parser stopped."""
+        for html in (
+            '<html lang="tr"><head><title>V</title></head><body><div>x</div></body></html>',
+            '<html lang="tr"><head><title>A</title>'
+            '<script type="application/ld+json">{"@type": "Article"}</script>'
+            "</head><body><div>x</div></body></html>",
+        ):
+            response = self.client.post(
+                "/analyze/file",
+                data={"source_url": "https://publisher.example/p"},
+                files={"file": ("p.html", html, "text/html")},
+            )
+            outcome = response.json()["outcome"]
+            blob = " ".join(
+                [outcome["headline"], outcome["what_happened"], outcome["what_to_do"]]
+            ).lower()
+            for jargon in ("parser", "paragraph tag", "html", "passage", "raw article"):
+                self.assertNotIn(jargon, blob)
+
     def test_invalid_url_submission_returns_a_user_facing_validation_error(self):
         response = TestClient(create_app()).post(
             "/analyze/url",

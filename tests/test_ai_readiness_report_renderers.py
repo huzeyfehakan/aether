@@ -40,12 +40,9 @@ class AIReadinessReportRendererTests(unittest.TestCase):
             metadata_analysis=MetadataAnalysis(
                 article_id="article-1",
                 article_version_id="version-1",
-                title_available=True,
                 title_length=12,
-                canonical_url_available=True,
                 publication_date_available=True,
                 last_modified_date_available=False,
-                language_available=True,
                 author_available=True,
                 description_available=False,
             ),

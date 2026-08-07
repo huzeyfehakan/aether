@@ -29,12 +29,9 @@ class StructuralSummary:
 
 @dataclass(frozen=True)
 class MetadataSummary:
-    title_available: bool
     title_length: int
-    canonical_url_available: bool
     publication_date_available: bool
     last_modified_date_available: bool
-    language_available: bool
     author_available: bool
     description_available: bool
 
@@ -111,12 +108,9 @@ class BuildAIReadinessReport:
                 total_word_count=structural.total_word_count,
             ),
             metadata_summary=MetadataSummary(
-                title_available=metadata.title_available,
                 title_length=metadata.title_length,
-                canonical_url_available=metadata.canonical_url_available,
                 publication_date_available=metadata.publication_date_available,
                 last_modified_date_available=metadata.last_modified_date_available,
-                language_available=metadata.language_available,
                 author_available=metadata.author_available,
                 description_available=metadata.description_available,
             ),

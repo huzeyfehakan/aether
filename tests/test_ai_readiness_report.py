@@ -36,12 +36,9 @@ class AIReadinessReportTests(unittest.TestCase):
             metadata_analysis=MetadataAnalysis(
                 article_id="article-1",
                 article_version_id="version-1",
-                title_available=True,
                 title_length=14,
-                canonical_url_available=True,
                 publication_date_available=True,
                 last_modified_date_available=False,
-                language_available=True,
                 author_available=True,
                 description_available=True,
             ),
@@ -72,7 +69,6 @@ class AIReadinessReportTests(unittest.TestCase):
         self.assertEqual(report.article_identity.article_id, "article-1")
         self.assertEqual(report.article_identity.article_version_id, "version-1")
         self.assertEqual(report.structural_summary.total_word_count, 12)
-        self.assertTrue(report.metadata_summary.title_available)
         self.assertTrue(report.metadata_summary.author_available)
         self.assertEqual(len(report.passage_quality_summary.passage_profiles), 2)
         self.assertEqual(

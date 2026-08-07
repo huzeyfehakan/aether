@@ -179,11 +179,13 @@ class StructuredDataAnalysisTests(unittest.TestCase):
             AssessAIReadiness().execute(analysis)
         )
 
-        self.assertEqual(len(report.editor_recommendations), 1)
-        self.assertEqual(
-            report.editor_recommendations[0].category,
-            RecommendationCategory.TECHNICAL,
-        )
+        structured = [
+            r
+            for r in report.editor_recommendations
+            if r.code.value.endswith("article_structured_data")
+        ]
+        self.assertEqual(len(structured), 1)
+        self.assertEqual(structured[0].category, RecommendationCategory.TECHNICAL)
 
     def test_rejects_an_article_version_from_a_different_article(self):
         first = self.ingest("birinci")

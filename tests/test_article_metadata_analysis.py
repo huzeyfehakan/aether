@@ -73,12 +73,9 @@ class ArticleMetadataAnalysisTests(unittest.TestCase):
         self.assertEqual(
             analysis.article_version_id, registered.article_version.article_version_id
         )
-        self.assertTrue(analysis.title_available)
         self.assertEqual(analysis.title_length, len("A stored title"))
-        self.assertTrue(analysis.canonical_url_available)
         self.assertTrue(analysis.publication_date_available)
         self.assertTrue(analysis.last_modified_date_available)
-        self.assertTrue(analysis.language_available)
         self.assertTrue(analysis.author_available)
         self.assertTrue(analysis.description_available)
 

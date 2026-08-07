@@ -41,6 +41,10 @@ class RecommendationCode(str, Enum):
     INCOMPLETE_ARTICLE_STRUCTURED_DATA = "incomplete_article_structured_data"
     TITLE_SOURCES_DISAGREE = "title_sources_disagree"
     DESCRIPTION_SOURCES_DISAGREE = "description_sources_disagree"
+    MISSING_PUBLICATION_DATE = "missing_publication_date"
+    MISSING_AUTHOR = "missing_author"
+    MISSING_SUMMARY = "missing_summary"
+    MISSING_LAST_MODIFIED_DATE = "missing_last_modified_date"
 
 
 #: Structured data is declared by the page template, so correcting it is a CMS
@@ -54,6 +58,12 @@ _CATEGORIES = {
     RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY: RecommendationCategory.EDITOR,
     RecommendationCode.TITLE_SOURCES_DISAGREE: RecommendationCategory.EDITOR,
     RecommendationCode.DESCRIPTION_SOURCES_DISAGREE: RecommendationCategory.EDITOR,
+    # Fields an editor fills in when writing the article.
+    RecommendationCode.MISSING_PUBLICATION_DATE: RecommendationCategory.EDITOR,
+    RecommendationCode.MISSING_AUTHOR: RecommendationCategory.EDITOR,
+    RecommendationCode.MISSING_SUMMARY: RecommendationCategory.EDITOR,
+    # The CMS stamps this on save; an editor has no field for it.
+    RecommendationCode.MISSING_LAST_MODIFIED_DATE: RecommendationCategory.TECHNICAL,
     RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: RecommendationCategory.TECHNICAL,
     RecommendationCode.INCOMPLETE_ARTICLE_STRUCTURED_DATA: (
         RecommendationCategory.TECHNICAL
@@ -82,7 +92,8 @@ class DeriveEditorRecommendations:
 
     def execute(self, report: ArticleAnalysisReport) -> Tuple[EditorRecommendation, ...]:
         return (
-            self._title_consistency(report)
+            self._missing_metadata(report)
+            + self._title_consistency(report)
             + self._editor(report)
             + self._technical(report)
         )
@@ -108,6 +119,30 @@ class DeriveEditorRecommendations:
                 ),
             )
         return ()
+
+    @staticmethod
+    def _missing_metadata(
+        report: ArticleAnalysisReport,
+    ) -> Tuple[EditorRecommendation, ...]:
+        """Absent metadata an editor or the CMS can supply.
+
+        Only fields that can actually be absent are checked. The domain
+        refuses to build an article without a title, a canonical URL or a
+        language, so those can never be missing here.
+        """
+        metadata = report.metadata_analysis
+        missing = (
+            (metadata.publication_date_available, RecommendationCode.MISSING_PUBLICATION_DATE),
+            (metadata.author_available, RecommendationCode.MISSING_AUTHOR),
+            (metadata.description_available, RecommendationCode.MISSING_SUMMARY),
+            (
+                metadata.last_modified_date_available,
+                RecommendationCode.MISSING_LAST_MODIFIED_DATE,
+            ),
+        )
+        return tuple(
+            EditorRecommendation(code=code) for available, code in missing if not available
+        )
 
     @staticmethod
     def _title_consistency(

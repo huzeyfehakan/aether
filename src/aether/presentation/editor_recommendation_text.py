@@ -72,6 +72,62 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
         ),
         what_to_do="Add the missing properties to the Article markup.",
     ),
+    RecommendationCode.MISSING_PUBLICATION_DATE: RecommendationText(
+        headline="This article does not say when it was published",
+        why_it_matters=(
+            "A publication date is how anything reading the page tells a piece "
+            "written today from one written three years ago. Without it this "
+            "article cannot be placed in the sequence of coverage on its "
+            "subject, and cannot be shown as current when it is."
+        ),
+        what_to_do=(
+            "Set the publish date on the article in your CMS. If that field is "
+            "already filled, the date is not reaching the published page and "
+            "whoever maintains the site needs to add it to the page markup."
+        ),
+    ),
+    RecommendationCode.MISSING_AUTHOR: RecommendationText(
+        headline="This article does not name who wrote it",
+        why_it_matters=(
+            "The byline is how a reader, and anything reading the page, knows "
+            "who stands behind the article. Without it the work can only be "
+            "attributed to the site as a whole, so the expertise of the person "
+            "or desk that produced it is invisible."
+        ),
+        what_to_do=(
+            "Fill in the author field for this article in your CMS. If the "
+            "piece is published by a desk rather than a person, name the desk "
+            "explicitly rather than leaving the field empty."
+        ),
+    ),
+    RecommendationCode.MISSING_SUMMARY: RecommendationText(
+        headline="This article has no summary",
+        why_it_matters=(
+            "The summary is the shortest statement of what the article is "
+            "about, and it is what appears beneath the headline in search "
+            "results and on shared links. Without one, other software writes "
+            "its own from whatever the article happens to open with."
+        ),
+        what_to_do=(
+            "Write one or two sentences in the summary or description field of "
+            "your CMS, saying what the article establishes rather than "
+            "repeating the headline."
+        ),
+    ),
+    RecommendationCode.MISSING_LAST_MODIFIED_DATE: RecommendationText(
+        headline="This article does not say when it was last updated",
+        why_it_matters=(
+            "An article that has been corrected or expanded looks identical to "
+            "one that has never changed. Anything reading the page has no way "
+            "to know a newer version exists, so a correction may never be "
+            "picked up."
+        ),
+        what_to_do=(
+            "Have the page publish a last-modified date whenever an article is "
+            "edited, through article:modified_time or the Schema.org "
+            "dateModified property."
+        ),
+    ),
     RecommendationCode.TITLE_SOURCES_DISAGREE: RecommendationText(
         headline="This article gives more than one headline",
         why_it_matters=(

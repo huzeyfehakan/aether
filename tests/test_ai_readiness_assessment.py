@@ -33,12 +33,9 @@ class AIReadinessAssessmentTests(unittest.TestCase):
         metadata = MetadataAnalysis(
             article_id="article-1",
             article_version_id="version-1",
-            title_available=metadata_available[0],
             title_length=10,
-            canonical_url_available=metadata_available[1],
             publication_date_available=metadata_available[2],
             last_modified_date_available=metadata_available[3],
-            language_available=metadata_available[4],
             author_available=metadata_available[5],
             description_available=metadata_available[6],
         )

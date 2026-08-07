@@ -20,11 +20,8 @@ class CompletenessClassification(str, Enum):
 class AIReadinessObservations:
     """Raw report observations used by the three deterministic classifications."""
 
-    title_available: bool
-    canonical_url_available: bool
     publication_date_available: bool
     last_modified_date_available: bool
-    language_available: bool
     author_available: bool
     description_available: bool
 
@@ -53,11 +50,8 @@ class AssessAIReadiness:
     def _observations_from(report: ArticleAnalysisReport) -> AIReadinessObservations:
         metadata = report.metadata_analysis
         return AIReadinessObservations(
-            title_available=metadata.title_available,
-            canonical_url_available=metadata.canonical_url_available,
             publication_date_available=metadata.publication_date_available,
             last_modified_date_available=metadata.last_modified_date_available,
-            language_available=metadata.language_available,
             author_available=metadata.author_available,
             description_available=metadata.description_available,
         )
@@ -67,11 +61,8 @@ class AssessAIReadiness:
         observations: AIReadinessObservations,
     ) -> CompletenessClassification:
         availability = (
-            observations.title_available,
-            observations.canonical_url_available,
             observations.publication_date_available,
             observations.last_modified_date_available,
-            observations.language_available,
             observations.author_available,
             observations.description_available,
         )

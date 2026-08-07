@@ -25,11 +25,44 @@ fragment against any fragment would let two different headlines agree merely
 by sharing a site name, in either position: "Story - Site" against
 "Other - Site", or "Site - Story" against "Site - Other".
 
-Known limitation: a headline that itself contains a padded separator, such as
-"Erdogan - Putin meeting", also yields fragments, so two titles can agree that
-a person would call different. That failure is towards silence rather than
-towards a false accusation, which is the safer direction for a report an
-editor is asked to trust.
+Known limitations
+-----------------
+
+These were measured, not guessed. None is solved here; they are recorded so
+the behaviour is visible when a report looks wrong.
+
+Reports a difference that a person would not (false positive):
+
+* Breadcrumb titles. Only one segment is removed, so "Site - Section -
+  Headline" never reduces to "Headline". A publisher using two-level titles
+  is flagged on every article, and a clean third declaration does not rescue
+  it.
+* Typographic variants. Curly and straight quotes, and a trailing full stop
+  present in one declaration, survive normalization and read as different
+  wording.
+* Unpadded separators. "Headline-Site" is not recognised as carrying a site
+  name, because an unpadded hyphen is ordinary punctuation; the site name
+  then counts as part of the headline.
+* Truncated declarations. A field cut to a length limit, with or without an
+  ellipsis, differs from the full headline.
+* Zero-width characters. These are not whitespace, so they are not collapsed.
+  Ordinary and non-breaking spaces are collapsed correctly.
+* Turkish dotless i. Resolving I against the dotless form needs a Turkish
+  locale and would corrupt other languages, so a declaration in capitals may
+  not match the same headline in lower case.
+
+Stays silent when a person would see a difference (false negative):
+
+* A headline that itself contains a padded separator, such as "Erdogan -
+  Putin meeting", yields fragments like any other value, so it can match a
+  different declaration that equals one of those fragments.
+* A page declaring only one title cannot disagree with itself, so a single
+  wrong headline is never reported here.
+
+The two directions are not equally costly. A false positive asks an editor to
+look at a headline that turns out to be fine; a false negative leaves a real
+mismatch on the site. The comparison is deliberately built so that its
+guessing, where it guesses at all, tends towards the first.
 """
 
 from html import unescape

@@ -47,7 +47,6 @@ class RecommendationCode(str, Enum):
     MISSING_LAST_MODIFIED_DATE = "missing_last_modified_date"
     NO_TOP_LEVEL_HEADING = "no_top_level_heading"
     MULTIPLE_TOP_LEVEL_HEADINGS = "multiple_top_level_headings"
-    SKIPPED_HEADING_LEVELS = "skipped_heading_levels"
 
 
 #: Structured data is declared by the page template, so correcting it is a CMS
@@ -68,7 +67,6 @@ _CATEGORIES = {
     # Editors write the headings inside an article.
     RecommendationCode.NO_TOP_LEVEL_HEADING: RecommendationCategory.EDITOR,
     RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS: RecommendationCategory.EDITOR,
-    RecommendationCode.SKIPPED_HEADING_LEVELS: RecommendationCategory.EDITOR,
     # The CMS stamps this on save; an editor has no field for it.
     RecommendationCode.MISSING_LAST_MODIFIED_DATE: RecommendationCategory.TECHNICAL,
     RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: RecommendationCategory.TECHNICAL,
@@ -198,16 +196,6 @@ class DeriveEditorRecommendations:
                 EditorRecommendation(
                     code=RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS,
                     other_article_count=analysis.top_level_count,
-                )
-            )
-        if analysis.skipped_levels:
-            found.append(
-                EditorRecommendation(
-                    code=RecommendationCode.SKIPPED_HEADING_LEVELS,
-                    missing_properties=tuple(
-                        f"H{skip.from_level} to H{skip.to_level}"
-                        for skip in analysis.skipped_levels
-                    ),
                 )
             )
         return tuple(found)

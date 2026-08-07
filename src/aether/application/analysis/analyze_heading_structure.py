@@ -5,9 +5,23 @@ it that answers a question. Three faults in an outline can be established from
 the markup alone, without judging the writing:
 
 * no top-level heading, so nothing states what the article as a whole is about;
-* more than one top-level heading, so which one names the article is ambiguous;
-* a level skipped, such as a section heading followed directly by a
-  sub-sub-heading, which leaves a gap in the outline.
+* more than one top-level heading, so which one names the article is ambiguous.
+
+Withdrawn: reporting a skipped heading level.
+---------------------------------------------
+A gap in the outline is a real fault and the check was deterministic, but
+measured against the TRT estate it almost never found one. What it found was
+template furniture: the heading of a legal-notice box on TRT Çocuk Ebeveyn
+Akademisi, and a "Diğer Haberler" related-articles widget on TRT Avaz. Both
+sit in class-named containers rather than in nav, aside, header or footer, so
+the containment rules that keep such boxes out of the body text cannot see
+them.
+
+The check therefore asked editors to renumber headings they did not write and
+cannot move, on four of six pages. A check that misfires costs more than one
+that stays silent, because it teaches an editor to distrust the report. It can
+return when furniture can be recognised, for instance once a heading can be
+tied to body text already known to be boilerplate.
 
 Rejected: reporting an article that has no subheadings at all.
 ---------------------------------------------------------------
@@ -31,13 +45,6 @@ from aether.domain.source_data import DeclaredHeading
 from aether.ports.outbound.content_repository import ContentRepository
 
 
-@dataclass(frozen=True)
-class SkippedHeadingLevel:
-    """A place where the outline jumps past one or more levels."""
-
-    from_level: int
-    to_level: int
-
 
 @dataclass(frozen=True)
 class HeadingStructureAnalysis:
@@ -47,7 +54,6 @@ class HeadingStructureAnalysis:
     article_version_id: str
     headings: Tuple[DeclaredHeading, ...]
     top_level_count: int
-    skipped_levels: Tuple[SkippedHeadingLevel, ...]
 
     @property
     def has_headings(self) -> bool:
@@ -76,24 +82,5 @@ class AnalyzeHeadingStructure:
             article_version_id=article_version.article_version_id,
             headings=headings,
             top_level_count=sum(1 for heading in headings if heading.level == 1),
-            skipped_levels=self._skipped_levels(headings),
         )
 
-    @staticmethod
-    def _skipped_levels(
-        headings: Tuple[DeclaredHeading, ...],
-    ) -> Tuple[SkippedHeadingLevel, ...]:
-        """Places where the outline descends by more than one level at once.
-
-        Only descents are counted. Returning from a sub-heading to a higher
-        level closes a section and is ordinary.
-        """
-        skipped = []
-        for previous, current in zip(headings, headings[1:]):
-            if current.level > previous.level + 1:
-                skipped.append(
-                    SkippedHeadingLevel(
-                        from_level=previous.level, to_level=current.level
-                    )
-                )
-        return tuple(skipped)

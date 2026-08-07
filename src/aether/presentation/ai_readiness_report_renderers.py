@@ -9,6 +9,7 @@ from aether.application.analysis.derive_editor_recommendations import (
 )
 from aether.presentation.editor_recommendation_text import (
     category_subtitle,
+    title_source_label,
     category_title,
     compared_articles_phrase,
     missing_properties_phrase,
@@ -83,6 +84,9 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
                 "code": recommendation.code.value,
                 "excerpt": recommendation.excerpt,
                 "other_article_count": recommendation.other_article_count,
+                "declared_values": [
+                    list(pair) for pair in recommendation.declared_values
+                ],
             }
             for recommendation in report.editor_recommendations
         ],
@@ -224,6 +228,8 @@ class PlainTextAIReadinessReportRenderer:
                         )
                     if detail:
                         lines.append(f"  {detail}")
+                    for source, value in occurrence.declared_values:
+                        lines.append(f"  {title_source_label(source)}: {value}")
                     if occurrence.excerpt:
                         lines.append(f'  "{occurrence.excerpt}"')
                 lines.extend(

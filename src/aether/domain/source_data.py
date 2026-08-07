@@ -16,9 +16,36 @@ immutable record and invite analyses that are no longer deterministic.
 """
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Tuple
 
 from .common import DomainValidationError
+
+
+class TitleSource(str, Enum):
+    """Where in the page a title was declared."""
+
+    DOCUMENT_TITLE = "document_title"
+    OPEN_GRAPH = "open_graph"
+    STRUCTURED_DATA = "structured_data"
+
+
+@dataclass(frozen=True)
+class DeclaredTitle:
+    """One title a page declared, kept with the place it was declared.
+
+    Ingestion picks a single title for the article record. The others are
+    retained here because a page that states two different headlines is
+    telling readers and machines different things, and that is only visible
+    when every declaration survives.
+    """
+
+    source: TitleSource
+    value: str
+
+    def __post_init__(self) -> None:
+        if not self.value or not self.value.strip():
+            raise DomainValidationError("declared title value is required")
 
 
 @dataclass(frozen=True)
@@ -50,7 +77,11 @@ class ArticleVersionSourceData:
 
     article_version_id: str
     structured_data_nodes: Tuple[StructuredDataNode, ...] = ()
+    declared_titles: Tuple[DeclaredTitle, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.article_version_id or not self.article_version_id.strip():
             raise DomainValidationError("source data article_version_id is required")
+        sources = [title.source for title in self.declared_titles]
+        if len(set(sources)) != len(sources):
+            raise DomainValidationError("each title source may be declared once")

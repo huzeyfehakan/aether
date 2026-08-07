@@ -72,6 +72,20 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
         ),
         what_to_do="Add the missing properties to the Article markup.",
     ),
+    RecommendationCode.TITLE_SOURCES_DISAGREE: RecommendationText(
+        headline="This article gives more than one headline",
+        why_it_matters=(
+            "The page states its title in several places, and they do not all "
+            "say the same thing. Readers see one headline, while software "
+            "reading the page may take another. Formatting differences such as "
+            "the site name or punctuation are ignored here, so this is a "
+            "genuine difference in wording."
+        ),
+        what_to_do=(
+            "Decide which headline is correct and make the others match it in "
+            "your CMS."
+        ),
+    ),
     RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY: RecommendationText(
         headline="This paragraph also appears in your other articles",
         why_it_matters=(
@@ -120,6 +134,18 @@ def missing_properties_phrase(missing_properties) -> str:
     if len(labels) == 1:
         return f"Not declared: {labels[0]}"
     return "Not declared: " + ", ".join(labels[:-1]) + f" and {labels[-1]}"
+
+
+#: Editor-facing names for the places a page can state its title.
+_TITLE_SOURCE_LABELS = {
+    "document_title": "Browser tab title",
+    "open_graph": "Social sharing title",
+    "structured_data": "Structured data headline",
+}
+
+
+def title_source_label(source: str) -> str:
+    return _TITLE_SOURCE_LABELS.get(source, source)
 
 
 def repeated_in_phrase(other_article_count: int) -> str:

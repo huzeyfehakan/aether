@@ -1,157 +1,169 @@
 # Aether
 
-Deterministic AI Readiness analysis for publisher articles.
+A deterministic AI Publishing Assistant for publisher articles.
 
-Aether is an open-source MVP for examining whether an article is easy for downstream AI systems and retrieval pipelines to consume. It focuses on publisher-controlled signals: metadata completeness, article structure, and passage coverage. It deliberately does not claim to predict how a particular model will rank, quote, or answer from an article.
+Aether reads a published article and tells an editor what to improve before it
+goes out — whether the page names its author, whether it states one headline or
+several, whether its body is mostly boilerplate, whether it tells machines what
+it is. Every finding is derived from the page itself by fixed rules. Nothing is
+inferred by a language model, and no finding depends on a threshold someone
+chose.
 
-## What Aether does
+It deliberately does **not** predict how any AI system will rank, quote or
+answer from an article. It reports what is on the page and what that costs.
 
-Given a public article URL or an HTML file, Aether ingests the source as an immutable article version, extracts deterministic metadata and passages, analyzes structure, metadata, and passage quality, assesses metadata completeness, passage coverage, and structural completeness, and renders a human-readable readiness report.
+## What it produces
 
-The current output is qualitative (`complete`, `partial`, or `missing`) rather than a numeric score. This keeps the MVP explainable and avoids presenting an arbitrary score as a measure of model visibility.
+Findings are separated by who can act on them. An editor can change what an
+article says today; markup and templates need the CMS or engineering, and
+usually fix every article at once.
 
-## Current capabilities
+```
+Editor Recommendations
+Things you can change in this article now.
+Compared against previously analyzed articles from this publisher (2 articles).
 
-- URL and local HTML analysis through a small FastAPI demonstration interface.
-- Deterministic HTML ingestion with immutable `ArticleVersion` fingerprints.
-- Passage extraction from visible HTML paragraphs.
-- Deterministic publication-date precedence, including JSON-LD `datePublished`.
-- Metadata extraction for title, canonical URL, dates, language, author, description, and keywords.
-- Deterministic support for matching server-supplied JSON article payloads.
-- Plain text, JSON, and Markdown report renderers.
-- In-memory repositories suitable for the current MVP and its tests.
+Most of this article is text that appears in your other articles
+  36 of 61 words in this article also appear in your other articles
+  Why it matters: More of this article's words are shared with your other
+  articles than are its own. Anything reading the page to learn what this
+  piece says finds mostly text it has already seen elsewhere.
+  What to do: Check that the article's own text is reaching the published
+  page. If standing notices such as a disclaimer or a byline make up most
+  of the body, they belong outside it.
+
+Technical AI Readiness
+Things that need a change to the page template or the CMS.
+
+Your article markup leaves some details undeclared
+  Not declared: language
+```
+
+Every recommendation names a concrete action and what the gap costs. None of
+them says "author is missing" and stops.
+
+## What it checks
+
+| Finding | Audience |
+| --- | --- |
+| No publication date, byline or summary | Editor |
+| The page states more than one headline, or more than one summary | Editor |
+| A paragraph that also appears in the publisher's other articles | Editor |
+| A body that is mostly such text | Editor |
+| No main heading, or more than one | Editor |
+| No last-modified date | Technical |
+| No Schema.org `Article` markup, or an incomplete one | Technical |
+
+A URL that yields no article text is not an error. Aether says what it found
+and what each case implies, separating a page that declares itself an article
+but serves no text — a real fault — from a video or listing page, where
+nothing is wrong.
 
 ## Quick start
 
-### Requirements
-
-- Python 3.9 or newer
-- A network connection when analyzing a URL
-
-Create an environment and install the project in editable mode:
+Requires Python 3.9 or newer.
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
+python3 -m venv .venv && source .venv/bin/activate
 python -m pip install -e .
-```
-
-### Run the web demonstration
-
-```bash
 uvicorn aether.presentation.web.app:app --reload
 ```
 
-Open <http://127.0.0.1:8000/>. Choose **Analyze a URL** for a public article, or **Upload HTML** for a saved HTML document. The interface keeps advanced fallback fields behind an expandable section and presents technical details only when requested.
+Open <http://127.0.0.1:8000/> and analyse a URL, or upload a saved HTML file.
 
-### Use the application from Python
-
-The web layer is intentionally thin. The same deterministic pipeline can be composed directly:
+From Python:
 
 ```python
 from aether.presentation.web.app import AIReadinessPipeline
 
 pipeline = AIReadinessPipeline()
-report = pipeline.analyze_report(
-    html="<html><head><title>Example</title></head><body><p>Example text.</p></body></html>",
-    source_url="https://example.com/article",
-    publisher="example.com",
+result = pipeline.analyze_report(
+    html=open("article.html", encoding="utf-8").read(),
+    source_url="https://publisher.example/article",
+    publisher="Publisher",
     article_type="news_report",
 )
-print(report)
 ```
 
-For presentation-specific output, use the renderers in `aether.presentation.ai_readiness_report_renderers`.
+`analyze_report` returns a finished report, or a `PageAssessment` explaining
+why the page could not be analysed. Renderers for plain text, JSON and
+Markdown live in `aether.presentation.ai_readiness_report_renderers`.
 
-## Run the tests
+Findings that compare articles — repeated text, and a body that is mostly
+repeated text — need more than one article from the same publisher. Analyse a
+few, and the report states how many it compared against.
 
-The project uses the Python standard-library unittest runner:
+## Design rules
+
+These are the constraints the code is held to, and the reason it looks the way
+it does.
+
+**Deterministic, with no thresholds.** The same page and the same corpus always
+produce the same report. Where a rule needs a comparison it compares two
+measured quantities rather than a constant: an article body is reported as
+mostly boilerplate when its shared words outnumber its own, never when it falls
+under a chosen length.
+
+**No publisher-specific rules.** Nothing keys on a publisher name, host or URL
+pattern. A site name in a title is recognised by being a separator-delimited
+segment another declaration lacks, not by a list of publishers.
+
+**Rejected approaches are written down.** Where an obvious heuristic was
+considered and refused, the reasoning sits beside the rule that replaced it —
+why `og:type` is reported as evidence but never trusted to classify a page, why
+"this article has no subheadings" is not a finding, why matching any title
+fragment against any other would let two different headlines agree.
+
+**Findings are addressed to someone.** A recommendation an editor cannot act on
+belongs in the technical section, and one nobody can act on does not belong in
+the report. Several measurements were deleted for failing that test.
+
+## Architecture
+
+A small ports-and-adapters design. Dependencies point inward: the domain knows
+nothing of FastAPI, HTTP or HTML.
+
+```text
+src/aether/
+├── domain/              Immutable records and their invariants
+├── application/
+│   ├── ingestion/       Raw HTML to an immutable article version
+│   └── analysis/        Measurements, and the advice derived from them
+├── ports/outbound/      Repository contracts
+├── adapters/outbound/   HTTP fetching, in-memory repositories
+└── presentation/        Renderers, editor-facing wording, FastAPI app
+```
+
+One rule is worth stating here because it shapes the code: the application
+layer decides *which* recommendation applies and emits a code; presentation
+decides *how it reads*. That keeps copy out of use cases and leaves room for a
+Turkish edition of the same findings.
+
+See [`docs/architecture.md`](docs/architecture.md) for layer responsibilities,
+and [`docs/body-extraction.md`](docs/body-extraction.md) and
+[`docs/publication-date-extraction.md`](docs/publication-date-extraction.md)
+for the extraction contracts.
+
+## Tests
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-The suite covers domain invariants, ingestion, deterministic analyses, assessment/report construction, renderers, the web layer, and a happy-path acceptance fixture.
+169 tests, run on Python 3.9 through 3.13 in CI. Fixtures are reduced captures
+of real publisher pages, kept faithful to what those pages actually serve —
+including their defects, such as a double-escaped JSON-LD headline and a
+date-only `datePublished`.
 
-## Architecture
+## Known limits
 
-Aether follows a small ports-and-adapters design. Domain objects contain invariants, application use cases orchestrate workflows, adapters perform I/O, and presentation code translates an existing report for people or other consumers. Dependencies point inward: business logic does not depend on FastAPI, HTTP clients, or HTML presentation details.
-
-```mermaid
-flowchart LR
-    UI[Web presentation] --> UC[Application use cases]
-    CLI[Other presentation clients] --> UC
-    UC --> D[Domain model]
-    UC --> P[Ports]
-    P --> A[Adapters]
-    A --> WEB[HTTP / HTML sources]
-    A --> MEM[In-memory repositories]
-```
-
-The end-to-end analysis flow is:
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant Web as FastAPI presentation
-    participant Ingest as Ingestion use case
-    participant Analysis as Analysis use cases
-    participant Assess as Assessment use case
-    participant Report as Report builder
-    User->>Web: URL or HTML file
-    Web->>Ingest: raw HTML + source metadata
-    Ingest-->>Web: immutable ArticleVersion + Passages
-    Web->>Analysis: analyze stored article version
-    Analysis-->>Web: structural, metadata, quality results
-    Web->>Assess: ArticleAnalysisReport
-    Assess-->>Web: AIReadinessAssessment
-    Web->>Report: assessment
-    Report-->>Web: AIReadinessReport
-    Web-->>User: readable report
-```
-
-For layer responsibilities and dependency rules, see [`docs/architecture.md`](docs/architecture.md).
-
-## Project structure
-
-```text
-src/aether/
-├── domain/                 Immutable entities and validation rules
-├── application/
-│   ├── ingestion/          Raw HTML registration and source snapshots
-│   ├── analysis/           Structural, metadata, quality, assessment, reports
-│   └── curation/           Claim candidates and evidence workflows
-├── ports/outbound/         Repository and external capability contracts
-├── adapters/outbound/      HTTP fetching and in-memory implementations
-└── presentation/           Report renderers and FastAPI demonstration UI
-tests/                      Unit, integration, and acceptance tests
-docs/                       Focused extraction and architecture notes
-```
-
-## Determinism and known limitations
-
-Aether uses only information available in the supplied HTML and explicit user fallbacks. It does not use LLMs, NLP, external enrichment, publisher-specific rules, or URL-based heuristics.
-
-Consequently, client-side-only article bodies cannot be analyzed unless the server response includes a supported hydration payload; a local HTML file without a canonical URL needs a source URL; article type currently defaults to `news_report` in the demonstration flow; no numeric score, recommendations, claim extraction, or Schema.org graph report is part of this MVP; and publisher markup changes can affect extraction and should be captured by new deterministic fixtures and tests.
-
-See [`docs/body-extraction.md`](docs/body-extraction.md) and [`docs/publication-date-extraction.md`](docs/publication-date-extraction.md) for the current extraction contracts.
-
-## Roadmap
-
-1. Improve fixture coverage across publisher layouts and malformed inputs.
-2. Add persistence behind the existing repository ports.
-3. Add richer provenance and curation workflows for claims and evidence.
-4. Introduce deterministic structured-data analysis when the ingestion model can retain the required source representation.
-5. Evaluate calibrated scoring only after outcome data and review criteria exist.
-6. Add integrations for scheduled publisher monitoring and report export.
-
-These are future directions, not promises that the current MVP already supports.
-
-## Contributing
-
-Changes should preserve the domain model and deterministic behavior. Add or update tests with every behavior change, keep publisher-specific logic out of generic parsing, and run the complete suite before opening a pull request. Please read the architecture notes before changing a layer boundary.
+- Comparisons across articles hold only for the current process. Persistence
+  behind the repository port would make them durable.
+- Findings about a page template are reported per article, so one template fix
+  is restated on every article of a property.
+- Title comparison has documented edge cases, recorded in
+  `application/analysis/declared_text_comparison.py`.
 
 ## License
 
-Released under the [MIT License](LICENSE).
+[MIT](LICENSE).

@@ -4,6 +4,16 @@ The primary body source is visible paragraph text in the fetched HTML. Aether
 uses article-contained paragraphs first, then main-contained paragraphs, then
 other visible paragraphs.
 
+Paragraphs inside `a`, `aside`, `figcaption`, `footer`, `header` and `nav` are
+not article text. These are HTML sectioning and link semantics only: no class
+name, publisher name or URL pattern is consulted. A paragraph that *contains* a
+link is unaffected; only one nested *inside* a link is excluded, which is how
+recommendation cards are kept out of the body while inline citations are kept
+in.
+
+Headings are collected from the same container as the body, by the same rules,
+so a site banner heading is never mistaken for the article's own.
+
 Some server responses contain no rendered article paragraphs but include a
 server-supplied `application/json` hydration payload. Aether deterministically
 supports this format when a JSON object, in document order:

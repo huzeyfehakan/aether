@@ -19,9 +19,6 @@ from aether.presentation.editor_recommendation_text import (
 )
 
 
-def _display_optional(value: Any) -> str:
-    return "unavailable" if value is None else str(value)
-
 
 def _codes_in_order(recommendations) -> list:
     """Distinct recommendation codes, keeping first-seen order."""

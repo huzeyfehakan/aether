@@ -127,13 +127,13 @@ class DeriveEditorRecommendations:
         return (
             self._missing_metadata(report)
             + self._heading_structure(report)
-            + self._title_consistency(report)
-            + self._editor(report)
-            + self._technical(report)
+            + self._declared_consistency(report)
+            + self._repeated_text(report)
+            + self._structured_data(report)
         )
 
     @staticmethod
-    def _technical(
+    def _structured_data(
         report: ArticleAnalysisReport,
     ) -> Tuple[EditorRecommendation, ...]:
         analysis = report.structured_data_analysis
@@ -205,10 +205,10 @@ class DeriveEditorRecommendations:
         return tuple(found)
 
     @staticmethod
-    def _title_consistency(
+    def _declared_consistency(
         report: ArticleAnalysisReport,
     ) -> Tuple[EditorRecommendation, ...]:
-        analysis = report.title_consistency_analysis
+        analysis = report.declared_consistency_analysis
         if analysis is None:
             return ()
         found = []
@@ -235,7 +235,7 @@ class DeriveEditorRecommendations:
         return tuple(found)
 
     @staticmethod
-    def _editor(
+    def _repeated_text(
         report: ArticleAnalysisReport,
     ) -> Tuple[EditorRecommendation, ...]:
         duplication = report.content_duplication_analysis

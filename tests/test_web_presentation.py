@@ -407,6 +407,42 @@ class WebPresentationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return response
 
+    def test_the_draft_review_names_checks_as_codes_not_sentences(self):
+        """Application decides whether a check applies; presentation words it.
+
+        These were English sentences built inside the use case, which fixed the
+        report to one language and put copy in application logic.
+        """
+        from aether.application.analysis.build_draft_review import (
+            DraftCheck,
+            UnavailableCheck,
+        )
+
+        review = self.client.app.state.pipeline.analyze_draft(
+            "<h1>Başlık</h1><p>Bir paragraf.</p>", "", "tr", ""
+        )
+
+        for check in review.checks_performed:
+            self.assertIsInstance(check, DraftCheck)
+        for check in review.checks_unavailable:
+            self.assertIsInstance(check, UnavailableCheck)
+
+    def test_every_draft_check_code_has_wording(self):
+        """A code with no entry would reach an editor as an enum name."""
+        from aether.application.analysis.build_draft_review import (
+            DraftCheck,
+            UnavailableCheck,
+        )
+        from aether.presentation.draft_check_text import (
+            performed_check_text,
+            unavailable_check_text,
+        )
+
+        for check in DraftCheck:
+            self.assertTrue(performed_check_text(check))
+        for check in UnavailableCheck:
+            self.assertTrue(unavailable_check_text(check))
+
     def test_not_choosing_a_publisher_is_offered_and_never_chosen_for_you(self):
         """Being first in the list is not a choice the editor made."""
         dom = run_page_script(

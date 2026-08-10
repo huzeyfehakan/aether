@@ -36,6 +36,10 @@ from aether.application.ingestion.register_raw_html_article import (
     canonical_url_from_html,
 )
 from aether.domain.common import DomainValidationError
+from aether.presentation.draft_check_text import (
+    performed_check_text,
+    unavailable_check_text,
+)
 from aether.presentation.page_outcome_text import outcome_view
 from aether.presentation.ai_readiness_report_renderers import (
     PlainTextAIReadinessReportRenderer,
@@ -350,8 +354,12 @@ def _draft_view(review: Any) -> Dict[str, Any]:
         "paragraph_count": review.paragraph_count,
         "word_count": review.word_count,
         "compared_article_count": review.compared_article_count,
-        "checks_performed": list(review.checks_performed),
-        "checks_unavailable": list(review.checks_unavailable),
+        "checks_performed": [
+            performed_check_text(check) for check in review.checks_performed
+        ],
+        "checks_unavailable": [
+            unavailable_check_text(check) for check in review.checks_unavailable
+        ],
         "recommendations": [
             {
                 "headline": recommendation_text(r).headline,

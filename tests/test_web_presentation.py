@@ -169,6 +169,41 @@ class WebPresentationTests(unittest.TestCase):
         missing = sorted(referenced - set(draft))
         self.assertEqual(missing, [], f"template reads {missing} which the draft omits")
 
+    def _submit_handler(self):
+        template = self._template()
+        begin = template.index("form.addEventListener('submit'")
+        return template[begin : template.index("\n        });", begin)]
+
+    def test_the_loading_state_is_cleared_in_finally(self):
+        """A draft rendered its result beneath a stale "Analyzing article…".
+
+        The clear sat on one success path and the draft branch returned before
+        reaching it. Asserted structurally, so a branch added later cannot
+        skip it: the loading text is cleared where the button is re-enabled.
+        """
+        handler = self._submit_handler()
+
+        finally_block = handler[handler.index("finally {") :]
+        self.assertIn("status.textContent", finally_block)
+        self.assertIn("button.disabled = false", finally_block)
+
+    def test_the_loading_state_is_not_cleared_on_a_single_success_path(self):
+        """Clearing it inline is how the draft branch came to bypass it."""
+        handler = self._submit_handler()
+
+        self.assertNotIn("status.textContent = '';", handler)
+
+    def test_a_successful_draft_leaves_no_loading_message(self):
+        """The draft branch returns early, so the clear must survive a return."""
+        response = self._draft("<h1>Başlık</h1><p>Bir paragraf.</p>")
+        self.assertEqual(response.status_code, 200)
+
+        handler = self._submit_handler()
+        draft_branch = handler[handler.index("if (data.draft) {") : handler.index("if (data.outcome)")]
+
+        self.assertIn("return;", draft_branch)
+        self.assertNotIn("status.textContent", draft_branch)
+
     def test_drafts_are_not_offered_as_something_to_compare_against(self):
         self.client.post(
             "/analyze/draft",

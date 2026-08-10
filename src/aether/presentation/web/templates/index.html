@@ -228,7 +228,7 @@
           if (form.id === 'draft-form') {
             payload.set('content', draftIsRich ? draftArea.innerHTML : draftArea.textContent);
           }
-          button.disabled = true; status.textContent = 'Analyzing article…'; reportCard.classList.add('hidden');
+          button.disabled = true; delete status.dataset.error; status.textContent = 'Analyzing article…'; reportCard.classList.add('hidden');
           try {
             const response = await fetch(form.dataset.endpoint, { method: 'POST', body: payload });
             const data = await response.json(); if (!response.ok) throw new Error(data.detail || 'Analysis failed');
@@ -241,7 +241,6 @@
               draftCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
               return;
             }
-            status.textContent = '';
             if (data.outcome) {
               document.querySelector('#outcome-headline').textContent = data.outcome.headline;
               document.querySelector('#outcome-happened').textContent = data.outcome.what_happened;
@@ -251,8 +250,11 @@
               return;
             }
             renderReport(data.view, data.report); reportCard.classList.remove('hidden'); reportCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          } catch (error) { status.textContent = error.message; }
-          finally { button.disabled = false; refreshPublishers(); }
+          } catch (error) { status.dataset.error = error.message; }
+          // Cleared here rather than on each success path: a branch that
+          // returned early once left the loading text on screen beneath a
+          // rendered result.
+          finally { button.disabled = false; status.textContent = status.dataset.error || ''; refreshPublishers(); }
         });
       });
     </script>

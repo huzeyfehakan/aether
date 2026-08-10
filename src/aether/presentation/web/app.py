@@ -137,7 +137,14 @@ class AIReadinessPipeline:
         language: str,
         publisher: str,
     ) -> Any:
-        """Analyse an unpublished draft, running only the checks it supports."""
+        """Analyse an unpublished draft, running only the checks it supports.
+
+        An empty ``publisher`` is an editor who chose not to compare, not a
+        publisher named nothing. The draft is still stored, under a name of its
+        own, and the review says the comparison was not run.
+        """
+        comparison_requested = bool(publisher.strip())
+        publisher = publisher.strip() or _DRAFTS_WITHOUT_A_PUBLISHER
         prepared = prepare_draft(content, headline, language, publisher)
         registration = self._register_article.execute(
             RawHtmlArticle(
@@ -153,7 +160,10 @@ class AIReadinessPipeline:
             registration.article, registration.article_version.article_version_id
         )
         return self._build_draft_review.execute(
-            analysis_report, prepared.headline, prepared.heading_check_available
+            analysis_report,
+            prepared.headline,
+            prepared.heading_check_available,
+            comparison_requested,
         )
 
     def analyze(
@@ -196,6 +206,11 @@ class AIReadinessPipeline:
 
 
 _TEMPLATE_PATH = Path(__file__).parent / "templates" / "index.html"
+
+#: Where a draft is kept when the editor chose not to compare it. The domain
+#: requires a publisher, and this is not one: no draft filed here is ever
+#: compared against anything, because drafts are excluded from every corpus.
+_DRAFTS_WITHOUT_A_PUBLISHER = "Unpublished drafts"
 
 
 def _canonical_url_from_html(html: str) -> Optional[str]:
@@ -449,7 +464,7 @@ def create_app(fetcher: Optional[HtmlFetcher] = None) -> FastAPI:
     ) -> Dict[str, Any]:
         try:
             review = app.state.pipeline.analyze_draft(
-                content, headline, language, publisher or "Unpublished drafts"
+                content, headline, language, publisher
             )
         except (DraftContentRequired, DraftHeadlineRequired) as error:
             raise HTTPException(status_code=422, detail=str(error)) from error

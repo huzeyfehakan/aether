@@ -81,8 +81,8 @@
               <option value="ar">العربية</option><option value="ru">Русский</option>
               <option value="de">Deutsch</option><option value="fr">Français</option>
             </select></label>
-          <label>Compare against <select name="publisher" id="draft-publisher"><option value="">Nothing analysed yet</option></select>
-            <p class="help">Articles you have already checked, so repeated text can be found.</p></label>
+          <label>Compare against <select name="publisher" id="draft-publisher"></select>
+            <p class="help" id="draft-compare-state"></p></label>
           <button class="primary">Check draft</button>
         </form>
       </section>
@@ -214,15 +214,41 @@
         document.querySelector('#report').textContent = rawReport;
       }
 
+      // What comparing against a publisher will and will not do, stated before
+      // the draft is submitted. The first option used to be selected simply by
+      // being first, so a draft was compared against a publisher the editor had
+      // never chosen, and choosing nothing looked identical to finding nothing.
+      // Publishers are listed under the name they were stored with. A display
+      // name is not derived from the hostname: any such rule would be a guess
+      // about what the site is called.
+      function describeComparison() {
+        const select = document.querySelector('#draft-publisher');
+        const note = document.querySelector('#draft-compare-state');
+        if (!select || !note) return;
+        if (select.value) {
+          note.textContent = `Repeated text will be checked against articles you have already checked from ${select.value}.`;
+        } else if (select.options.length > 1) {
+          note.textContent = 'This draft will be checked on its own. Choose a publisher to also check for text repeated from its articles.';
+        } else {
+          note.textContent = 'No articles have been checked yet, so there is nothing to compare this draft against.';
+        }
+      }
+
       async function refreshPublishers() {
         const select = document.querySelector('#draft-publisher');
         if (!select) return;
         const response = await fetch('/publishers');
         const names = (await response.json()).publishers;
-        select.innerHTML = names.length
-          ? names.map((n) => `<option value="${n}">${n}</option>`).join('')
-          : '<option value="">Nothing analysed yet</option>';
+        // Rebuilding the list after every submission used to discard the
+        // editor's choice, so a second check silently compared against nothing.
+        const chosen = select.value;
+        select.innerHTML = ['<option value="">Don’t compare — check this draft on its own</option>']
+          .concat(names.map((n) => `<option value="${n}">${n}</option>`)).join('');
+        select.value = names.includes(chosen) ? chosen : '';
+        describeComparison();
       }
+      const publisherSelect = document.querySelector('#draft-publisher');
+      if (publisherSelect) publisherSelect.addEventListener('change', describeComparison);
       refreshPublishers();
 
       document.querySelectorAll('form[data-endpoint]').forEach((form) => {

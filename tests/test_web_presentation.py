@@ -407,6 +407,84 @@ class WebPresentationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return response
 
+    def test_not_choosing_a_publisher_is_offered_and_never_chosen_for_you(self):
+        """Being first in the list is not a choice the editor made."""
+        dom = run_page_script(
+            "await refreshPublishers();",
+            publishers=["trthaber.com", "trtworld.com"],
+        )
+        select = dom["#draft-publisher"]["html"]
+
+        self.assertIn('<option value="">', select)
+        self.assertIn("Don", select)
+        self.assertLess(select.index('value=""'), select.index("trthaber.com"))
+
+    def test_the_editor_is_told_what_comparing_will_do(self):
+        chosen = run_page_script(
+            "await refreshPublishers();"
+            "document.querySelector('#draft-publisher').value = 'trthaber.com';"
+            "describeComparison();",
+            publishers=["trthaber.com"],
+        )
+        self.assertIn(
+            "trthaber.com", chosen["#draft-compare-state"]["text"]
+        )
+
+        not_chosen = run_page_script(
+            "await refreshPublishers();", publishers=["trthaber.com"]
+        )
+        self.assertIn(
+            "checked on its own", not_chosen["#draft-compare-state"]["text"]
+        )
+
+        nothing_yet = run_page_script("await refreshPublishers();", publishers=[])
+        self.assertIn(
+            "No articles have been checked yet",
+            nothing_yet["#draft-compare-state"]["text"],
+        )
+
+    def test_the_chosen_publisher_survives_a_submission(self):
+        """The list is rebuilt after every submit, which discarded the choice."""
+        dom = run_page_script(
+            "await refreshPublishers();"
+            "document.querySelector('#draft-publisher').value = 'trtworld.com';"
+            "await refreshPublishers();",
+            publishers=["trthaber.com", "trtworld.com"],
+        )
+
+        self.assertIn("trtworld.com", dom["#draft-compare-state"]["text"])
+
+    def test_a_draft_with_no_publisher_says_repetition_was_not_checked(self):
+        draft = self._draft("<h1>Başlık</h1><p>Bir paragraf.</p>", publisher="").json()[
+            "draft"
+        ]
+        unavailable = " ".join(draft["checks_unavailable"])
+
+        self.assertIn("no publisher was chosen", unavailable)
+        self.assertNotIn(
+            "Text repeated in your other articles", draft["checks_performed"]
+        )
+
+    def test_a_publisher_with_nothing_checked_yet_says_so_differently(self):
+        """Not the same as declining to compare, and not stated the same way."""
+        draft = self._draft(
+            "<h1>Başlık</h1><p>Bir paragraf.</p>", publisher="trthaber.com"
+        ).json()["draft"]
+        unavailable = " ".join(draft["checks_unavailable"])
+
+        self.assertIn("have been checked yet", unavailable)
+        self.assertNotIn("no publisher was chosen", unavailable)
+
+    def test_no_publisher_display_name_is_invented_from_a_hostname(self):
+        dom = run_page_script(
+            "await refreshPublishers();",
+            publishers=["ebeveynakademisi.trtcocuk.net.tr"],
+        )
+        select = dom["#draft-publisher"]["html"]
+
+        self.assertIn("ebeveynakademisi.trtcocuk.net.tr", select)
+        self.assertNotIn("Ebeveynakademisi<", select)
+
     def test_choosing_a_publisher_after_a_first_check_takes_effect(self):
         """A draft was identified by its text alone, so it kept the publisher
         it was first checked against. Checking it again after choosing one

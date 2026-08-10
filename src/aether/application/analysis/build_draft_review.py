@@ -39,6 +39,19 @@ HEADINGS_UNAVAILABLE_WITHOUT_MARKUP = (
     "Heading structure, because the pasted draft carried no formatting"
 )
 
+#: A comparison that did not happen is stated, never left out. Leaving it out
+#: made "nothing to change" mean both "nothing was found" and "nothing was
+#: looked for", which an editor cannot tell apart.
+REPEATED_TEXT_CHECK = "Text repeated in your other articles"
+REPEATED_TEXT_NO_PUBLISHER = (
+    "Text repeated in your other articles, because no publisher was chosen to "
+    "compare this draft against"
+)
+REPEATED_TEXT_NO_CORPUS = (
+    "Text repeated in your other articles, because no articles from that "
+    "publisher have been checked yet"
+)
+
 
 @dataclass(frozen=True)
 class DraftReview:
@@ -66,7 +79,11 @@ class BuildDraftReview:
         self._recommendations = recommendations or DeriveEditorRecommendations()
 
     def execute(
-        self, report: ArticleAnalysisReport, headline: str, heading_check_available: bool
+        self,
+        report: ArticleAnalysisReport,
+        headline: str,
+        heading_check_available: bool,
+        comparison_requested: bool = True,
     ) -> DraftReview:
         structural = report.structural_analysis
         duplication = report.content_duplication_analysis
@@ -77,8 +94,14 @@ class BuildDraftReview:
             performed.append("Heading structure")
         else:
             unavailable.insert(0, HEADINGS_UNAVAILABLE_WITHOUT_MARKUP)
-        if duplication is not None and duplication.compared_article_count:
-            performed.append("Text repeated in your other articles")
+
+        compared = duplication.compared_article_count if duplication is not None else 0
+        if not comparison_requested:
+            unavailable.insert(0, REPEATED_TEXT_NO_PUBLISHER)
+        elif compared:
+            performed.append(REPEATED_TEXT_CHECK)
+        else:
+            unavailable.insert(0, REPEATED_TEXT_NO_CORPUS)
 
         return DraftReview(
             headline=headline,

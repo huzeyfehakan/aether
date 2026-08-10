@@ -33,16 +33,26 @@ TEMPLATE_PATH = (
 _HARNESS = """
 const nodes = new Map();
 function el(sel) {
-  if (!nodes.has(sel)) nodes.set(sel, {
-    sel, textContent: '', innerHTML: '', disabled: false, dataset: {},
-    value: '', options: [],
+  if (!nodes.has(sel)) {
+    const node = {
+    sel, textContent: '', _html: '', disabled: false, dataset: {},
+    value: '',
     classList: { _s: new Set(), add(c){this._s.add(c);}, remove(c){this._s.delete(c);},
                  toggle(c,f){ f ? this._s.add(c) : this._s.delete(c); },
                  contains(c){ return this._s.has(c); } },
     scrollIntoView(){}, setAttribute(k,v){ this[k] = v; }, getAttribute(k){ return this[k] ?? null; },
     addEventListener(t,h){ (this._h ||= {})[t] = h; },
     appendChild(){}, remove(){},
-  });
+    };
+    // A <select> exposes the options its markup declares, which is what the
+    // page reads to tell "nothing to compare against" from "nothing chosen".
+    Object.defineProperty(node, 'innerHTML', {
+      get(){ return this._html; },
+      set(v){ this._html = v; this.options = [...String(v).matchAll(/<option value="([^"]*)"/g)].map((m) => ({ value: m[1] })); },
+    });
+    node.innerHTML = '';
+    nodes.set(sel, node);
+  }
   return nodes.get(sel);
 }
 globalThis.document = {
@@ -61,7 +71,7 @@ globalThis.localStorage = {
   getItem(k){ return this._v[k] ?? null; },
   setItem(k,v){ this._v[k] = String(v); },
 };
-globalThis.fetch = async () => ({ ok: true, json: async () => ({ publishers: [] }) });
+globalThis.fetch = async () => ({ ok: true, json: async () => ({ publishers: PUBLISHERS }) });
 
 SCRIPT
 
@@ -77,7 +87,9 @@ def node_available() -> bool:
     return shutil.which("node") is not None
 
 
-def run_page_script(render: str, language: str = "en-GB", stored=None) -> dict:
+def run_page_script(
+    render: str, language: str = "en-GB", stored=None, publishers=()
+) -> dict:
     """Execute the served page's script, then ``render``, and report the DOM.
 
     ``render`` is JavaScript run after the page has loaded, calling into the
@@ -94,6 +106,7 @@ def run_page_script(render: str, language: str = "en-GB", stored=None) -> dict:
         .replace("RENDER", render)
         .replace("LANGUAGE", json.dumps(language))
         .replace("STORED", json.dumps(stored or {}))
+        .replace("PUBLISHERS", json.dumps(list(publishers)))
     )
 
     with tempfile.NamedTemporaryFile("w", suffix=".mjs", delete=False) as handle:

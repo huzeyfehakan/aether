@@ -11,6 +11,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from aether.presentation.web.app import create_app  # noqa: E402
 
+from tests.page_script import run_page_script  # noqa: E402
+
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "trt_world_erdogan_kazakhstan.html"
 
@@ -390,6 +392,58 @@ class WebPresentationTests(unittest.TestCase):
         self.assertIn(
             "Bu icerik bilgilendirme", recommendation["occurrences"][0]["excerpt"]
         )
+
+    def _publish(self, slug, paragraph, publisher="ebeveynakademisi.trtcocuk.net.tr"):
+        """Put one article into the corpus a draft can be compared against."""
+        html = (
+            f'<html lang="tr"><head><title>{slug}</title></head><body><main>'
+            f"<p>{paragraph}</p></main></body></html>"
+        )
+        response = self.client.post(
+            "/analyze/file",
+            data={"source_url": f"https://{publisher}/makale/{slug}"},
+            files={"file": ("a.html", html, "text/html")},
+        )
+        self.assertEqual(response.status_code, 200)
+        return response
+
+    def test_a_draft_finding_reaches_the_page_instead_of_throwing(self):
+        """The whole seam: a real repeated paragraph, rendered by the real page.
+
+        renderDraft called a card() that only existed inside renderReport, so a
+        draft with anything to report threw a ReferenceError and showed nothing.
+        A draft with no findings took the other branch and rendered, which is
+        why every earlier check of this flow looked correct.
+
+        Asserted by running the page, because the two static template checks
+        above both passed while this was broken.
+        """
+        shared = "Bu icerik bilgilendirme amacli hazirlanmistir."
+        self._publish("birinci", shared)
+        draft = self._draft(
+            f"<h1>Yeni makale</h1><p>{shared}</p><p>Bu paragraf ozgundur.</p>",
+            publisher="ebeveynakademisi.trtcocuk.net.tr",
+        ).json()["draft"]
+
+        self.assertTrue(
+            draft["recommendations"], "the draft must have a finding to render"
+        )
+
+        dom = run_page_script(f"renderDraft({json.dumps(draft)});")
+        findings = dom["#draft-findings"]["html"]
+
+        self.assertIn("This paragraph also appears in your other articles", findings)
+        self.assertIn(shared, findings)
+        self.assertIn("What to do.", findings)
+        self.assertNotIn("Nothing to change", findings)
+
+    def test_a_draft_with_nothing_to_report_still_says_so(self):
+        """The branch that did work must keep working."""
+        draft = self._draft("<h1>Başlık</h1><p>Bir paragraf.</p>").json()["draft"]
+
+        dom = run_page_script(f"renderDraft({json.dumps(draft)});")
+
+        self.assertIn("Nothing to change", dom["#draft-findings"]["html"])
 
     def test_index_shows_both_audience_sections(self):
         response = self.client.get("/")

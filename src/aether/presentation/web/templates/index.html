@@ -124,6 +124,15 @@
       const statusBadge = (value) => `<span class="badge ${value}">${titleCase(value)}</span>`;
       const metric = (label, value) => `<div class="metric-card"><p>${label}</p><strong>${value}</strong></div>`;
 
+      // A recommendation reads the same whether it came from a draft or a
+      // published article, so these live here rather than inside one renderer.
+      // They were local to renderReport, which left renderDraft calling a card()
+      // that did not exist: a draft that had findings threw instead of showing
+      // them, and only a draft with nothing to report ever rendered.
+      const declaredRows = (o) => (o.declared || []).map((d) => `<tr><td>${d.label}</td><td>${d.value}</td></tr>`).join('');
+      const occurrence = (o) => `${o.detail ? `<span class="repeat-count">${o.detail}</span>` : ''}${o.declared ? `<table class="metadata-table declared">${declaredRows(o)}</table>` : ''}${o.excerpt ? `<blockquote>${o.excerpt}</blockquote>` : ''}`;
+      const card = (item) => `<div class="recommendation"><h4>${item.headline}</h4>${item.occurrences.map(occurrence).join('')}<p><strong>Why it matters.</strong> ${item.why_it_matters}</p><p><strong>What to do.</strong> ${item.what_to_do}</p></div>`;
+
       document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach((item) => item.setAttribute('aria-selected', String(item === tab)));
         document.querySelectorAll('.form-panel').forEach((panel) => panel.classList.toggle('active', panel.id === tab.getAttribute('aria-controls')));
@@ -183,10 +192,6 @@
         document.querySelector('#metadata-summary').textContent = missing.length ? `${missing.length} metadata field${missing.length === 1 ? '' : 's'} missing from the stored article.` : 'All currently assessed metadata fields are available.';
         document.querySelector('#metadata-table').innerHTML = view.metadata.map((field) => `<tr><td>${field.label}</td><td class="${field.available ? 'available' : 'unavailable'}">${field.available ? 'Available' : 'Missing'}</td></tr>`).join('');
         document.querySelector('#missing-list').innerHTML = missing.map((field) => `<span class="missing-item">${field.label} missing</span>`).join('');
-
-        const declaredRows = (o) => (o.declared || []).map((d) => `<tr><td>${d.label}</td><td>${d.value}</td></tr>`).join('');
-        const occurrence = (o) => `${o.detail ? `<span class="repeat-count">${o.detail}</span>` : ''}${o.declared ? `<table class="metadata-table declared">${declaredRows(o)}</table>` : ''}${o.excerpt ? `<blockquote>${o.excerpt}</blockquote>` : ''}`;
-        const card = (item) => `<div class="recommendation"><h4>${item.headline}</h4>${item.occurrences.map(occurrence).join('')}<p><strong>Why it matters.</strong> ${item.why_it_matters}</p><p><strong>What to do.</strong> ${item.what_to_do}</p></div>`;
 
         const editorFindings = view.editor;
         document.querySelector('#editor-section').classList.toggle('hidden', !editorFindings);

@@ -20,7 +20,12 @@ from aether.application.analysis.analyze_declared_consistency import AnalyzeDecl
 from aether.application.analysis.assess_ai_readiness import AssessAIReadiness
 from aether.application.analysis.build_ai_readiness_report import BuildAIReadinessReport
 from aether.application.analysis.build_article_analysis_report import BuildArticleAnalysisReport
-from aether.application.ingestion.prepare_draft import prepare_draft
+from aether.application.analysis.build_draft_review import BuildDraftReview
+from aether.application.ingestion.prepare_draft import (
+    DraftContentRequired,
+    DraftHeadlineRequired,
+    prepare_draft,
+)
 from aether.application.ingestion.assess_page_content import (
     AssessPageContent,
     PageAssessment,
@@ -85,6 +90,7 @@ class AIReadinessPipeline:
             heading_structure_analysis=AnalyzeHeadingStructure(repository),
             is_draft=True,
         )
+        self._build_draft_review = BuildDraftReview()
         self._assess_page = AssessPageContent()
         self._assess_readiness = AssessAIReadiness()
         self._build_readiness_report = BuildAIReadinessReport()
@@ -146,10 +152,9 @@ class AIReadinessPipeline:
         analysis_report = self._build_draft_report.execute(
             registration.article, registration.article_version.article_version_id
         )
-        report = self._build_readiness_report.execute(
-            self._assess_readiness.execute(analysis_report)
+        return self._build_draft_review.execute(
+            analysis_report, prepared.headline, prepared.heading_check_available
         )
-        return report, prepared
 
     def analyze(
         self,
@@ -319,13 +324,44 @@ def _report_view(report: Any) -> Dict[str, Any]:
     }
 
 
-#: Checks that describe the published page, so a draft cannot answer them.
-#: Listed for the editor rather than silently omitted.
-_UNAVAILABLE_UNTIL_PUBLISHED = [
-    "Publication date, byline and summary, which are set when the article is published",
-    "Whether the page states one headline and one summary, which needs the published page",
-    "Schema.org article markup, which the site template produces",
-]
+def _draft_view(review: Any) -> Dict[str, Any]:
+    """Shape a draft review for display.
+
+    Nothing here mentions metadata, structured data or article identity: a
+    draft has none, and the review type does not carry them.
+    """
+    return {
+        "headline": review.headline,
+        "paragraph_count": review.paragraph_count,
+        "word_count": review.word_count,
+        "compared_article_count": review.compared_article_count,
+        "checks_performed": list(review.checks_performed),
+        "checks_unavailable": list(review.checks_unavailable),
+        "recommendations": [
+            {
+                "headline": recommendation_text(r).headline,
+                "why_it_matters": recommendation_text(r).why_it_matters,
+                "what_to_do": recommendation_text(r).what_to_do,
+                "occurrences": [_occurrence_view(r)],
+            }
+            for r in review.recommendations
+        ],
+    }
+
+
+def _occurrence_view(recommendation: Any) -> Dict[str, Any]:
+    occurrence: Dict[str, Any] = {}
+    if recommendation.excerpt:
+        occurrence["excerpt"] = recommendation.excerpt
+    if recommendation.other_article_count:
+        occurrence["detail"] = repeated_in_phrase(recommendation.other_article_count)
+    if recommendation.heading_count:
+        occurrence["detail"] = heading_count_phrase(recommendation.heading_count)
+    if recommendation.total_word_count:
+        occurrence["detail"] = shared_words_phrase(
+            recommendation.repeated_word_count, recommendation.total_word_count
+        )
+    return occurrence
 
 
 def _analysis_response(result: Any) -> Dict[str, Any]:
@@ -399,7 +435,7 @@ def create_app(fetcher: Optional[HtmlFetcher] = None) -> FastAPI:
             {
                 article.publisher
                 for article in repository.all_articles()
-                if not article.canonical_source.startswith("https://draft.invalid/")
+                if article.article_type != "draft"
             }
         )
         return {"publishers": names}
@@ -412,22 +448,14 @@ def create_app(fetcher: Optional[HtmlFetcher] = None) -> FastAPI:
         publisher: str = Form(""),
     ) -> Dict[str, Any]:
         try:
-            report, prepared = app.state.pipeline.analyze_draft(
+            review = app.state.pipeline.analyze_draft(
                 content, headline, language, publisher or "Unpublished drafts"
             )
-            response = _analysis_response(report)
-            response["draft"] = {
-                "heading_check_available": prepared.heading_check_available,
-                "unavailable": _UNAVAILABLE_UNTIL_PUBLISHED
-                + (
-                    []
-                    if prepared.heading_check_available
-                    else ["Heading structure, because the pasted draft carried no formatting"]
-                ),
-            }
-            return response
+        except (DraftContentRequired, DraftHeadlineRequired) as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
         except DomainValidationError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
+        return {"draft": _draft_view(review)}
 
     @app.post("/analyze/file")
     async def analyze_file(

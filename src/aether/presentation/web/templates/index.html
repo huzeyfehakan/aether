@@ -89,6 +89,13 @@
 
       <p id="status" role="alert"></p>
 
+      <section id="draft-card" class="panel hidden" aria-live="polite">
+        <div class="report-heading"><div><div class="eyebrow">Draft review</div><h2>See what you can improve before publishing</h2></div></div>
+        <p id="draft-summary" class="muted"></p>
+        <div class="section"><h3>What we checked</h3><ul id="draft-performed" class="not-checked"></ul><div id="draft-findings"></div></div>
+        <div class="section"><h3>Available after publishing</h3><p class="muted">These need the live page, so they cannot be checked yet.</p><ul id="draft-unavailable" class="not-checked"></ul></div>
+      </section>
+
       <section id="outcome-card" class="panel hidden" aria-live="polite">
         <div class="report-heading"><div><div class="eyebrow">Analysis complete</div><h2 id="outcome-headline"></h2></div></div>
         <p id="outcome-happened"></p>
@@ -103,9 +110,6 @@
         <div class="section"><h3>Article structure</h3><p>How the stored article is organized for deterministic passage analysis.</p><div id="structure-metrics" class="metric-grid"></div></div>
 
         <div class="section"><h3>Metadata availability</h3><p id="metadata-summary">Source fields found in the article.</p><table class="metadata-table"><tbody id="metadata-table"></tbody></table><div id="missing-list" class="missing-list"></div></div>
-
-        
-        <div class="section hidden" id="not-checked-section"><h3>Not checked yet</h3><p class="muted">These need the published page. Check the article again once it is live.</p><ul id="not-checked-list" class="not-checked"></ul></div>
 
         <div class="section" id="editor-section"><h3>Editor Recommendations</h3><p class="muted" id="editor-subtitle"></p><p id="editor-compared"></p><div id="editor-list"></div></div>
 
@@ -145,14 +149,23 @@
         });
       }
 
-      function renderNotChecked(draft) {
-        const section = document.querySelector('#not-checked-section');
-        section.classList.toggle('hidden', !draft);
-        if (draft) {
-          document.querySelector('#not-checked-list').innerHTML =
-            draft.unavailable.map((item) => `<li>${item}</li>`).join('');
-        }
+      function renderDraft(draft) {
+        const paras = `${draft.paragraph_count} paragraph${draft.paragraph_count === 1 ? '' : 's'}`;
+        const words = `${draft.word_count} word${draft.word_count === 1 ? '' : 's'}`;
+        const compared = draft.compared_article_count
+          ? ` · compared against ${draft.compared_article_count} of your articles`
+          : '';
+        document.querySelector('#draft-summary').textContent =
+          `“${draft.headline}” — ${paras}, ${words}${compared}`;
+        document.querySelector('#draft-performed').innerHTML =
+          draft.checks_performed.map((c) => `<li>${c}</li>`).join('');
+        document.querySelector('#draft-unavailable').innerHTML =
+          draft.checks_unavailable.map((c) => `<li>${c}</li>`).join('');
+        document.querySelector('#draft-findings').innerHTML = draft.recommendations.length
+          ? draft.recommendations.map(card).join('')
+          : '<p class="muted">Nothing to change in this draft.</p>';
       }
+
 
       function renderReport(view, rawReport) {
         const assessment = view.assessment;
@@ -220,7 +233,14 @@
             const response = await fetch(form.dataset.endpoint, { method: 'POST', body: payload });
             const data = await response.json(); if (!response.ok) throw new Error(data.detail || 'Analysis failed');
             const outcomeCard = document.querySelector('#outcome-card');
-            outcomeCard.classList.add('hidden'); renderNotChecked(null);
+            const draftCard = document.querySelector('#draft-card');
+            outcomeCard.classList.add('hidden'); draftCard.classList.add('hidden');
+            if (data.draft) {
+              renderDraft(data.draft);
+              draftCard.classList.remove('hidden');
+              draftCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              return;
+            }
             status.textContent = '';
             if (data.outcome) {
               document.querySelector('#outcome-headline').textContent = data.outcome.headline;
@@ -230,7 +250,7 @@
               outcomeCard.classList.remove('hidden'); outcomeCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
               return;
             }
-            renderNotChecked(data.draft); renderReport(data.view, data.report); reportCard.classList.remove('hidden'); reportCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            renderReport(data.view, data.report); reportCard.classList.remove('hidden'); reportCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
           } catch (error) { status.textContent = error.message; }
           finally { button.disabled = false; refreshPublishers(); }
         });

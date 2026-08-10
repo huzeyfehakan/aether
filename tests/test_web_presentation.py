@@ -63,60 +63,111 @@ class WebPresentationTests(unittest.TestCase):
         self.assertIn('name="fallback_published_at" type="date"', response.text)
         self.assertIn('<select name="fallback_language">', response.text)
 
-    def test_a_draft_runs_only_the_checks_a_draft_can_answer(self):
-        rich = (
-            "<h1>Çocuklarda ekran süresi</h1><p>Uzmanlara göre değişir.</p>"
-            "<h2>Öneriler</h2><p>İki yaş altında önerilmez.</p>"
-        )
-        response = self.client.post(
+    def _draft(self, content, headline="", publisher="TRT Çocuk"):
+        return self.client.post(
             "/analyze/draft",
-            data={
-                "content": rich,
-                "headline": "Çocuklarda ekran süresi",
-                "language": "tr",
-                "publisher": "TRT Çocuk",
-            },
+            data={"content": content, "headline": headline,
+                  "language": "tr", "publisher": publisher},
         )
+
+    def test_a_draft_never_reports_published_page_fields(self):
+        """A draft has no metadata, identity or structured data to be missing."""
+        response = self._draft("<h1>Başlık</h1><p>Bir paragraf.</p>")
 
         self.assertEqual(response.status_code, 200)
         body = response.json()
-        self.assertTrue(body["draft"]["heading_check_available"])
-        codes = [r["code"] for r in json.loads(body["report"] or "{}").get("x", [])] if False else None
-        # No published-page finding may appear for a draft.
-        rendered = body["report"]
-        for absent in ("does not say when it was published", "does not name who wrote it",
-                       "Schema.org", "more than one headline"):
-            self.assertNotIn(absent, rendered)
+        self.assertEqual(list(body), ["draft"])
+        draft = body["draft"]
+        # Naming a check as unavailable is correct; reporting a page field as
+        # missing, or carrying page-level structure at all, is not.
+        self.assertNotIn("metadata", json.dumps(draft["recommendations"]).lower())
+        for absent in ("article_id", "identity", "assessment", "completeness"):
+            self.assertNotIn(absent, json.dumps(draft).lower())
+        self.assertNotIn("missing", " ".join(draft["checks_unavailable"]).lower())
+
+    def test_a_draft_uses_the_heading_from_the_pasted_markup(self):
+        response = self._draft("<h1>Ekran süresi</h1><p>Bir paragraf.</p>")
+
+        self.assertEqual(response.json()["draft"]["headline"], "Ekran süresi")
+
+    def test_a_draft_without_a_heading_asks_for_the_headline(self):
+        """Never invented, and never taken from the first paragraph."""
+        response = self._draft("<p>Bu ilk paragraftır.</p><p>İkinci.</p>")
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("enter the headline", response.json()["detail"])
+
+    def test_a_supplied_headline_is_used_when_the_paste_has_no_heading(self):
+        response = self._draft("<p>Bir paragraf.</p>", headline="Editörün başlığı")
+
+        self.assertEqual(response.json()["draft"]["headline"], "Editörün başlığı")
+
+    def test_a_draft_with_its_own_heading_is_not_given_a_second_one(self):
+        """Injecting one made every such draft look like it had two."""
+        response = self._draft("<h1>Başlık</h1><p>Bir paragraf.</p>", headline="Başka")
+        findings = " ".join(
+            r["headline"] for r in response.json()["draft"]["recommendations"]
+        )
+
+        self.assertNotIn("more than one main heading", findings)
+
+    def test_a_draft_with_several_top_level_headings_is_reported(self):
+        response = self._draft("<h1>Bir</h1><p>M.</p><h1>İki</h1><p>N.</p>")
+        draft = response.json()["draft"]
+        findings = " ".join(r["headline"] for r in draft["recommendations"])
+        details = json.dumps(draft["recommendations"], ensure_ascii=False)
+
+        self.assertIn("more than one main heading", findings)
+        self.assertIn("claim to be the main heading", details)
+        self.assertNotIn("other article", details)
 
     def test_a_plain_text_draft_says_headings_could_not_be_checked(self):
-        response = self.client.post(
-            "/analyze/draft",
-            data={
-                "content": "Uzmanlara göre değişir.\n\nİki yaş altında önerilmez.",
-                "headline": "Çocuklarda ekran süresi",
-                "language": "tr",
-                "publisher": "TRT Çocuk",
-            },
+        response = self._draft(
+            "Bir paragraf.\n\nİkinci paragraf.", headline="Editörün başlığı"
         )
+        draft = response.json()["draft"]
 
         self.assertEqual(response.status_code, 200)
-        draft = response.json()["draft"]
-        self.assertFalse(draft["heading_check_available"])
+        self.assertNotIn("Heading structure", draft["checks_performed"])
         self.assertTrue(
-            any("carried no formatting" in item for item in draft["unavailable"]),
-            draft["unavailable"],
+            any("carried no formatting" in c for c in draft["checks_unavailable"])
         )
+
+    def test_an_empty_draft_is_refused_with_an_editor_facing_message(self):
+        response = self._draft("", headline="Bir başlık")
+
+        self.assertEqual(response.status_code, 422)
+        detail = response.json()["detail"].lower()
+        for jargon in ("paragraph tag", "raw article", "parser", "none"):
+            self.assertNotIn(jargon, detail)
 
     def test_a_draft_lists_what_needs_the_published_page(self):
-        response = self.client.post(
-            "/analyze/draft",
-            data={"content": "<p>Bir paragraf.</p>", "headline": "Başlık",
-                  "language": "tr", "publisher": "TRT"},
-        )
+        draft = self._draft("<h1>Başlık</h1><p>Bir paragraf.</p>").json()["draft"]
+        unavailable = " ".join(draft["checks_unavailable"]).lower()
 
-        unavailable = " ".join(response.json()["draft"]["unavailable"]).lower()
         self.assertIn("publication date", unavailable)
         self.assertIn("schema.org", unavailable)
+        self.assertNotIn("missing", unavailable)
+
+    def test_a_draft_is_never_compared_against_another_draft(self):
+        """An unpublished draft is not part of what a publisher has published."""
+        first = self._draft("<h1>Bir</h1><p>Paylaşılan bir paragraf.</p>", publisher="TRT")
+        second = self._draft("<h1>İki</h1><p>Paylaşılan bir paragraf.</p>", publisher="TRT")
+
+        self.assertEqual(second.json()["draft"]["compared_article_count"], 0)
+        findings = " ".join(
+            r["headline"] for r in second.json()["draft"]["recommendations"]
+        )
+        self.assertNotIn("appears in your other articles", findings)
+
+    def test_the_draft_template_reads_only_fields_the_draft_response_sends(self):
+        """The seam where the last two regressions lived."""
+        template = self._template()
+        draft = self._draft("<h1>Başlık</h1><p>Bir paragraf.</p>").json()["draft"]
+        referenced = set(re.findall(r"\bdraft\.([a-z_]+)", template))
+
+        missing = sorted(referenced - set(draft))
+        self.assertEqual(missing, [], f"template reads {missing} which the draft omits")
 
     def test_drafts_are_not_offered_as_something_to_compare_against(self):
         self.client.post(

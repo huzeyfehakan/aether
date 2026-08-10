@@ -9,6 +9,7 @@ from aether.application.analysis.derive_editor_recommendations import (
 )
 from aether.presentation.editor_recommendation_text import (
     category_subtitle,
+    heading_count_phrase,
     shared_words_phrase,
     title_source_label,
     category_title,
@@ -214,6 +215,8 @@ class PlainTextAIReadinessReportRenderer:
                     detail = ""
                     if occurrence.other_article_count:
                         detail = repeated_in_phrase(occurrence.other_article_count)
+                    if occurrence.heading_count:
+                        lines.append(f"  {heading_count_phrase(occurrence.heading_count)}")
                     if occurrence.total_word_count:
                         lines.append(
                             "  "

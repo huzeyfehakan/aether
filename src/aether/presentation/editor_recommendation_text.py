@@ -272,6 +272,16 @@ def shared_words_phrase(repeated_word_count: int, total_word_count: int) -> str:
     )
 
 
+def heading_count_phrase(heading_count: int) -> str:
+    """State how many top-level headings were found, in its own words.
+
+    This has its own fact rather than borrowing the repetition count, which
+    the report words as "also appears in N other articles" and which described
+    a heading count as though it were duplication.
+    """
+    return f"{heading_count} headings claim to be the main heading"
+
+
 def repeated_in_phrase(other_article_count: int) -> str:
     """Describe how widely a paragraph is repeated, in plain language."""
     if other_article_count == 1:

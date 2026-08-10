@@ -103,6 +103,47 @@ class HeadingStructureTests(unittest.TestCase):
         self.assertEqual(analysis.top_level_count, 1)
         self.assertEqual(len(analysis.headings), 1)
 
+    def test_more_than_one_main_heading_is_worded_as_a_heading_count(self):
+        """It borrowed the repetition count and read as duplication."""
+        from aether.application.analysis.analyze_article_metadata import (
+            AnalyzeArticleMetadata,
+        )
+        from aether.application.analysis.analyze_article_structure import (
+            AnalyzeArticleStructure,
+        )
+        from aether.application.analysis.analyze_passage_quality import (
+            AnalyzePassageQuality,
+        )
+        from aether.application.analysis.build_article_analysis_report import (
+            BuildArticleAnalysisReport,
+        )
+        from aether.application.analysis.derive_editor_recommendations import (
+            DeriveEditorRecommendations,
+            RecommendationCode,
+        )
+        from aether.presentation.editor_recommendation_text import heading_count_phrase
+
+        registration = self.ingest(
+            "iki-ana", "<h1>Birinci</h1><p>M.</p><h1>İkinci</h1><p>M.</p>"
+        )
+        report = BuildArticleAnalysisReport(
+            AnalyzeArticleStructure(self.repository),
+            AnalyzeArticleMetadata(self.repository),
+            AnalyzePassageQuality(self.repository),
+            heading_structure_analysis=AnalyzeHeadingStructure(self.repository),
+        ).execute(registration.article, registration.article_version.article_version_id)
+
+        recommendation = next(
+            r
+            for r in DeriveEditorRecommendations().execute(report)
+            if r.code is RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS
+        )
+
+        self.assertEqual(recommendation.heading_count, 2)
+        self.assertEqual(recommendation.other_article_count, 0)
+        self.assertIn("main heading", heading_count_phrase(recommendation.heading_count))
+        self.assertNotIn("other article", heading_count_phrase(recommendation.heading_count))
+
     def test_rejects_an_article_version_from_a_different_article(self):
         first = self.ingest("birinci", "<h1>Bir</h1><p>Metin.</p>")
         second = self.ingest("ikinci", "<h1>İki</h1><p>Metin.</p>")

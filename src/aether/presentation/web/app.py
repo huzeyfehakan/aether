@@ -39,6 +39,7 @@ from aether.application.analysis.derive_editor_recommendations import (
 )
 from aether.presentation.editor_recommendation_text import (
     category_subtitle,
+    heading_count_phrase,
     shared_words_phrase,
     title_source_label,
     compared_articles_phrase,
@@ -207,6 +208,8 @@ def _recommendation_views(report: Any, category) -> list:
             occurrence["detail"] = repeated_in_phrase(
                 recommendation.other_article_count
             )
+        if recommendation.heading_count:
+            occurrence["detail"] = heading_count_phrase(recommendation.heading_count)
         if recommendation.total_word_count:
             occurrence["detail"] = shared_words_phrase(
                 recommendation.repeated_word_count, recommendation.total_word_count

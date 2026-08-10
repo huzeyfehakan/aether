@@ -87,6 +87,7 @@ class EditorRecommendation:
     passage_ids: Tuple[str, ...] = ()
     other_article_count: int = 0
     missing_properties: Tuple[str, ...] = ()
+    heading_count: int = 0
     repeated_word_count: int = 0
     total_word_count: int = 0
     declared_values: Tuple[Tuple[str, str], ...] = ()
@@ -199,7 +200,7 @@ class DeriveEditorRecommendations:
             found.append(
                 EditorRecommendation(
                     code=RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS,
-                    other_article_count=analysis.top_level_count,
+                    heading_count=analysis.top_level_count,
                 )
             )
         return tuple(found)

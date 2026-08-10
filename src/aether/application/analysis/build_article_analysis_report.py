@@ -52,6 +52,10 @@ class ArticleAnalysisReport:
     structured_data_analysis: Optional[StructuredDataAnalysis] = None
     declared_consistency_analysis: Optional[DeclaredConsistencyAnalysis] = None
     heading_structure_analysis: Optional[HeadingStructureAnalysis] = None
+    #: An unpublished draft. Metadata, declared consistency and structured data
+    #: describe the published page, which does not exist yet, so findings about
+    #: them would be about the CMS template rather than the draft.
+    is_draft: bool = False
 
     def __post_init__(self) -> None:
         analyses = [
@@ -87,6 +91,7 @@ class BuildArticleAnalysisReport:
         structured_data_analysis: Optional[AnalyzeStructuredData] = None,
         declared_consistency_analysis: Optional[AnalyzeDeclaredConsistency] = None,
         heading_structure_analysis: Optional[AnalyzeHeadingStructure] = None,
+        is_draft: bool = False,
     ) -> None:
         self._structure_analysis = structure_analysis
         self._metadata_analysis = metadata_analysis
@@ -95,6 +100,7 @@ class BuildArticleAnalysisReport:
         self._structured_data_analysis = structured_data_analysis
         self._declared_consistency_analysis = declared_consistency_analysis
         self._heading_structure_analysis = heading_structure_analysis
+        self._is_draft = is_draft
 
     def execute(self, article: Article, article_version_id: str) -> ArticleAnalysisReport:
         return ArticleAnalysisReport(
@@ -123,4 +129,5 @@ class BuildArticleAnalysisReport:
                 if self._heading_structure_analysis is not None
                 else None
             ),
+            is_draft=self._is_draft,
         )

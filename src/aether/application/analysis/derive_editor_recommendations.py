@@ -125,6 +125,11 @@ class DeriveEditorRecommendations:
     """Derive editor-facing advice from an existing analysis report."""
 
     def execute(self, report: ArticleAnalysisReport) -> Tuple[EditorRecommendation, ...]:
+        if report.is_draft:
+            # A draft has no published page, so only the checks its own text
+            # can answer are run. Nothing is inferred about what the CMS will
+            # publish around it.
+            return self._heading_structure(report) + self._repeated_text(report)
         return (
             self._missing_metadata(report)
             + self._heading_structure(report)

@@ -20,6 +20,7 @@ from aether.application.analysis.analyze_declared_consistency import AnalyzeDecl
 from aether.application.analysis.assess_ai_readiness import AssessAIReadiness
 from aether.application.analysis.build_ai_readiness_report import BuildAIReadinessReport
 from aether.application.analysis.build_article_analysis_report import BuildArticleAnalysisReport
+from aether.application.ingestion.prepare_draft import prepare_draft
 from aether.application.ingestion.assess_page_content import (
     AssessPageContent,
     PageAssessment,
@@ -61,6 +62,7 @@ class AIReadinessPipeline:
 
     def __init__(self) -> None:
         repository = InMemoryContentRepository()
+        self.repository = repository
         self._register_article = RegisterRawHtmlArticle(repository)
         self._build_analysis_report = BuildArticleAnalysisReport(
             AnalyzeArticleStructure(repository),
@@ -73,6 +75,15 @@ class AIReadinessPipeline:
             AnalyzeStructuredData(repository),
             AnalyzeDeclaredConsistency(repository),
             AnalyzeHeadingStructure(repository),
+        )
+        # A draft composes only the analyses its own text can answer.
+        self._build_draft_report = BuildArticleAnalysisReport(
+            AnalyzeArticleStructure(repository),
+            AnalyzeArticleMetadata(repository),
+            AnalyzePassageQuality(repository),
+            AnalyzeContentDuplication(repository),
+            heading_structure_analysis=AnalyzeHeadingStructure(repository),
+            is_draft=True,
         )
         self._assess_page = AssessPageContent()
         self._assess_readiness = AssessAIReadiness()
@@ -112,6 +123,33 @@ class AIReadinessPipeline:
         )
         assessment = self._assess_readiness.execute(analysis_report)
         return self._build_readiness_report.execute(assessment)
+
+    def analyze_draft(
+        self,
+        content: str,
+        headline: str,
+        language: str,
+        publisher: str,
+    ) -> Any:
+        """Analyse an unpublished draft, running only the checks it supports."""
+        prepared = prepare_draft(content, headline, language)
+        registration = self._register_article.execute(
+            RawHtmlArticle(
+                html=prepared.html,
+                source_url=prepared.source_url,
+                publisher=publisher,
+                article_type="draft",
+                observed_at=datetime.now(timezone.utc),
+                fallback_language=language,
+            )
+        )
+        analysis_report = self._build_draft_report.execute(
+            registration.article, registration.article_version.article_version_id
+        )
+        report = self._build_readiness_report.execute(
+            self._assess_readiness.execute(analysis_report)
+        )
+        return report, prepared
 
     def analyze(
         self,
@@ -281,6 +319,15 @@ def _report_view(report: Any) -> Dict[str, Any]:
     }
 
 
+#: Checks that describe the published page, so a draft cannot answer them.
+#: Listed for the editor rather than silently omitted.
+_UNAVAILABLE_UNTIL_PUBLISHED = [
+    "Publication date, byline and summary, which are set when the article is published",
+    "Whether the page states one headline and one summary, which needs the published page",
+    "Schema.org article markup, which the site template produces",
+]
+
+
 def _analysis_response(result: Any) -> Dict[str, Any]:
     """Shape either a finished report or an explained non-article outcome.
 
@@ -342,6 +389,44 @@ def create_app(fetcher: Optional[HtmlFetcher] = None) -> FastAPI:
             )
             return _analysis_response(report)
         except (HtmlFetchError, DomainValidationError) as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+    @app.get("/publishers")
+    def publishers() -> Dict[str, Any]:
+        """Publishers already analysed, so a draft can be compared with them."""
+        repository = app.state.pipeline.repository
+        names = sorted(
+            {
+                article.publisher
+                for article in repository.all_articles()
+                if not article.canonical_source.startswith("https://draft.invalid/")
+            }
+        )
+        return {"publishers": names}
+
+    @app.post("/analyze/draft")
+    def analyze_draft(
+        content: str = Form(...),
+        headline: str = Form(""),
+        language: str = Form("tr"),
+        publisher: str = Form(""),
+    ) -> Dict[str, Any]:
+        try:
+            report, prepared = app.state.pipeline.analyze_draft(
+                content, headline, language, publisher or "Unpublished drafts"
+            )
+            response = _analysis_response(report)
+            response["draft"] = {
+                "heading_check_available": prepared.heading_check_available,
+                "unavailable": _UNAVAILABLE_UNTIL_PUBLISHED
+                + (
+                    []
+                    if prepared.heading_check_available
+                    else ["Heading structure, because the pasted draft carried no formatting"]
+                ),
+            }
+            return response
+        except DomainValidationError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
     @app.post("/analyze/file")

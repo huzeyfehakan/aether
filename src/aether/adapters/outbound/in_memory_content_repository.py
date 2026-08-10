@@ -44,6 +44,10 @@ class InMemoryContentRepository(ContentRepository):
             )
         )
 
+    def all_articles(self) -> Tuple[Article, ...]:
+        """Every stored article. Used to offer an editor what to compare against."""
+        return tuple(self._articles_by_id.values())
+
     def count_article_versions_for_publisher(self, publisher: str) -> int:
         return sum(
             1

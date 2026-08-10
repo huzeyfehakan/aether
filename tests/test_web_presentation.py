@@ -1,3 +1,4 @@
+import json
 import re
 import sys
 import unittest
@@ -30,15 +31,103 @@ class WebPresentationTests(unittest.TestCase):
         self.fetcher = StubHtmlFetcher(self.html)
         self.client = TestClient(create_app(self.fetcher))
 
-    def test_index_displays_url_and_html_file_submission_forms(self):
+    def test_index_offers_a_published_article_and_a_draft_flow(self):
         response = self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('data-endpoint="/analyze/url"', response.text)
-        self.assertIn('data-endpoint="/analyze/file"', response.text)
-        self.assertIn("Advanced source details", response.text)
+        self.assertIn('data-endpoint="/analyze/draft"', response.text)
+        self.assertIn("Check a draft", response.text)
         self.assertIn('id="assessment-grid"', response.text)
         self.assertIn('id="report"', response.text)
+
+    def test_the_editor_ui_no_longer_asks_for_a_saved_html_file(self):
+        """Nobody in an editorial workflow has one; the endpoint stays for tests."""
+        response = self.client.get("/")
+
+        self.assertNotIn('data-endpoint="/analyze/file"', response.text)
+        self.assertNotIn("Upload HTML", response.text)
+
+    def test_the_editor_ui_no_longer_shows_controls_that_do_nothing(self):
+        """Content type never reached an analysis; publisher is derived."""
+        response = self.client.get("/")
+
+        self.assertNotIn("article_type_override", response.text)
+        self.assertNotIn("Content type", response.text)
+        self.assertNotIn("Publisher override", response.text)
+
+    def test_recovery_fields_use_human_controls_not_iso_timestamps(self):
+        response = self.client.get("/")
+
+        self.assertNotIn("2026-05-14T14:00:00+03:00", response.text)
+        self.assertIn('name="fallback_published_at" type="date"', response.text)
+        self.assertIn('<select name="fallback_language">', response.text)
+
+    def test_a_draft_runs_only_the_checks_a_draft_can_answer(self):
+        rich = (
+            "<h1>Çocuklarda ekran süresi</h1><p>Uzmanlara göre değişir.</p>"
+            "<h2>Öneriler</h2><p>İki yaş altında önerilmez.</p>"
+        )
+        response = self.client.post(
+            "/analyze/draft",
+            data={
+                "content": rich,
+                "headline": "Çocuklarda ekran süresi",
+                "language": "tr",
+                "publisher": "TRT Çocuk",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body["draft"]["heading_check_available"])
+        codes = [r["code"] for r in json.loads(body["report"] or "{}").get("x", [])] if False else None
+        # No published-page finding may appear for a draft.
+        rendered = body["report"]
+        for absent in ("does not say when it was published", "does not name who wrote it",
+                       "Schema.org", "more than one headline"):
+            self.assertNotIn(absent, rendered)
+
+    def test_a_plain_text_draft_says_headings_could_not_be_checked(self):
+        response = self.client.post(
+            "/analyze/draft",
+            data={
+                "content": "Uzmanlara göre değişir.\n\nİki yaş altında önerilmez.",
+                "headline": "Çocuklarda ekran süresi",
+                "language": "tr",
+                "publisher": "TRT Çocuk",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        draft = response.json()["draft"]
+        self.assertFalse(draft["heading_check_available"])
+        self.assertTrue(
+            any("carried no formatting" in item for item in draft["unavailable"]),
+            draft["unavailable"],
+        )
+
+    def test_a_draft_lists_what_needs_the_published_page(self):
+        response = self.client.post(
+            "/analyze/draft",
+            data={"content": "<p>Bir paragraf.</p>", "headline": "Başlık",
+                  "language": "tr", "publisher": "TRT"},
+        )
+
+        unavailable = " ".join(response.json()["draft"]["unavailable"]).lower()
+        self.assertIn("publication date", unavailable)
+        self.assertIn("schema.org", unavailable)
+
+    def test_drafts_are_not_offered_as_something_to_compare_against(self):
+        self.client.post(
+            "/analyze/draft",
+            data={"content": "<p>Bir paragraf.</p>", "headline": "Başlık",
+                  "language": "tr", "publisher": "Taslaklar"},
+        )
+
+        names = self.client.get("/publishers").json()["publishers"]
+
+        self.assertNotIn("Taslaklar", names)
 
     def test_url_submission_fetches_html_and_returns_existing_plain_text_report(self):
         response = self.client.post(

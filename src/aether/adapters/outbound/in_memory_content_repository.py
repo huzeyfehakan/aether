@@ -54,11 +54,13 @@ class InMemoryContentRepository(ContentRepository):
     #: nothing about either.
     _DRAFT_ARTICLE_TYPE = "draft"
 
-    def count_article_versions_for_publisher(self, publisher: str) -> int:
+    def count_article_versions_for_publisher(
+        self, publisher: str, excluding: Optional[str] = None
+    ) -> int:
         return sum(
             1
-            for version in self._versions.values()
-            if self._is_published_by(version, publisher)
+            for version_id, version in self._versions.items()
+            if version_id != excluding and self._is_published_by(version, publisher)
         )
 
     def find_passage_fingerprint_occurrences(

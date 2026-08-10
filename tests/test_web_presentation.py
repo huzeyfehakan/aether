@@ -407,6 +407,56 @@ class WebPresentationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return response
 
+    def test_a_draft_counts_every_published_article_it_was_compared_with(self):
+        """One published article is one article compared against, not none.
+
+        The count subtracted the article being analysed, which is right for a
+        published article because it is in the corpus. A draft never is, so the
+        subtraction removed a real article instead.
+        """
+        publisher = "ebeveynakademisi.trtcocuk.net.tr"
+        for index, (slug, paragraph) in enumerate(
+            (("birinci", "Birinci metin."), ("ikinci", "Ikinci metin.")), start=1
+        ):
+            self._publish(slug, paragraph, publisher=publisher)
+            draft = self._draft(
+                f"<h1>Taslak {index}</h1><p>Tamamen ozgun bir paragraf {index}.</p>",
+                publisher=publisher,
+            ).json()["draft"]
+
+            self.assertEqual(draft["compared_article_count"], index)
+            self.assertIn(
+                "Text repeated in your other articles", draft["checks_performed"]
+            )
+
+    def test_drafts_are_never_counted_as_articles_to_compare_against(self):
+        publisher = "ebeveynakademisi.trtcocuk.net.tr"
+        self._publish("birinci", "Birinci metin.", publisher=publisher)
+        for index in range(3):
+            draft = self._draft(
+                f"<h1>Taslak {index}</h1><p>Ozgun paragraf {index}.</p>",
+                publisher=publisher,
+            ).json()["draft"]
+
+        self.assertEqual(draft["compared_article_count"], 1)
+
+    def test_a_published_article_still_excludes_itself_from_the_comparison(self):
+        """The published path must be unchanged; it was already correct."""
+        publisher = "ebeveynakademisi.trtcocuk.net.tr"
+        first = self._publish("birinci", "Birinci metin.", publisher=publisher)
+        self.assertEqual(
+            first.json()["view"]["editor"]["compared_articles"],
+            "No previously analyzed articles from this publisher, so repeated "
+            "text could not be checked.",
+        )
+
+        second = self._publish("ikinci", "Ikinci metin.", publisher=publisher)
+        self.assertEqual(
+            second.json()["view"]["editor"]["compared_articles"],
+            "Compared against previously analyzed articles from this publisher "
+            "(1 article).",
+        )
+
     def test_a_draft_finding_reaches_the_page_instead_of_throwing(self):
         """The whole seam: a real repeated paragraph, rendered by the real page.
 

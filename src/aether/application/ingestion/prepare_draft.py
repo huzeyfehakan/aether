@@ -21,6 +21,7 @@ heading check could not run.
 """
 
 from dataclasses import dataclass
+import json
 import re
 from hashlib import sha256
 from html import escape
@@ -91,13 +92,23 @@ class DraftContentRequired(ValueError):
 
 
 def prepare_draft(
-    content: str, headline: str, language: str, source_url: Optional[str] = None
+    content: str,
+    headline: str,
+    language: str,
+    publisher: str = "",
+    source_url: Optional[str] = None,
 ) -> PreparedDraft:
     """Express a pasted draft as a document ingestion can read.
 
     The draft's own heading wins when it has one, and no second heading is
     added, because injecting one would make every such draft appear to have
     two competing main headings.
+
+    A draft is identified by its text *and* the publisher it is being checked
+    against. Identity was the text alone, so the same draft checked twice was
+    one record, and the publisher chosen the first time was the one it kept:
+    an editor who checked a draft before choosing a publisher had that draft
+    permanently compared against nothing, with no way to see why.
     """
     if not content or not content.strip():
         raise DraftContentRequired(
@@ -126,7 +137,11 @@ def prepare_draft(
         f'<html lang="{escape(language.strip())}"><body><main>'
         f"{heading}{body}</main></body></html>"
     )
-    identifier = sha256(html.encode("utf-8")).hexdigest()[:16]
+    # The publisher is part of what is hashed, not appended to the address, so
+    # two publishers cannot collide on a shared prefix and the address itself
+    # continues to disclose nothing about either.
+    identity = json.dumps([publisher, html], ensure_ascii=False, separators=(",", ":"))
+    identifier = sha256(identity.encode("utf-8")).hexdigest()[:16]
     return PreparedDraft(
         html=html,
         source_url=source_url or f"https://draft.invalid/{identifier}",

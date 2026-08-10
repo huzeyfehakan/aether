@@ -138,7 +138,7 @@ class AIReadinessPipeline:
         publisher: str,
     ) -> Any:
         """Analyse an unpublished draft, running only the checks it supports."""
-        prepared = prepare_draft(content, headline, language)
+        prepared = prepare_draft(content, headline, language, publisher)
         registration = self._register_article.execute(
             RawHtmlArticle(
                 html=prepared.html,

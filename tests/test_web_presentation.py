@@ -407,6 +407,47 @@ class WebPresentationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return response
 
+    def test_choosing_a_publisher_after_a_first_check_takes_effect(self):
+        """A draft was identified by its text alone, so it kept the publisher
+        it was first checked against. Checking it again after choosing one
+        compared it against the earlier choice, silently and permanently.
+        """
+        publisher = "ebeveynakademisi.trtcocuk.net.tr"
+        shared = "Bu icerik bilgilendirme amacli hazirlanmistir."
+        self._publish("birinci", shared, publisher=publisher)
+        draft = f"<h1>Yeni makale</h1><p>{shared}</p><p>Ozgun paragraf.</p>"
+
+        without = self._draft(draft, publisher="").json()["draft"]
+        self.assertEqual(without["recommendations"], [])
+
+        with_publisher = self._draft(draft, publisher=publisher).json()["draft"]
+        findings = " ".join(r["headline"] for r in with_publisher["recommendations"])
+        self.assertIn("also appears in your other articles", findings)
+
+    def test_the_same_draft_and_publisher_stay_one_draft(self):
+        publisher = "ebeveynakademisi.trtcocuk.net.tr"
+        self._publish("birinci", "Birinci metin.", publisher=publisher)
+        draft = "<h1>Taslak</h1><p>Ozgun bir paragraf.</p>"
+
+        self._draft(draft, publisher=publisher)
+        self._draft(draft, publisher=publisher)
+
+        repository = self.client.app.state.pipeline.repository
+        drafts = [a for a in repository.all_articles() if a.article_type == "draft"]
+        self.assertEqual(len(drafts), 1)
+
+    def test_the_same_draft_checked_against_two_publishers_is_two_drafts(self):
+        draft = "<h1>Taslak</h1><p>Ozgun bir paragraf.</p>"
+
+        self._draft(draft, publisher="TRT Haber")
+        self._draft(draft, publisher="TRT World")
+
+        repository = self.client.app.state.pipeline.repository
+        publishers = {
+            a.publisher for a in repository.all_articles() if a.article_type == "draft"
+        }
+        self.assertEqual(publishers, {"TRT Haber", "TRT World"})
+
     def test_a_draft_counts_every_published_article_it_was_compared_with(self):
         """One published article is one article compared against, not none.
 

@@ -19,5 +19,10 @@ dist/
 # Presentation and office artifacts
 *.pptx
 *.ppt
+*.docx
+*.doc
 *.bak
 ~$*
+
+# Local agent settings. Personal to one machine, never shared.
+.claude/settings.local.json

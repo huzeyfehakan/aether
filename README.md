@@ -2,12 +2,12 @@
 
 A deterministic AI Publishing Assistant for publisher articles.
 
-Aether reads a published article and tells an editor what to improve before it
-goes out — whether the page names its author, whether it states one headline or
-several, whether its body is mostly boilerplate, whether it tells machines what
-it is. Every finding is derived from the page itself by fixed rules. Nothing is
-inferred by a language model, and no finding depends on a threshold someone
-chose.
+Aether reads an article and reports what an editor can improve — whether the
+page names its author, whether it states one headline or several, whether its
+body is mostly boilerplate, whether it tells machines what it is. It works on a
+published URL, and on a draft pasted from a CMS before it goes out. Every
+finding is derived from the page itself by fixed rules. Nothing is inferred by
+a language model, and no finding depends on a threshold someone chose.
 
 It deliberately does **not** predict how any AI system will rank, quote or
 answer from an article. It reports what is on the page and what that costs.
@@ -59,6 +59,12 @@ and what each case implies, separating a page that declares itself an article
 but serves no text — a real fault — from a video or listing page, where
 nothing is wrong.
 
+**Checking a draft.** An editor can paste a draft from a CMS or word processor,
+keeping formatting so headings survive, and choose which publisher's
+already-checked articles to compare it against. The review states what was
+checked, what can only be checked after publishing, and why. A check that could
+not run is never reported as a failure.
+
 ## Quick start
 
 Requires Python 3.9 or newer.
@@ -95,28 +101,23 @@ few, and the report states how many it compared against.
 
 ## Design rules
 
-These are the constraints the code is held to, and the reason it looks the way
-it does.
+The constraints the code is held to, each recorded in
+[`docs/decisions/`](docs/decisions/) with the evidence behind it and the
+condition that would reopen it.
 
-**Deterministic, with no thresholds.** The same page and the same corpus always
-produce the same report. Where a rule needs a comparison it compares two
-measured quantities rather than a constant: an article body is reported as
-mostly boilerplate when its shared words outnumber its own, never when it falls
-under a chosen length.
+| | |
+|---|---|
+| [Deterministic, without chosen thresholds](docs/decisions/0001-deterministic-rules-without-thresholds.md) | A body is "mostly boilerplate" when its shared words outnumber its own — never when it falls under a chosen length |
+| [No publisher-specific rules](docs/decisions/0002-no-publisher-specific-rules.md) | Nothing keys on a name, host or URL pattern |
+| [Never predict model behaviour](docs/decisions/0003-never-predict-model-behaviour.md) | No score, no forecast of how any AI system will treat the page |
+| [Every finding names who can act on it](docs/decisions/0004-every-finding-names-who-can-act.md) | Editor or technical; a finding nobody can act on is not reported |
+| [Fail toward silence](docs/decisions/0005-fail-toward-silence.md) | A false positive costs an editor's trust; a missed finding costs less |
+| [Separate finding codes from wording](docs/decisions/0007-separate-finding-codes-from-wording.md) | The application emits a code; presentation decides how it reads |
 
-**No publisher-specific rules.** Nothing keys on a publisher name, host or URL
-pattern. A site name in a title is recognised by being a separator-delimited
-segment another declaration lacks, not by a list of publishers.
-
-**Rejected approaches are written down.** Where an obvious heuristic was
-considered and refused, the reasoning sits beside the rule that replaced it —
+Rejected approaches are written down beside the decision that replaced them —
 why `og:type` is reported as evidence but never trusted to classify a page, why
 "this article has no subheadings" is not a finding, why matching any title
 fragment against any other would let two different headlines agree.
-
-**Findings are addressed to someone.** A recommendation an editor cannot act on
-belongs in the technical section, and one nobody can act on does not belong in
-the report. Several measurements were deleted for failing that test.
 
 ## Architecture
 
@@ -136,16 +137,25 @@ src/aether/
 
 One rule is worth stating here because it shapes the code: the application
 layer decides *which* recommendation applies and emits a code; presentation
-decides *how it reads*. That keeps copy out of use cases and leaves room for a
-Turkish edition of the same findings.
+decides *how it reads*. That keeps copy out of use cases, and is what makes a
+second interface language a lookup table rather than a rewrite.
 
-[`docs/handoff.md`](docs/handoff.md) records the design principles, the ideas
-deliberately rejected, and the questions to ask when editor feedback arrives.
+## Documentation
 
-See [`docs/architecture.md`](docs/architecture.md) for layer responsibilities,
-and [`docs/body-extraction.md`](docs/body-extraction.md) and
-[`docs/publication-date-extraction.md`](docs/publication-date-extraction.md)
-for the extraction contracts.
+[`docs/context.md`](docs/context.md) is the index — it says which document
+answers which question. In short:
+
+| | |
+|---|---|
+| [`AGENTS.md`](AGENTS.md) | How to work in this repository: process, git, verification |
+| [`docs/handoff.md`](docs/handoff.md) | Current state: released and in-progress work, blockers, next step |
+| [`docs/decisions/`](docs/decisions/) | Settled product decisions and the evidence behind them |
+| [`docs/product-discovery.md`](docs/product-discovery.md) | What is still unknown, and the questions that would settle it |
+| [`docs/architecture.md`](docs/architecture.md) | Layer responsibilities and the package map |
+
+Extraction contracts have their own notes:
+[`docs/body-extraction.md`](docs/body-extraction.md) and
+[`docs/publication-date-extraction.md`](docs/publication-date-extraction.md).
 
 ## Tests
 
@@ -153,19 +163,32 @@ for the extraction contracts.
 python -m unittest discover -s tests -v
 ```
 
-169 tests, run on Python 3.9 through 3.13 in CI. Fixtures are reduced captures
-of real publisher pages, kept faithful to what those pages actually serve —
-including their defects, such as a double-escaped JSON-LD headline and a
-date-only `datePublished`.
+Run on Python 3.9 through 3.13 in CI. Fixtures are reduced captures of real
+publisher pages, kept faithful to what those pages actually serve — including
+their defects, such as a double-escaped JSON-LD headline and a date-only
+`datePublished`.
+
+Some tests run the served page's own script under Node and **skip silently when
+Node is absent**, still reporting `OK`. Check the skip count, not just the
+result — see [`AGENTS.md`](AGENTS.md) §3 for what counts as verified, and
+[`docs/architecture.md`](docs/architecture.md) for the harness's structural
+limits.
 
 ## Known limits
 
-- Comparisons across articles hold only for the current process. Persistence
-  behind the repository port would make them durable.
+What this means for someone using the tool. The technical statement of each is
+in [`docs/architecture.md`](docs/architecture.md).
+
+- Comparisons across articles hold only for the current process, and only
+  within one publisher. Persistence behind the repository port would make them
+  durable.
 - Findings about a page template are reported per article, so one template fix
   is restated on every article of a property.
 - Title comparison has documented edge cases, recorded in
   `application/analysis/declared_text_comparison.py`.
+- Only pages carrying article prose are analysed. Audio, video and programme
+  pages are reported as such and not assessed —
+  [decision 0008](docs/decisions/0008-classify-pages-from-declared-article-nodes.md).
 
 ## License
 

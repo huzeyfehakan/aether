@@ -29,6 +29,8 @@
       .declared { margin-top: 11px; } .declared td:last-child { text-align: left; color: #24374d; }
       .repeat-count { background: #eef3fa; border-radius: 99px; color: #3f5876; font-size: .8rem; font-weight: 680; padding: 3px 9px; } .recommendation blockquote { border-left: 2px solid #dbe3ec; color: #5d6b7e; font-style: italic; margin: 11px 0 0; padding: 2px 0 2px 12px; }
       .technical { margin-top: 28px; } .technical pre { background: #101d2c; border-radius: 10px; color: #dce9f7; margin: 14px 0 0; overflow: auto; padding: 16px; white-space: pre-wrap; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .score-headline { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; } .score-total { font-size: 2.2rem; font-weight: 800; color: #086ad8; line-height: 1; }
+      .score-weight { color: #d63c30; font-weight: 800; font-size: 1.1rem; margin: 0 0 4px; }
       @media (max-width: 640px) { .shell { width: min(100% - 28px, 1120px); padding-top: 30px; } .form-panel, #report-card { padding: 19px; } .tabs { overflow-x: auto; } }
     </style>
   </head>
@@ -98,13 +100,24 @@
 
       <section id="report-card" class="panel hidden" aria-live="polite">
         <div class="report-heading"><div><div class="eyebrow">Analysis complete</div><h2>AI Readiness Report</h2></div><span id="report-state" class="badge partial">Assessment available</span></div>
-        <div id="assessment-grid" class="assessment-grid"></div>
+        
+        <!-- YENİ: AI Readiness Score Bölümü -->
+        <div class="section" id="score-section" style="margin-top: 0;">
+          <div class="score-headline">
+            <span id="score-total" class="score-total">0</span>
+            <span style="font-size: 1.1rem; color: #58677b;">/ 100 Overall Score</span>
+          </div>
+          <p>0–100 composite score based on transparent deterministic measurements.</p>
+          <div id="score-grid" class="metric-grid"></div>
+        </div>
+        <!-- BİTİŞ: AI Readiness Score Bölümü -->
+
+        <div class="section"><h3>Assessment Summary</h3><div id="assessment-grid" class="assessment-grid"></div></div>
 
         <div class="section"><h3>Article structure</h3><p>How the stored article is organized for deterministic passage analysis.</p><div id="structure-metrics" class="metric-grid"></div></div>
 
         <div class="section"><h3>Metadata availability</h3><p id="metadata-summary">Source fields found in the article.</p><table class="metadata-table"><tbody id="metadata-table"></tbody></table><div id="missing-list" class="missing-list"></div></div>
 
-        
         <div class="section" id="editor-section"><h3>Editor Recommendations</h3><p class="muted" id="editor-subtitle"></p><p id="editor-compared"></p><div id="editor-list"></div></div>
 
         <div class="section" id="technical-section"><h3>Technical AI Readiness</h3><p class="muted" id="technical-subtitle"></p><div id="technical-list"></div></div>
@@ -141,6 +154,35 @@
       });
 
       function renderReport(view, rawReport) {
+        
+        // YENİ: Skoru düz metin rapordan (rawReport) Regex ile çekiyoruz
+        const totalMatch = rawReport.match(/Total Score:\s*(\d+)/);
+        const entityMatch = rawReport.match(/Entity Coverage\s*\((\d+)%\):\s*([\d\.]+)/);
+        const structMatch = rawReport.match(/Structured Data\s*\((\d+)%\):\s*([\d\.]+)/);
+        const semMatch = rawReport.match(/Semantic Quality\s*\((\d+)%\):\s*([\d\.]+)/);
+        const techMatch = rawReport.match(/Technical Access\s*\((\d+)%\):\s*([\d\.]+)/);
+
+        if (totalMatch && entityMatch && structMatch && semMatch && techMatch) {
+            document.querySelector('#score-total').textContent = totalMatch[1];
+            const dimensions = [
+                { label: 'Entity Coverage', weight: entityMatch[1], val: parseFloat(entityMatch[2]) },
+                { label: 'Structured Data', weight: structMatch[1], val: parseFloat(structMatch[2]) },
+                { label: 'Semantic Quality', weight: semMatch[1], val: parseFloat(semMatch[2]) },
+                { label: 'Technical Access', weight: techMatch[1], val: parseFloat(techMatch[2]) }
+            ];
+            
+            document.querySelector('#score-grid').innerHTML = dimensions.map(d => `
+                <div class="metric-card">
+                    <p class="score-weight">%${d.weight}</p>
+                    <h4 style="margin: 0 0 5px; font-size: 1rem;">${d.label}</h4>
+                    <strong style="color: #45617d;">${d.val.toFixed(1)} / 100</strong>
+                </div>
+            `).join('');
+            document.querySelector('#score-section').classList.remove('hidden');
+        } else {
+            document.querySelector('#score-section').classList.add('hidden');
+        }
+
         const assessment = view.assessment;
         const cards = [
           ['Metadata', assessment.metadata, 'Fields an AI system needs to identify and attribute this article'],
@@ -202,7 +244,10 @@
               outcomeCard.classList.remove('hidden'); outcomeCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
               return;
             }
-            renderReport(data.view, data.report); reportCard.classList.remove('hidden'); reportCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            // YENİ: Backend'den gelen view ve report değişkenlerini gönderiyoruz.
+            renderReport(data.view, data.report); 
+            reportCard.classList.remove('hidden'); reportCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
           } catch (error) { status.textContent = error.message; }
           finally { button.disabled = false; }
         });

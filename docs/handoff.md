@@ -27,9 +27,15 @@ Where this file disagrees with the repository, the repository is right.
 
 ## Current task
 
-Restructuring the repository's context documents so a fresh Claude Code or Codex
-session can reconstruct the project without prior chat history. Complete and
-uncommitted. No product code was touched.
+Product design only; no code in flight. The context-document restructure this
+section used to describe is finished and published, so it has left this file.
+
+A design pass on a criteria-based score ran to a stopping point without touching
+code. The stakeholder input behind it, and the questions it left open, are in
+[`product-discovery.md`](product-discovery.md). **What the pass concluded is not
+recorded anywhere in this repository** — deliberately, because none of it was
+accepted as a decision record. A fresh session will find the inputs and the open
+questions, but not the reasoning between them.
 
 ## Released
 

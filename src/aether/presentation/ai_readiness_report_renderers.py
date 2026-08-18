@@ -20,7 +20,6 @@ from aether.presentation.editor_recommendation_text import (
 )
 
 
-
 def _codes_in_order(recommendations) -> list:
     """Distinct recommendation codes, keeping first-seen order."""
     seen = []
@@ -32,6 +31,7 @@ def _codes_in_order(recommendations) -> list:
 
 def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
     """Map report fields directly without deriving any new business information."""
+    score = report.assessment_summary.score
     return {
         "article_identity": {
             "article_id": report.article_identity.article_id,
@@ -90,6 +90,29 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
             "metadata_completeness": (
                 report.assessment_summary.metadata_completeness.value
             ),
+            "score": {
+                "total": score.total,
+                "entity_coverage": {
+                    "weight_percentage": score.entity_coverage.weight_percentage,
+                    "dimension_score": score.entity_coverage.dimension_score,
+                    "weighted_contribution": score.entity_coverage.weighted_contribution,
+                },
+                "structured_data": {
+                    "weight_percentage": score.structured_data.weight_percentage,
+                    "dimension_score": score.structured_data.dimension_score,
+                    "weighted_contribution": score.structured_data.weighted_contribution,
+                },
+                "semantic_quality": {
+                    "weight_percentage": score.semantic_quality.weight_percentage,
+                    "dimension_score": score.semantic_quality.dimension_score,
+                    "weighted_contribution": score.semantic_quality.weighted_contribution,
+                },
+                "technical_access": {
+                    "weight_percentage": score.technical_access.weight_percentage,
+                    "dimension_score": score.technical_access.dimension_score,
+                    "weighted_contribution": score.technical_access.weighted_contribution,
+                },
+            }
         },
     }
 
@@ -107,14 +130,21 @@ class PlainTextAIReadinessReportRenderer:
     def render(self, report: AIReadinessReport) -> str:
         structural = report.structural_summary
         metadata = report.metadata_summary
-        passage_quality = report.passage_quality_summary
         assessment = report.assessment_summary
+        score = assessment.score
         lines = (
             "AI Readiness Report",
             "",
             "Article Identity",
             f"Article ID: {report.article_identity.article_id}",
             f"Article Version ID: {report.article_identity.article_version_id}",
+            "",
+            "AI Readiness Score",
+            f"Total Score: {score.total} / 100",
+            f" - Entity Coverage ({score.entity_coverage.weight_percentage}%): {score.entity_coverage.dimension_score:.1f}",
+            f" - Structured Data ({score.structured_data.weight_percentage}%): {score.structured_data.dimension_score:.1f}",
+            f" - Semantic Quality ({score.semantic_quality.weight_percentage}%): {score.semantic_quality.dimension_score:.1f}",
+            f" - Technical Access ({score.technical_access.weight_percentage}%): {score.technical_access.dimension_score:.1f}",
             "",
             "Structural Summary",
             f"Total Passages: {structural.total_passage_count}",
@@ -133,13 +163,6 @@ class PlainTextAIReadinessReportRenderer:
 
     @staticmethod
     def _structured_data_lines(report: AIReadinessReport) -> tuple:
-        """Report the Schema.org declaration as a separate question.
-
-        Extracted metadata answers what could be read from the page at all.
-        This answers what the page formally declares to machines. A detail can
-        be readable and undeclared at once, so the two are stated apart rather
-        than left looking like a contradiction.
-        """
         summary = report.structured_data_summary
         if summary is None:
             return ()
@@ -164,9 +187,6 @@ class PlainTextAIReadinessReportRenderer:
     @staticmethod
     def _recommendation_lines(report: AIReadinessReport) -> tuple:
         lines = []
-        # The editor's own work comes first. Platform findings follow, because
-        # they are usually the same on every article and are not the reader's
-        # to fix.
         for category in (
             RecommendationCategory.EDITOR,
             RecommendationCategory.TECHNICAL,
@@ -204,9 +224,6 @@ class PlainTextAIReadinessReportRenderer:
                         "Nothing to change: this article declares itself completely."
                     )
                     continue
-            # Findings of the same kind share one explanation. Repeating the
-            # same two paragraphs of rationale under every occurrence buries
-            # the occurrences themselves.
             for code in _codes_in_order(in_category):
                 occurrences = [r for r in in_category if r.code is code]
                 text = recommendation_text(occurrences[0])
@@ -252,6 +269,7 @@ class MarkdownAIReadinessReportRenderer:
         metadata = report.metadata_summary
         passage_quality = report.passage_quality_summary
         assessment = report.assessment_summary
+        score = assessment.score
         lines = [
             "# AI Readiness Report",
             "",
@@ -259,6 +277,15 @@ class MarkdownAIReadinessReportRenderer:
             "",
             f"- Article ID: `{report.article_identity.article_id}`",
             f"- Article Version ID: `{report.article_identity.article_version_id}`",
+            "",
+            "## AI Readiness Score",
+            "",
+            f"**Total Score: {score.total} / 100**",
+            "",
+            f"- **Entity Coverage ({score.entity_coverage.weight_percentage}%)**: {score.entity_coverage.dimension_score:.1f}",
+            f"- **Structured Data ({score.structured_data.weight_percentage}%)**: {score.structured_data.dimension_score:.1f}",
+            f"- **Semantic Quality ({score.semantic_quality.weight_percentage}%)**: {score.semantic_quality.dimension_score:.1f}",
+            f"- **Technical Access ({score.technical_access.weight_percentage}%)**: {score.technical_access.dimension_score:.1f}",
             "",
             "## Structural Summary",
             "",

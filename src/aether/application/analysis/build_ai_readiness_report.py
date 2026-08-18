@@ -42,8 +42,28 @@ class PassageQualitySummary:
 
 
 @dataclass(frozen=True)
+class ScoreDimensionSummary:
+    """A user-facing summary of a single score dimension."""
+    weight_percentage: int
+    dimension_score: float
+    weighted_contribution: float
+
+
+@dataclass(frozen=True)
+class ScoreSummary:
+    """A user-facing summary of the total composite score and its dimensions."""
+    total: int
+    entity_coverage: ScoreDimensionSummary
+    structured_data: ScoreDimensionSummary
+    semantic_quality: ScoreDimensionSummary
+    technical_access: ScoreDimensionSummary
+
+
+@dataclass(frozen=True)
 class AssessmentSummary:
+    """Includes both completeness classification and the deterministic composite score."""
     metadata_completeness: CompletenessClassification
+    score: ScoreSummary
 
 
 @dataclass(frozen=True)
@@ -98,6 +118,35 @@ class BuildAIReadinessReport:
         structural = report.structural_analysis
         metadata = report.metadata_analysis
         passage_quality = report.passage_quality_analysis
+        
+        # 1. Ham skoru Assessment içerisinden alıyoruz
+        raw_score = assessment.score
+        
+        # 2. Skoru sunum katmanı DTO'larına dönüştürüyoruz
+        score_summary = ScoreSummary(
+            total=raw_score.total,
+            entity_coverage=ScoreDimensionSummary(
+                weight_percentage=raw_score.entity_coverage.weight_percentage,
+                dimension_score=raw_score.entity_coverage.dimension_score,
+                weighted_contribution=raw_score.entity_coverage.weighted_contribution,
+            ),
+            structured_data=ScoreDimensionSummary(
+                weight_percentage=raw_score.structured_data.weight_percentage,
+                dimension_score=raw_score.structured_data.dimension_score,
+                weighted_contribution=raw_score.structured_data.weighted_contribution,
+            ),
+            semantic_quality=ScoreDimensionSummary(
+                weight_percentage=raw_score.semantic_quality.weight_percentage,
+                dimension_score=raw_score.semantic_quality.dimension_score,
+                weighted_contribution=raw_score.semantic_quality.weighted_contribution,
+            ),
+            technical_access=ScoreDimensionSummary(
+                weight_percentage=raw_score.technical_access.weight_percentage,
+                dimension_score=raw_score.technical_access.dimension_score,
+                weighted_contribution=raw_score.technical_access.weighted_contribution,
+            ),
+        )
+
         return AIReadinessReport(
             article_identity=ArticleIdentitySummary(
                 article_id=structural.article_id,
@@ -119,6 +168,7 @@ class BuildAIReadinessReport:
             ),
             assessment_summary=AssessmentSummary(
                 metadata_completeness=assessment.metadata_completeness,
+                score=score_summary,
             ),
             content_reuse_summary=self._content_reuse_summary(report),
             structured_data_summary=self._structured_data_summary(report),

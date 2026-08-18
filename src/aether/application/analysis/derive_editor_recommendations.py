@@ -48,6 +48,7 @@ class RecommendationCode(str, Enum):
     BODY_MOSTLY_REPEATED_TEXT = "body_mostly_repeated_text"
     NO_TOP_LEVEL_HEADING = "no_top_level_heading"
     MULTIPLE_TOP_LEVEL_HEADINGS = "multiple_top_level_headings"
+    WEAK_ARTICLE_OPENING = "weak_article_opening"
 
 
 #: Structured data is declared by the page template, so correcting it is a CMS
@@ -69,6 +70,7 @@ _CATEGORIES = {
     # Editors write the headings inside an article.
     RecommendationCode.NO_TOP_LEVEL_HEADING: RecommendationCategory.EDITOR,
     RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS: RecommendationCategory.EDITOR,
+    RecommendationCode.WEAK_ARTICLE_OPENING: RecommendationCategory.EDITOR,
     # The CMS stamps this on save; an editor has no field for it.
     RecommendationCode.MISSING_LAST_MODIFIED_DATE: RecommendationCategory.TECHNICAL,
     RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: RecommendationCategory.TECHNICAL,
@@ -129,10 +131,15 @@ class DeriveEditorRecommendations:
             # A draft has no published page, so only the checks its own text
             # can answer are run. Nothing is inferred about what the CMS will
             # publish around it.
-            return self._heading_structure(report) + self._repeated_text(report)
+            return (
+                self._heading_structure(report)
+                + self._weak_article_opening(report)
+                + self._repeated_text(report)
+            )
         return (
             self._missing_metadata(report)
             + self._heading_structure(report)
+            + self._weak_article_opening(report)
             + self._declared_consistency(report)
             + self._repeated_text(report)
             + self._structured_data(report)
@@ -209,6 +216,19 @@ class DeriveEditorRecommendations:
                 )
             )
         return tuple(found)
+
+    @staticmethod
+    def _weak_article_opening(
+        report: ArticleAnalysisReport,
+    ) -> Tuple[EditorRecommendation, ...]:
+        """Report a short first paragraph only when the article is substantial."""
+        profiles = report.passage_quality_analysis.passage_profiles
+        if not profiles:
+            return ()
+        total_word_count = sum(profile.word_count for profile in profiles)
+        if total_word_count < 150 or profiles[0].word_count > 20:
+            return ()
+        return (EditorRecommendation(code=RecommendationCode.WEAK_ARTICLE_OPENING),)
 
     @staticmethod
     def _declared_consistency(

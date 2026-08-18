@@ -32,6 +32,7 @@ decision without a stated reopening condition becomes dogma.
 | [0007](0007-separate-finding-codes-from-wording.md) | Separate finding codes from their wording |
 | [0008](0008-classify-pages-from-declared-article-nodes.md) | Classify pages from declared Article nodes, never from `og:type` |
 | [0009](0009-anchor-title-comparison-on-whole-values.md) | Anchor title comparison on whole declared values |
+| [0010](0010-thresholded-article-opening-prototype.md) | Thresholded article-opening prototype |
 
 ## Rejected ideas, and where they live
 

@@ -155,6 +155,17 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
             "section headings."
         ),
     ),
+    RecommendationCode.WEAK_ARTICLE_OPENING: RecommendationText(
+        headline="The article opening is very short",
+        why_it_matters=(
+            "The article contains substantial content, but its opening paragraph "
+            "provides very little context before the rest of the story."
+        ),
+        what_to_do=(
+            "Add one or two sentences near the beginning that clearly summarize "
+            "what the article is about."
+        ),
+    ),
     RecommendationCode.TITLE_SOURCES_DISAGREE: RecommendationText(
         headline="This article gives more than one headline",
         why_it_matters=(

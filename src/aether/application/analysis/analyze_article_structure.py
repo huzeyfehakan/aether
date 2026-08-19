@@ -10,18 +10,17 @@ from aether.ports.outbound.content_repository import ContentRepository
 
 @dataclass(frozen=True)
 class ArticleStructuralAnalysis:
-    """Deterministic size facts for one immutable Article Version.
-
-    Heading structure is deliberately absent rather than reported as unknown.
-    The frozen ArticleVersion preserves normalized title and body text but no
-    heading tags, so the field could only ever be empty. It can return once
-    ingestion retains a heading inventory.
-    """
+    """Deterministic size facts for one immutable Article Version."""
 
     article_id: str
     article_version_id: str
     total_passage_count: int
     total_word_count: int
+    table_word_count: int
+    list_word_count: int
+    blockquote_word_count: int
+    answered_question_heading_count: int
+    unanswered_question_heading_count: int
 
 
 class AnalyzeArticleStructure:
@@ -40,12 +39,21 @@ class AnalyzeArticleStructure:
             )
         passages = self._content_repository.list_passages_for_version(article_version_id)
         self._validate_passages(article_version, passages)
+        
+        source_data = self._content_repository.get_source_data(article_version_id)
+        if source_data is None:
+            raise DomainValidationError("source data must exist for structural analysis")
 
         return ArticleStructuralAnalysis(
             article_id=article.article_id,
             article_version_id=article_version.article_version_id,
             total_passage_count=len(passages),
             total_word_count=sum(self._word_count(passage.text) for passage in passages),
+            table_word_count=source_data.table_word_count,
+            list_word_count=source_data.list_word_count,
+            blockquote_word_count=source_data.blockquote_word_count,
+            answered_question_heading_count=source_data.answered_question_heading_count,
+            unanswered_question_heading_count=source_data.unanswered_question_heading_count,
         )
 
     @staticmethod

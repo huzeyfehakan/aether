@@ -31,6 +31,10 @@ from aether.application.analysis.analyze_passage_quality import (
     AnalyzePassageQuality,
     PassageQualityAnalysis,
 )
+from aether.application.analysis.analyze_internal_links import (
+    AnalyzeInternalLinks,
+    InternalLinkAnalysisResult,
+)
 from aether.domain.common import DomainValidationError
 from aether.domain.content import Article
 
@@ -52,6 +56,7 @@ class ArticleAnalysisReport:
     structured_data_analysis: Optional[StructuredDataAnalysis] = None
     declared_consistency_analysis: Optional[DeclaredConsistencyAnalysis] = None
     heading_structure_analysis: Optional[HeadingStructureAnalysis] = None
+    internal_link_analysis: Optional[InternalLinkAnalysisResult] = None
     #: An unpublished draft. Metadata, declared consistency and structured data
     #: describe the published page, which does not exist yet, so findings about
     #: them would be about the CMS template rather than the draft.
@@ -71,6 +76,8 @@ class ArticleAnalysisReport:
             analyses.append(self.declared_consistency_analysis)
         if self.heading_structure_analysis is not None:
             analyses.append(self.heading_structure_analysis)
+        if self.internal_link_analysis is not None:
+            analyses.append(self.internal_link_analysis)
         article_ids = {analysis.article_id for analysis in analyses}
         version_ids = {analysis.article_version_id for analysis in analyses}
         if len(article_ids) != 1 or len(version_ids) != 1:
@@ -91,6 +98,7 @@ class BuildArticleAnalysisReport:
         structured_data_analysis: Optional[AnalyzeStructuredData] = None,
         declared_consistency_analysis: Optional[AnalyzeDeclaredConsistency] = None,
         heading_structure_analysis: Optional[AnalyzeHeadingStructure] = None,
+        internal_link_analysis: Optional[AnalyzeInternalLinks] = None,
         is_draft: bool = False,
     ) -> None:
         self._structure_analysis = structure_analysis
@@ -100,6 +108,7 @@ class BuildArticleAnalysisReport:
         self._structured_data_analysis = structured_data_analysis
         self._declared_consistency_analysis = declared_consistency_analysis
         self._heading_structure_analysis = heading_structure_analysis
+        self._internal_link_analysis = internal_link_analysis
         self._is_draft = is_draft
 
     def execute(self, article: Article, article_version_id: str) -> ArticleAnalysisReport:
@@ -127,6 +136,11 @@ class BuildArticleAnalysisReport:
             heading_structure_analysis=(
                 self._heading_structure_analysis.execute(article, article_version_id)
                 if self._heading_structure_analysis is not None
+                else None
+            ),
+            internal_link_analysis=(
+                self._internal_link_analysis.execute(article, article_version_id)
+                if self._internal_link_analysis is not None
                 else None
             ),
             is_draft=self._is_draft,

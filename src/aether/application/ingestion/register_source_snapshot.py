@@ -13,6 +13,7 @@ from aether.domain.source_data import (
     DeclaredHeading,
     DeclaredTitle,
     StructuredDataNode,
+    InternalLink,
 )
 from aether.ports.outbound.content_repository import ContentRepository
 
@@ -38,6 +39,12 @@ class SourceArticleSnapshot:
     declared_titles: Tuple[DeclaredTitle, ...] = ()
     declared_descriptions: Tuple[DeclaredDescription, ...] = ()
     declared_headings: Tuple[DeclaredHeading, ...] = ()
+    internal_links: Tuple[InternalLink, ...] = ()
+    table_word_count: int = 0
+    list_word_count: int = 0
+    blockquote_word_count: int = 0
+    answered_question_heading_count: int = 0
+    unanswered_question_heading_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -132,6 +139,12 @@ class RegisterSourceSnapshot:
                 declared_titles=snapshot.declared_titles,
                 declared_descriptions=snapshot.declared_descriptions,
                 declared_headings=snapshot.declared_headings,
+                internal_links=snapshot.internal_links,
+                table_word_count=snapshot.table_word_count,
+                list_word_count=snapshot.list_word_count,
+                blockquote_word_count=snapshot.blockquote_word_count,
+                answered_question_heading_count=snapshot.answered_question_heading_count,
+                unanswered_question_heading_count=snapshot.unanswered_question_heading_count,
             )
         )
         return RegistrationResult(

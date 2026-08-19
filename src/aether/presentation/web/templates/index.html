@@ -110,12 +110,25 @@
         
         <!-- YENİ: AI Readiness Score Bölümü -->
         <div class="section" id="score-section" style="margin-top: 0;">
-          <div class="score-headline">
-            <span id="score-total" class="score-total">0</span>
-            <span style="font-size: 1.1rem; color: #58677b;">/ 100 Overall Score</span>
+          <div style="display: flex; gap: 32px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 300px;">
+              <h3 style="color: #0768d7; margin-bottom: 12px;">SEO Score</h3>
+              <div class="score-headline">
+                <span id="seo-score-total" class="score-total">0</span>
+                <span style="font-size: 1.1rem; color: #58677b;">/ 100</span>
+              </div>
+              <div id="seo-score-grid" class="metric-grid"></div>
+            </div>
+            <div style="flex: 1; min-width: 300px;">
+              <h3 style="color: #0768d7; margin-bottom: 12px;">GEO Score</h3>
+              <div class="score-headline">
+                <span id="geo-score-total" class="score-total">0</span>
+                <span style="font-size: 1.1rem; color: #58677b;">/ 100</span>
+              </div>
+              <div id="geo-score-grid" class="metric-grid"></div>
+            </div>
           </div>
-          <p>0–100 composite score based on transparent deterministic measurements.</p>
-          <div id="score-grid" class="metric-grid"></div>
+          <p style="margin-top: 16px;">0–100 composite scores based on transparent deterministic measurements.</p>
         </div>
         <!-- BİTİŞ: AI Readiness Score Bölümü -->
 
@@ -193,22 +206,29 @@
       function renderReport(view, rawReport) {
         
         // YENİ: Skoru düz metin rapordan (rawReport) Regex ile çekiyoruz
-        const totalMatch = rawReport.match(/Total Score:\s*(\d+)/);
+        const seoTotalMatch = rawReport.match(/SEO Score[\s\S]*?Total Score:\s*(\d+)/);
+        const geoTotalMatch = rawReport.match(/GEO Score[\s\S]*?Total Score:\s*(\d+)/);
+
         const entityMatch = rawReport.match(/Entity Coverage\s*\((\d+)%\):\s*([\d\.]+)/);
         const structMatch = rawReport.match(/Structured Data\s*\((\d+)%\):\s*([\d\.]+)/);
-        const semMatch = rawReport.match(/Semantic Quality\s*\((\d+)%\):\s*([\d\.]+)/);
+        const semQualityMatch = rawReport.match(/Semantic Quality\s*\((\d+)%\):\s*([\d\.]+)/);
         const techMatch = rawReport.match(/Technical Access\s*\((\d+)%\):\s*([\d\.]+)/);
 
-        if (totalMatch && entityMatch && structMatch && semMatch && techMatch) {
-            document.querySelector('#score-total').textContent = totalMatch[1];
-            const dimensions = [
+        const semCompMatch = rawReport.match(/Semantic Completeness\s*\((\d+)%\):\s*([\d\.]+)/);
+        const entAuthMatch = rawReport.match(/Entity Authority\s*\((\d+)%\):\s*([\d\.]+)/);
+        const structRichMatch = rawReport.match(/Structural Richness\s*\((\d+)%\):\s*([\d\.]+)/);
+        const discMatch = rawReport.match(/Discoverability\s*\((\d+)%\):\s*([\d\.]+)/);
+
+        if (seoTotalMatch && entityMatch && structMatch && semQualityMatch && techMatch) {
+            document.querySelector('#seo-score-total').textContent = seoTotalMatch[1];
+            const seoDimensions = [
                 { label: 'Entity Coverage', weight: entityMatch[1], val: parseFloat(entityMatch[2]) },
                 { label: 'Structured Data', weight: structMatch[1], val: parseFloat(structMatch[2]) },
-                { label: 'Semantic Quality', weight: semMatch[1], val: parseFloat(semMatch[2]) },
+                { label: 'Semantic Quality', weight: semQualityMatch[1], val: parseFloat(semQualityMatch[2]) },
                 { label: 'Technical Access', weight: techMatch[1], val: parseFloat(techMatch[2]) }
             ];
             
-            document.querySelector('#score-grid').innerHTML = dimensions.map(d => `
+            document.querySelector('#seo-score-grid').innerHTML = seoDimensions.map(d => `
                 <div class="metric-card">
                     <p class="score-weight">%${d.weight}</p>
                     <h4 style="margin: 0 0 5px; font-size: 1rem;">${d.label}</h4>
@@ -218,6 +238,24 @@
             document.querySelector('#score-section').classList.remove('hidden');
         } else {
             document.querySelector('#score-section').classList.add('hidden');
+        }
+
+        if (geoTotalMatch && semCompMatch && entAuthMatch && structRichMatch && discMatch) {
+            document.querySelector('#geo-score-total').textContent = geoTotalMatch[1];
+            const geoDimensions = [
+                { label: 'Semantic Completeness', weight: semCompMatch[1], val: parseFloat(semCompMatch[2]) },
+                { label: 'Entity Authority', weight: entAuthMatch[1], val: parseFloat(entAuthMatch[2]) },
+                { label: 'Structural Richness', weight: structRichMatch[1], val: parseFloat(structRichMatch[2]) },
+                { label: 'Discoverability', weight: discMatch[1], val: parseFloat(discMatch[2]) }
+            ];
+            
+            document.querySelector('#geo-score-grid').innerHTML = geoDimensions.map(d => `
+                <div class="metric-card">
+                    <p class="score-weight">%${d.weight}</p>
+                    <h4 style="margin: 0 0 5px; font-size: 1rem;">${d.label}</h4>
+                    <strong style="color: #45617d;">${d.val.toFixed(1)} / 100</strong>
+                </div>
+            `).join('');
         }
 
         const assessment = view.assessment;

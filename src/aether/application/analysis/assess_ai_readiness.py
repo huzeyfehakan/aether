@@ -33,25 +33,39 @@ class ScoreDimension:
 
 
 @dataclass(frozen=True)
-class AIReadinessScore:
-    """Composite 0-100 score divided into four architectural dimensions.
-    
-    Not a black box: each component is exposed so the presentation layer 
-    can explain exactly 'why' and 'how' the score was achieved.
-    """
-    entity_coverage: ScoreDimension   # Varlık Kapsamı: %30
-    structured_data: ScoreDimension   # Yapısal Veri: %25
-    semantic_quality: ScoreDimension  # Anlamsal Kalite: %25
-    technical_access: ScoreDimension  # Teknik Erişim: %20
+class SEOScore:
+    """Composite 0-100 score for traditional SEO dimensions."""
+    entity_coverage: ScoreDimension
+    structured_data: ScoreDimension
+    semantic_quality: ScoreDimension
+    technical_access: ScoreDimension
 
     @property
     def total(self) -> int:
-        """The final composite score rounded to the nearest integer."""
         calculated_total = (
             self.entity_coverage.weighted_contribution
             + self.structured_data.weighted_contribution
             + self.semantic_quality.weighted_contribution
             + self.technical_access.weighted_contribution
+        )
+        return round(calculated_total)
+
+
+@dataclass(frozen=True)
+class GEOScore:
+    """Composite 0-100 score for Generative Engine Optimization principles."""
+    semantic_completeness: ScoreDimension   # %40
+    entity_authority: ScoreDimension        # %30
+    structural_richness: ScoreDimension     # %15
+    discoverability: ScoreDimension         # %15
+
+    @property
+    def total(self) -> int:
+        calculated_total = (
+            self.semantic_completeness.weighted_contribution
+            + self.entity_authority.weighted_contribution
+            + self.structural_richness.weighted_contribution
+            + self.discoverability.weighted_contribution
         )
         return round(calculated_total)
 
@@ -73,7 +87,8 @@ class AIReadinessAssessment:
     report: ArticleAnalysisReport
     observations: AIReadinessObservations
     metadata_completeness: CompletenessClassification
-    score: AIReadinessScore
+    seo_score: SEOScore
+    geo_score: GEOScore
 
 
 class AssessAIReadiness:
@@ -81,11 +96,14 @@ class AssessAIReadiness:
 
     def execute(self, report: ArticleAnalysisReport) -> AIReadinessAssessment:
         observations = self._observations_from(report)
+        seo_score = self._calculate_seo_score(report, observations)
+        geo_score = self._calculate_geo_score(report, observations)
         return AIReadinessAssessment(
             report=report,
             observations=observations,
             metadata_completeness=self._metadata_completeness(observations),
-            score=self._calculate_score(report, observations),
+            seo_score=seo_score,
+            geo_score=geo_score,
         )
 
     @staticmethod
@@ -114,15 +132,12 @@ class AssessAIReadiness:
             return CompletenessClassification.PARTIAL
         return CompletenessClassification.MISSING
 
-    def _calculate_score(
+    def _calculate_seo_score(
         self, 
         report: ArticleAnalysisReport, 
         observations: AIReadinessObservations
-    ) -> AIReadinessScore:
-        """Deterministically calculate the score strictly based on page measurements."""
-        
-        # 1. Varlık Kapsamı (%30) - Schema, sameAs, Knowledge Graph (Temsili olarak Metadata bütünlüğü kullanıldı)
-        # Ölçüm: Mevcut olan bildirimlerin toplam beklenen bildirimlere oranı.
+    ) -> SEOScore:
+        """Deterministically calculate SEO score strictly based on page measurements."""
         available_metadata_count = sum([
             observations.publication_date_available,
             observations.last_modified_date_available,
@@ -131,42 +146,95 @@ class AssessAIReadiness:
         ])
         entity_score = (available_metadata_count / 4.0) * 100.0
 
-        # 2. Yapısal Veri (%25) - JSON-LD geçerliliği, zorunlu alanlar
-        # Ölçüm: Eksik property'lerin beyan edilenlere oranı.
         structured_score = 0.0
         sd_analysis = report.structured_data_analysis
         if sd_analysis is not None and sd_analysis.article_node_present:
             declared_count = len(sd_analysis.declared_article_properties)
             missing_count = len(sd_analysis.missing_article_properties)
             total_expected = declared_count + missing_count
-            
             if total_expected > 0:
                 structured_score = (declared_count / total_expected) * 100.0
             else:
-                structured_score = 100.0 # Eksik yok, her şey tam.
-
-        # 3. Anlamsal Kalite (%25) - Özgünlük, Hiyerarşi
-        # Ölçüm: Tekrarlanmayan (özgün) pasajların tüm makaleye oranı (Boilerplate tespiti).
+                structured_score = 100.0
+        
         semantic_score = 100.0
         dup_analysis = report.content_duplication_analysis
         if dup_analysis is not None and dup_analysis.total_passage_count > 0:
             unique_passages = dup_analysis.total_passage_count - len(dup_analysis.repeated_passages)
             semantic_score = (max(0, unique_passages) / dup_analysis.total_passage_count) * 100.0
 
-        # 4. Teknik Erişim (%20) - Erişim ve Tutarlılık
-        # Ölçüm: Başlık hiyerarşisi ve bildirim tutarlılığı (Örn: H1 etiketinin varlığı vs.)
         technical_score = 100.0
         cons_analysis = report.declared_consistency_analysis
         if cons_analysis is not None:
-            # Örnek mantık: Tutarsızlıkları puan düşürerek oranlamak yerine
-            # var olan tutarlılık analizinden bir oran çekilmelidir.
-            # Kodunuzda cons_analysis içeriğini bilmediğim için, varsayılan
-            # bir orantı mantığı koydum. Gerçek modele göre adapte edilmelidir.
-            technical_score = 100.0 # Varsa cons_analysis.valid_ratio * 100 olarak güncelleyebilirsiniz.
+            technical_score = 100.0
 
-        return AIReadinessScore(
+        return SEOScore(
             entity_coverage=ScoreDimension(weight_percentage=30, dimension_score=entity_score),
             structured_data=ScoreDimension(weight_percentage=25, dimension_score=structured_score),
             semantic_quality=ScoreDimension(weight_percentage=25, dimension_score=semantic_score),
             technical_access=ScoreDimension(weight_percentage=20, dimension_score=technical_score),
+        )
+
+    def _calculate_geo_score(
+        self,
+        report: ArticleAnalysisReport,
+        observations: AIReadinessObservations
+    ) -> GEOScore:
+        # 1. Semantic Completeness (40%)
+        # Based on passages with statistics and fluency penalty
+        passage_quality = report.passage_quality_analysis
+        semantic_comp = 0.0
+        if passage_quality and len(passage_quality.passage_profiles) > 0:
+            profiles = passage_quality.passage_profiles
+            stats_count = sum(1 for p in profiles if p.contains_statistics)
+            base_score = (stats_count / len(profiles)) * 100.0
+            
+            # Fluency balance multiplier (up to 1.0)
+            balance = passage_quality.passage_balance_ratio
+            
+            # Keyword stuffing penalty (deduct up to 20 points based on ratio)
+            penalty = passage_quality.keyword_stuffing_ratio * 100.0 * 2.0 # Arbitrary simple scaling
+            penalty = min(penalty, 20.0)
+            
+            semantic_comp = max(0.0, (base_score * balance) - penalty)
+        
+        # 2. Entity & Authority (30%)
+        # Based on citations
+        entity_auth = 0.0
+        if passage_quality and len(passage_quality.passage_profiles) > 0:
+            profiles = passage_quality.passage_profiles
+            cit_count = sum(1 for p in profiles if p.contains_citation)
+            entity_auth = (cit_count / len(profiles)) * 100.0
+            
+        # 3. Structural Richness (15%)
+        # Direct Answer Patterns + Table/List Density
+        structural_richness = 0.0
+        struct = report.structural_analysis
+        if struct and struct.total_word_count > 0:
+            # Ratio of structured words
+            struct_words = struct.table_word_count + struct.list_word_count + struct.blockquote_word_count
+            richness_score = (struct_words / struct.total_word_count) * 100.0
+            
+            # Answered questions boost
+            total_q = struct.answered_question_heading_count + struct.unanswered_question_heading_count
+            q_score = 100.0 if total_q == 0 else (struct.answered_question_heading_count / total_q) * 100.0
+            
+            structural_richness = (richness_score * 0.5) + (q_score * 0.5)
+            
+        # 4. Discoverability (15%)
+        # Internal links
+        discoverability = 0.0
+        links = report.internal_link_analysis
+        if links:
+            if not links.potential_orphan:
+                discoverability += 50.0 # Not an orphan
+            if links.outgoing_link_count > 0:
+                # Based on uniqueness ratio
+                discoverability += (links.unique_target_count / links.outgoing_link_count) * 50.0
+
+        return GEOScore(
+            semantic_completeness=ScoreDimension(weight_percentage=40, dimension_score=semantic_comp),
+            entity_authority=ScoreDimension(weight_percentage=30, dimension_score=entity_auth),
+            structural_richness=ScoreDimension(weight_percentage=15, dimension_score=structural_richness),
+            discoverability=ScoreDimension(weight_percentage=15, dimension_score=discoverability),
         )

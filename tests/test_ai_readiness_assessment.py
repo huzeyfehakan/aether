@@ -44,11 +44,18 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             article_version_id="version-1",
             total_passage_count=structural_counts[0],
             total_word_count=structural_counts[1],
+            table_word_count=0,
+            list_word_count=0,
+            blockquote_word_count=0,
+            answered_question_heading_count=0,
+            unanswered_question_heading_count=0,
         )
         passage_quality = PassageQualityAnalysis(
             article_id="article-1",
             article_version_id="version-1",
             passage_profiles=(),
+            passage_balance_ratio=1.0,
+            keyword_stuffing_ratio=0.0,
         )
         return ArticleAnalysisReport(
             structural_analysis=structural,
@@ -71,7 +78,8 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             assessment.metadata_completeness, CompletenessClassification.COMPLETE
         )
         self.assertTrue(assessment.observations.author_available)
-        self.assertFalse(hasattr(assessment, "score"))
+        self.assertTrue(hasattr(assessment, "seo_score"))
+        self.assertTrue(hasattr(assessment, "geo_score"))
 
     def test_classifies_partial_report_from_existing_raw_observations(self):
         report = self.report(

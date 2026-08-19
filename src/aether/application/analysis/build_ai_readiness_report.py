@@ -50,8 +50,8 @@ class ScoreDimensionSummary:
 
 
 @dataclass(frozen=True)
-class ScoreSummary:
-    """A user-facing summary of the total composite score and its dimensions."""
+class SEOScoreSummary:
+    """A user-facing summary of the total SEO score and its dimensions."""
     total: int
     entity_coverage: ScoreDimensionSummary
     structured_data: ScoreDimensionSummary
@@ -60,10 +60,21 @@ class ScoreSummary:
 
 
 @dataclass(frozen=True)
+class GEOScoreSummary:
+    """A user-facing summary of the total GEO score and its dimensions."""
+    total: int
+    semantic_completeness: ScoreDimensionSummary
+    entity_authority: ScoreDimensionSummary
+    structural_richness: ScoreDimensionSummary
+    discoverability: ScoreDimensionSummary
+
+
+@dataclass(frozen=True)
 class AssessmentSummary:
-    """Includes both completeness classification and the deterministic composite score."""
+    """Includes both completeness classification and the deterministic composite scores."""
     metadata_completeness: CompletenessClassification
-    score: ScoreSummary
+    seo_score: SEOScoreSummary
+    geo_score: GEOScoreSummary
 
 
 @dataclass(frozen=True)
@@ -119,31 +130,54 @@ class BuildAIReadinessReport:
         metadata = report.metadata_analysis
         passage_quality = report.passage_quality_analysis
         
-        # 1. Ham skoru Assessment içerisinden alıyoruz
-        raw_score = assessment.score
+        raw_seo = assessment.seo_score
+        raw_geo = assessment.geo_score
         
-        # 2. Skoru sunum katmanı DTO'larına dönüştürüyoruz
-        score_summary = ScoreSummary(
-            total=raw_score.total,
+        seo_summary = SEOScoreSummary(
+            total=raw_seo.total,
             entity_coverage=ScoreDimensionSummary(
-                weight_percentage=raw_score.entity_coverage.weight_percentage,
-                dimension_score=raw_score.entity_coverage.dimension_score,
-                weighted_contribution=raw_score.entity_coverage.weighted_contribution,
+                weight_percentage=raw_seo.entity_coverage.weight_percentage,
+                dimension_score=raw_seo.entity_coverage.dimension_score,
+                weighted_contribution=raw_seo.entity_coverage.weighted_contribution,
             ),
             structured_data=ScoreDimensionSummary(
-                weight_percentage=raw_score.structured_data.weight_percentage,
-                dimension_score=raw_score.structured_data.dimension_score,
-                weighted_contribution=raw_score.structured_data.weighted_contribution,
+                weight_percentage=raw_seo.structured_data.weight_percentage,
+                dimension_score=raw_seo.structured_data.dimension_score,
+                weighted_contribution=raw_seo.structured_data.weighted_contribution,
             ),
             semantic_quality=ScoreDimensionSummary(
-                weight_percentage=raw_score.semantic_quality.weight_percentage,
-                dimension_score=raw_score.semantic_quality.dimension_score,
-                weighted_contribution=raw_score.semantic_quality.weighted_contribution,
+                weight_percentage=raw_seo.semantic_quality.weight_percentage,
+                dimension_score=raw_seo.semantic_quality.dimension_score,
+                weighted_contribution=raw_seo.semantic_quality.weighted_contribution,
             ),
             technical_access=ScoreDimensionSummary(
-                weight_percentage=raw_score.technical_access.weight_percentage,
-                dimension_score=raw_score.technical_access.dimension_score,
-                weighted_contribution=raw_score.technical_access.weighted_contribution,
+                weight_percentage=raw_seo.technical_access.weight_percentage,
+                dimension_score=raw_seo.technical_access.dimension_score,
+                weighted_contribution=raw_seo.technical_access.weighted_contribution,
+            ),
+        )
+
+        geo_summary = GEOScoreSummary(
+            total=raw_geo.total,
+            semantic_completeness=ScoreDimensionSummary(
+                weight_percentage=raw_geo.semantic_completeness.weight_percentage,
+                dimension_score=raw_geo.semantic_completeness.dimension_score,
+                weighted_contribution=raw_geo.semantic_completeness.weighted_contribution,
+            ),
+            entity_authority=ScoreDimensionSummary(
+                weight_percentage=raw_geo.entity_authority.weight_percentage,
+                dimension_score=raw_geo.entity_authority.dimension_score,
+                weighted_contribution=raw_geo.entity_authority.weighted_contribution,
+            ),
+            structural_richness=ScoreDimensionSummary(
+                weight_percentage=raw_geo.structural_richness.weight_percentage,
+                dimension_score=raw_geo.structural_richness.dimension_score,
+                weighted_contribution=raw_geo.structural_richness.weighted_contribution,
+            ),
+            discoverability=ScoreDimensionSummary(
+                weight_percentage=raw_geo.discoverability.weight_percentage,
+                dimension_score=raw_geo.discoverability.dimension_score,
+                weighted_contribution=raw_geo.discoverability.weighted_contribution,
             ),
         )
 
@@ -168,7 +202,8 @@ class BuildAIReadinessReport:
             ),
             assessment_summary=AssessmentSummary(
                 metadata_completeness=assessment.metadata_completeness,
-                score=score_summary,
+                seo_score=seo_summary,
+                geo_score=geo_summary,
             ),
             content_reuse_summary=self._content_reuse_summary(report),
             structured_data_summary=self._structured_data_summary(report),

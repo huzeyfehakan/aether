@@ -48,6 +48,11 @@ capabilities.
 under review rather than settled — the checks are thinner than the reporting
 frame around them. See [`product-discovery.md`](product-discovery.md).
 
+**Proportional Dual Scoring (SEO/GEO).** Implemented, unreleased.
+- Dual scores (`seo_score` and `geo_score`) are successfully calculated using rule-based deterministic metrics (no thresholds). 
+- Ingestion layer, analysis modules, presentation renderers, and `index.html` template have been updated to present both scores gracefully.
+- All unit and acceptance tests have been updated and are green.
+
 **Turkish interface edition.** Uncommitted, and not ready to land.
 
 - Working: negotiation is `X-Aether-Language` → `Accept-Language` → Turkish;
@@ -78,7 +83,7 @@ ordinary bug-fixing.
 
 | Level | Status |
 |---|---|
-| **tests pass** | Yes — 208 tests |
+| **tests pass** | Yes — 205 tests |
 | **served-page verified** | **No** — the app has not been exercised in a browser against the in-progress work |
 | **feature complete** | **No** — the Turkish edition has not landed |
 

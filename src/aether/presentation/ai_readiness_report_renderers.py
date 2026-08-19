@@ -29,9 +29,62 @@ def _codes_in_order(recommendations) -> list:
     return seen
 
 
+def _score_mapping(score) -> dict:
+    result = {"total": score.total}
+    if hasattr(score, 'entity_coverage'):
+        result["entity_coverage"] = {
+            "weight_percentage": score.entity_coverage.weight_percentage,
+            "dimension_score": score.entity_coverage.dimension_score,
+            "weighted_contribution": score.entity_coverage.weighted_contribution,
+        }
+    if hasattr(score, 'structured_data'):
+        result["structured_data"] = {
+            "weight_percentage": score.structured_data.weight_percentage,
+            "dimension_score": score.structured_data.dimension_score,
+            "weighted_contribution": score.structured_data.weighted_contribution,
+        }
+    if hasattr(score, 'semantic_quality'):
+        result["semantic_quality"] = {
+            "weight_percentage": score.semantic_quality.weight_percentage,
+            "dimension_score": score.semantic_quality.dimension_score,
+            "weighted_contribution": score.semantic_quality.weighted_contribution,
+        }
+    if hasattr(score, 'technical_access'):
+        result["technical_access"] = {
+            "weight_percentage": score.technical_access.weight_percentage,
+            "dimension_score": score.technical_access.dimension_score,
+            "weighted_contribution": score.technical_access.weighted_contribution,
+        }
+    if hasattr(score, 'semantic_completeness'):
+        result["semantic_completeness"] = {
+            "weight_percentage": score.semantic_completeness.weight_percentage,
+            "dimension_score": score.semantic_completeness.dimension_score,
+            "weighted_contribution": score.semantic_completeness.weighted_contribution,
+        }
+    if hasattr(score, 'entity_authority'):
+        result["entity_authority"] = {
+            "weight_percentage": score.entity_authority.weight_percentage,
+            "dimension_score": score.entity_authority.dimension_score,
+            "weighted_contribution": score.entity_authority.weighted_contribution,
+        }
+    if hasattr(score, 'structural_richness'):
+        result["structural_richness"] = {
+            "weight_percentage": score.structural_richness.weight_percentage,
+            "dimension_score": score.structural_richness.dimension_score,
+            "weighted_contribution": score.structural_richness.weighted_contribution,
+        }
+    if hasattr(score, 'discoverability'):
+        result["discoverability"] = {
+            "weight_percentage": score.discoverability.weight_percentage,
+            "dimension_score": score.discoverability.dimension_score,
+            "weighted_contribution": score.discoverability.weighted_contribution,
+        }
+    return result
+
 def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
     """Map report fields directly without deriving any new business information."""
-    score = report.assessment_summary.score
+    seo_score = report.assessment_summary.seo_score
+    geo_score = report.assessment_summary.geo_score
     return {
         "article_identity": {
             "article_id": report.article_identity.article_id,
@@ -87,32 +140,9 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
             for recommendation in report.editor_recommendations
         ],
         "assessment_summary": {
-            "metadata_completeness": (
-                report.assessment_summary.metadata_completeness.value
-            ),
-            "score": {
-                "total": score.total,
-                "entity_coverage": {
-                    "weight_percentage": score.entity_coverage.weight_percentage,
-                    "dimension_score": score.entity_coverage.dimension_score,
-                    "weighted_contribution": score.entity_coverage.weighted_contribution,
-                },
-                "structured_data": {
-                    "weight_percentage": score.structured_data.weight_percentage,
-                    "dimension_score": score.structured_data.dimension_score,
-                    "weighted_contribution": score.structured_data.weighted_contribution,
-                },
-                "semantic_quality": {
-                    "weight_percentage": score.semantic_quality.weight_percentage,
-                    "dimension_score": score.semantic_quality.dimension_score,
-                    "weighted_contribution": score.semantic_quality.weighted_contribution,
-                },
-                "technical_access": {
-                    "weight_percentage": score.technical_access.weight_percentage,
-                    "dimension_score": score.technical_access.dimension_score,
-                    "weighted_contribution": score.technical_access.weighted_contribution,
-                },
-            }
+            "metadata_completeness": report.assessment_summary.metadata_completeness.value,
+            "seo_score": _score_mapping(seo_score),
+            "geo_score": _score_mapping(geo_score),
         },
     }
 
@@ -131,7 +161,8 @@ class PlainTextAIReadinessReportRenderer:
         structural = report.structural_summary
         metadata = report.metadata_summary
         assessment = report.assessment_summary
-        score = assessment.score
+        seo = assessment.seo_score
+        geo = assessment.geo_score
         lines = (
             "AI Readiness Report",
             "",
@@ -139,12 +170,19 @@ class PlainTextAIReadinessReportRenderer:
             f"Article ID: {report.article_identity.article_id}",
             f"Article Version ID: {report.article_identity.article_version_id}",
             "",
-            "AI Readiness Score",
-            f"Total Score: {score.total} / 100",
-            f" - Entity Coverage ({score.entity_coverage.weight_percentage}%): {score.entity_coverage.dimension_score:.1f}",
-            f" - Structured Data ({score.structured_data.weight_percentage}%): {score.structured_data.dimension_score:.1f}",
-            f" - Semantic Quality ({score.semantic_quality.weight_percentage}%): {score.semantic_quality.dimension_score:.1f}",
-            f" - Technical Access ({score.technical_access.weight_percentage}%): {score.technical_access.dimension_score:.1f}",
+            "SEO Score",
+            f"Total Score: {seo.total} / 100",
+            f" - Entity Coverage ({seo.entity_coverage.weight_percentage}%): {seo.entity_coverage.dimension_score:.1f}",
+            f" - Structured Data ({seo.structured_data.weight_percentage}%): {seo.structured_data.dimension_score:.1f}",
+            f" - Semantic Quality ({seo.semantic_quality.weight_percentage}%): {seo.semantic_quality.dimension_score:.1f}",
+            f" - Technical Access ({seo.technical_access.weight_percentage}%): {seo.technical_access.dimension_score:.1f}",
+            "",
+            "GEO Score",
+            f"Total Score: {geo.total} / 100",
+            f" - Semantic Completeness ({geo.semantic_completeness.weight_percentage}%): {geo.semantic_completeness.dimension_score:.1f}",
+            f" - Entity Authority ({geo.entity_authority.weight_percentage}%): {geo.entity_authority.dimension_score:.1f}",
+            f" - Structural Richness ({geo.structural_richness.weight_percentage}%): {geo.structural_richness.dimension_score:.1f}",
+            f" - Discoverability ({geo.discoverability.weight_percentage}%): {geo.discoverability.dimension_score:.1f}",
             "",
             "Structural Summary",
             f"Total Passages: {structural.total_passage_count}",
@@ -269,7 +307,8 @@ class MarkdownAIReadinessReportRenderer:
         metadata = report.metadata_summary
         passage_quality = report.passage_quality_summary
         assessment = report.assessment_summary
-        score = assessment.score
+        seo = assessment.seo_score
+        geo = assessment.geo_score
         lines = [
             "# AI Readiness Report",
             "",
@@ -278,14 +317,23 @@ class MarkdownAIReadinessReportRenderer:
             f"- Article ID: `{report.article_identity.article_id}`",
             f"- Article Version ID: `{report.article_identity.article_version_id}`",
             "",
-            "## AI Readiness Score",
+            "## SEO Score",
             "",
-            f"**Total Score: {score.total} / 100**",
+            f"**Total Score: {seo.total} / 100**",
             "",
-            f"- **Entity Coverage ({score.entity_coverage.weight_percentage}%)**: {score.entity_coverage.dimension_score:.1f}",
-            f"- **Structured Data ({score.structured_data.weight_percentage}%)**: {score.structured_data.dimension_score:.1f}",
-            f"- **Semantic Quality ({score.semantic_quality.weight_percentage}%)**: {score.semantic_quality.dimension_score:.1f}",
-            f"- **Technical Access ({score.technical_access.weight_percentage}%)**: {score.technical_access.dimension_score:.1f}",
+            f"- **Entity Coverage ({seo.entity_coverage.weight_percentage}%)**: {seo.entity_coverage.dimension_score:.1f}",
+            f"- **Structured Data ({seo.structured_data.weight_percentage}%)**: {seo.structured_data.dimension_score:.1f}",
+            f"- **Semantic Quality ({seo.semantic_quality.weight_percentage}%)**: {seo.semantic_quality.dimension_score:.1f}",
+            f"- **Technical Access ({seo.technical_access.weight_percentage}%)**: {seo.technical_access.dimension_score:.1f}",
+            "",
+            "## GEO Score",
+            "",
+            f"**Total Score: {geo.total} / 100**",
+            "",
+            f"- **Semantic Completeness ({geo.semantic_completeness.weight_percentage}%)**: {geo.semantic_completeness.dimension_score:.1f}",
+            f"- **Entity Authority ({geo.entity_authority.weight_percentage}%)**: {geo.entity_authority.dimension_score:.1f}",
+            f"- **Structural Richness ({geo.structural_richness.weight_percentage}%)**: {geo.structural_richness.dimension_score:.1f}",
+            f"- **Discoverability ({geo.discoverability.weight_percentage}%)**: {geo.discoverability.dimension_score:.1f}",
             "",
             "## Structural Summary",
             "",

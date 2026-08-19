@@ -22,6 +22,7 @@ from aether.domain.source_data import (
     DescriptionSource,
     StructuredDataNode,
     TitleSource,
+    InternalLink,
 )
 from aether.ports.outbound.content_repository import ContentRepository
 
@@ -72,6 +73,12 @@ class NormalizedHtmlArticle:
     declared_titles: Tuple[DeclaredTitle, ...] = ()
     declared_descriptions: Tuple[DeclaredDescription, ...] = ()
     declared_headings: Tuple[DeclaredHeading, ...] = ()
+    internal_links: Tuple[InternalLink, ...] = ()
+    table_word_count: int = 0
+    list_word_count: int = 0
+    blockquote_word_count: int = 0
+    answered_question_heading_count: int = 0
+    unanswered_question_heading_count: int = 0
 
 
 class _ArticleHtmlCollector(HTMLParser):
@@ -115,6 +122,18 @@ class _ArticleHtmlCollector(HTMLParser):
         self._paragraph_is_body = True
         self._json_ld_parts: Optional[List[str]] = None
         self._application_json_parts: Optional[List[str]] = None
+
+        self._table_depth = 0
+        self._list_depth = 0
+        self._blockquote_depth = 0
+        self.table_word_count = 0
+        self.list_word_count = 0
+        self.blockquote_word_count = 0
+        self.links: List[Tuple[str, bool]] = []
+        
+        self._pending_question_heading = False
+        self.answered_question_heading_count = 0
+        self.unanswered_question_heading_count = 0
 
     def _containment_priority(self) -> int:
         return 3 if self._article_depth else 2 if self._main_depth else 1
@@ -165,6 +184,25 @@ class _ArticleHtmlCollector(HTMLParser):
             self._paragraph_priority = self._containment_priority()
             self._paragraph_is_body = self._non_body_depth == 0
 
+        if self._pending_question_heading:
+            if tag in {"p", "ul", "ol"}:
+                self.answered_question_heading_count += 1
+                self._pending_question_heading = False
+            elif tag not in {"a", "strong", "em", "span", "br", "i", "b", "u"}:
+                self.unanswered_question_heading_count += 1
+                self._pending_question_heading = False
+
+        if tag == "table":
+            self._table_depth += 1
+        elif tag in {"ul", "ol", "dl"}:
+            self._list_depth += 1
+        elif tag == "blockquote":
+            self._blockquote_depth += 1
+        elif tag == "a":
+            href = attributes.get("href")
+            if href:
+                self.links.append((href, self._non_body_depth == 0))
+
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
         if tag in self._SKIPPED_TAGS:
@@ -197,6 +235,9 @@ class _ArticleHtmlCollector(HTMLParser):
             self._heading_priority = 0
             self._heading_level = 0
             self._heading_is_body = True
+            
+            if text and text.strip().endswith("?"):
+                self._pending_question_heading = True
         elif tag == "title" and self._in_title:
             self._in_title = False
             self._title_captured = True
@@ -206,6 +247,13 @@ class _ArticleHtmlCollector(HTMLParser):
             self._article_depth = max(0, self._article_depth - 1)
         elif tag == "main":
             self._main_depth = max(0, self._main_depth - 1)
+            
+        if tag == "table":
+            self._table_depth = max(0, self._table_depth - 1)
+        elif tag in {"ul", "ol", "dl"}:
+            self._list_depth = max(0, self._list_depth - 1)
+        elif tag == "blockquote":
+            self._blockquote_depth = max(0, self._blockquote_depth - 1)
 
     def handle_data(self, data: str) -> None:
         if self._skip_depth:
@@ -220,6 +268,14 @@ class _ArticleHtmlCollector(HTMLParser):
             self._heading_parts.append(data)
         if self._paragraph_parts is not None:
             self._paragraph_parts.append(data)
+            
+        words = len(data.split())
+        if self._table_depth > 0:
+            self.table_word_count += words
+        if self._list_depth > 0:
+            self.list_word_count += words
+        if self._blockquote_depth > 0:
+            self.blockquote_word_count += words
 
 
 #: Heading tags, in outline order.
@@ -344,6 +400,15 @@ class HtmlArticleNormalizer:
         canonical_source = self._canonical_source(
             collector.canonical_source, raw_article.source_url
         )
+        
+        base_domain = urlparse(canonical_source).netloc
+        internal_links_list = []
+        for href, is_body in collector.links:
+            parsed_href = urlparse(href)
+            if not parsed_href.netloc or parsed_href.netloc == base_domain:
+                resolved_url = urljoin(canonical_source, href)
+                internal_links_list.append(InternalLink(target_url=resolved_url, is_in_body=is_body))
+                
         return NormalizedHtmlArticle(
             canonical_source=canonical_source,
             title=title,
@@ -366,6 +431,12 @@ class HtmlArticleNormalizer:
             declared_titles=self._declared_titles(collector),
             declared_descriptions=self._declared_descriptions(collector),
             declared_headings=self._declared_headings(collector),
+            internal_links=tuple(internal_links_list),
+            table_word_count=collector.table_word_count,
+            list_word_count=collector.list_word_count,
+            blockquote_word_count=collector.blockquote_word_count,
+            answered_question_heading_count=collector.answered_question_heading_count,
+            unanswered_question_heading_count=collector.unanswered_question_heading_count,
         )
 
     @staticmethod
@@ -771,5 +842,11 @@ class RegisterRawHtmlArticle:
                 declared_titles=normalized.declared_titles,
                 declared_descriptions=normalized.declared_descriptions,
                 declared_headings=normalized.declared_headings,
+                internal_links=normalized.internal_links,
+                table_word_count=normalized.table_word_count,
+                list_word_count=normalized.list_word_count,
+                blockquote_word_count=normalized.blockquote_word_count,
+                answered_question_heading_count=normalized.answered_question_heading_count,
+                unanswered_question_heading_count=normalized.unanswered_question_heading_count,
             )
         )

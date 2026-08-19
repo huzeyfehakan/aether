@@ -107,6 +107,18 @@ class StructuredDataNode:
 
 
 @dataclass(frozen=True)
+class InternalLink:
+    """An internal link declared in the article."""
+    
+    target_url: str
+    is_in_body: bool
+
+    def __post_init__(self) -> None:
+        if not self.target_url or not self.target_url.strip():
+            raise DomainValidationError("internal link target_url is required")
+
+
+@dataclass(frozen=True)
 class ArticleVersionSourceData:
     """Everything one article version declared to machines, as an inventory."""
 
@@ -115,6 +127,12 @@ class ArticleVersionSourceData:
     declared_titles: Tuple[DeclaredTitle, ...] = ()
     declared_descriptions: Tuple[DeclaredDescription, ...] = ()
     declared_headings: Tuple[DeclaredHeading, ...] = ()
+    internal_links: Tuple[InternalLink, ...] = ()
+    table_word_count: int = 0
+    list_word_count: int = 0
+    blockquote_word_count: int = 0
+    answered_question_heading_count: int = 0
+    unanswered_question_heading_count: int = 0
 
     def __post_init__(self) -> None:
         if not self.article_version_id or not self.article_version_id.strip():
@@ -123,3 +141,13 @@ class ArticleVersionSourceData:
             sources = [item.source for item in declared]
             if len(set(sources)) != len(sources):
                 raise DomainValidationError("each source may be declared once")
+        if self.table_word_count < 0:
+            raise DomainValidationError("table_word_count cannot be negative")
+        if self.list_word_count < 0:
+            raise DomainValidationError("list_word_count cannot be negative")
+        if self.blockquote_word_count < 0:
+            raise DomainValidationError("blockquote_word_count cannot be negative")
+        if self.answered_question_heading_count < 0:
+            raise DomainValidationError("answered_question_heading_count cannot be negative")
+        if self.unanswered_question_heading_count < 0:
+            raise DomainValidationError("unanswered_question_heading_count cannot be negative")

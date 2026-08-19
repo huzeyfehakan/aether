@@ -52,12 +52,13 @@ class EditorRecommendationTests(unittest.TestCase):
         self.repository = InMemoryContentRepository()
         self.register = RegisterRawHtmlArticle(self.repository)
 
-    def build(self, with_duplication=True):
+    def build(self, with_duplication=True, is_draft=False):
         return BuildArticleAnalysisReport(
             AnalyzeArticleStructure(self.repository),
             AnalyzeArticleMetadata(self.repository),
             AnalyzePassageQuality(self.repository),
             AnalyzeContentDuplication(self.repository) if with_duplication else None,
+            is_draft=is_draft,
         )
 
     def ingest(self, slug, paragraphs):
@@ -77,11 +78,15 @@ class EditorRecommendationTests(unittest.TestCase):
     def of_code(report, code):
         return [r for r in report.editor_recommendations if r.code is code]
 
-    def report_for(self, registration, with_duplication=True):
-        analysis = self.build(with_duplication).execute(
+    def report_for(self, registration, with_duplication=True, is_draft=False):
+        analysis = self.build(with_duplication, is_draft).execute(
             registration.article, registration.article_version.article_version_id
         )
         return BuildAIReadinessReport().execute(AssessAIReadiness().execute(analysis))
+
+    @staticmethod
+    def words(count):
+        return " ".join("word" for _ in range(count))
 
     def test_recommends_the_metadata_an_editor_can_supply(self):
         """Absence was measured and displayed, but never turned into advice."""
@@ -156,6 +161,42 @@ class EditorRecommendationTests(unittest.TestCase):
             RecommendationCode.MISSING_LAST_MODIFIED_DATE,
         ):
             self.assertNotIn(code, codes)
+
+    def test_recommends_an_opening_shorter_than_twenty_one_words_for_a_long_article(self):
+        article = self.ingest("short-opening", [self.words(10), self.words(190)])
+
+        report = self.report_for(article)
+
+        self.assertEqual(
+            len(self.of_code(report, RecommendationCode.WEAK_ARTICLE_OPENING)), 1
+        )
+
+    def test_does_not_recommend_a_long_article_with_an_opening_over_twenty_words(self):
+        article = self.ingest("long-opening", [self.words(35), self.words(165)])
+
+        report = self.report_for(article)
+
+        self.assertEqual(
+            self.of_code(report, RecommendationCode.WEAK_ARTICLE_OPENING), []
+        )
+
+    def test_does_not_recommend_a_short_article_with_a_short_opening(self):
+        article = self.ingest("short-article", [self.words(10), self.words(90)])
+
+        report = self.report_for(article)
+
+        self.assertEqual(
+            self.of_code(report, RecommendationCode.WEAK_ARTICLE_OPENING), []
+        )
+
+    def test_recommends_a_weak_opening_for_a_draft(self):
+        article = self.ingest("draft-short-opening", [self.words(10), self.words(190)])
+
+        report = self.report_for(article, is_draft=True)
+
+        self.assertEqual(
+            len(self.of_code(report, RecommendationCode.WEAK_ARTICLE_OPENING)), 1
+        )
 
     def test_repeated_text_is_addressed_to_the_editor(self):
         """The editor owns the article body and is the person who sees it."""

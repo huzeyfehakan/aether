@@ -11,31 +11,20 @@ piece of work belongs elsewhere.
 - **How the code is arranged, and its long-lived constraints** →
   [`architecture.md`](architecture.md)
 
-## Read the repository first
-
-This file deliberately does **not** record the active branch, commit hashes, or
-the state of anyone's working tree. That information is machine-local, goes
-stale within hours, and git already answers it precisely:
-
-```bash
-git status && git branch --show-current && git log --oneline -10
-```
-
-Where this file disagrees with the repository, the repository is right.
-
----
-
 ## Current task
 
-Product design only; no code in flight. The context-document restructure this
-section used to describe is finished and published, so it has left this file.
+The current work combines two deterministic prototypes:
 
-A design pass on a criteria-based score ran to a stopping point without touching
-code. The stakeholder input behind it, and the questions it left open, are in
-[`product-discovery.md`](product-discovery.md). **What the pass concluded is not
-recorded anywhere in this repository** — deliberately, because none of it was
-accepted as a decision record. A fresh session will find the inputs and the open
-questions, but not the reasoning between them.
+**Topic introduction recommendation.** A deterministic editor recommendation
+checks whether the article's main topic is sufficiently represented in the
+opening passage.
+
+**Proportional Dual Scoring (SEO/GEO).** Separate SEO and GEO visibility
+scores are calculated using deterministic rule-based metrics and presented in
+the article report.
+
+Both features are being evaluated on real publisher articles before further
+product work is finalized.
 
 ## Released
 
@@ -49,9 +38,20 @@ under review rather than settled — the checks are thinner than the reporting
 frame around them. See [`product-discovery.md`](product-discovery.md).
 
 **Proportional Dual Scoring (SEO/GEO).** Implemented, unreleased.
-- Dual scores (`seo_score` and `geo_score`) are successfully calculated using rule-based deterministic metrics (no thresholds). 
-- Ingestion layer, analysis modules, presentation renderers, and `index.html` template have been updated to present both scores gracefully.
-- All unit and acceptance tests have been updated and are green.
+
+- Dual scores (`seo_score` and `geo_score`) are calculated using deterministic
+  rule-based metrics.
+- Ingestion, analysis, presentation renderers, and the `index.html` template
+  support both scores.
+- The implementation is being evaluated before release.
+
+**Topic introduction recommendation.** Implemented as a deterministic
+editorial prototype.
+
+- It evaluates title-term coverage in the opening passage.
+- It produces an editor recommendation when coverage falls below the
+  configured threshold.
+- Its usefulness and threshold need evaluation on real publisher articles.
 
 **Turkish interface edition.** Uncommitted, and not ready to land.
 
@@ -69,46 +69,25 @@ frame around them. See [`product-discovery.md`](product-discovery.md).
 
 ## Blockers
 
-| Blocker | Blocks | Needs |
-|---|---|---|
-| No answer on what "duplicate" means | Any duplicate-detection work | Q1 and Q6 in [`product-discovery.md`](product-discovery.md) |
-| No real TRT Dinle page captured | Any non-article content model | A sample export or public URLs (Q11–Q12) |
-| Corpus is in-memory and process-scoped | Every cross-item finding | Persistence behind `ContentRepository` — see [`architecture.md`](architecture.md) |
-| Browser verification is manual | Regressions in the page script | See **Verification** |
-
-Product direction is blocked on discovery, not on code. Nothing above blocks
-ordinary bug-fixing.
+No implementation blocker. The prototypes need evaluation on real publisher
+articles before retaining or changing their thresholds.
 
 ## Verification
 
-| Level | Status |
-|---|---|
-| **tests pass** | Yes — 205 tests |
-| **served-page verified** | **No** — the app has not been exercised in a browser against the in-progress work |
-| **feature complete** | **No** — the Turkish edition has not landed |
+| Level                    | Status                                                                      |
+| ------------------------ | --------------------------------------------------------------------------- |
+| **tests pass**           | Yes — 203 passed, 6 skipped                                                 |
+| **served-page verified** | Yes — the score and recommendation behaviours have been verified separately |
+| **feature complete**     | No — the merged behaviour still needs integrated browser verification       |
 
-Why a green suite is weaker than it looks — the structural reasons — is recorded
-in [`architecture.md`](architecture.md). The vocabulary is in
+Why a green suite is weaker than it looks — the structural reasons — is
+recorded in [`architecture.md`](architecture.md). The vocabulary is in
 [`../AGENTS.md`](../AGENTS.md) §3.
 
 ## Next actions
 
-In order.
-
-1. **Re-add `<p id="outcome-happened"></p>` to the outcome card** in
-   `index.html` before the Turkish edition lands. The i18n pass removed it while
-   the page script still assigns to it, so the outcome explanation cannot
-   render. Verify by starting the app and analysing a non-article URL, not by
-   reading the template.
-2. **Teach the page-script harness to fail on this class of bug**: return `null`
-   for selectors the template does not declare, and make `querySelectorAll`
-   match. Own branch, own commit. This converts a whole regression class from
-   invisible into a test failure.
-3. **Reconcile the language defaults.** `language.py` documents Turkish as the
-   default and fallback, but 21 Python signatures default to `Language.ENGLISH`.
-   No current caller reaches them, because the HTTP boundary always passes a
-   resolved value; the first one that does will get the wrong language silently.
-4. **Then** the inline-ternary cleanup in `_report_view` and the plain-text
-   renderer, which is what decision 0007 requires before this lands.
-
-Do not merge and do not tag any of this without being asked.
+1. Verify the merged SEO/GEO score and editor recommendation behaviour together
+   on real publisher articles.
+2. Evaluate the topic-introduction threshold on those articles.
+3. Retain, change, or remove the prototypes based on that evaluation; do not
+   add further deterministic editorial recommendations before that review.

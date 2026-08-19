@@ -35,6 +35,10 @@ from aether.application.analysis.analyze_internal_links import (
     AnalyzeInternalLinks,
     InternalLinkAnalysisResult,
 )
+from aether.application.analysis.analyze_topic_introduction import (
+    AnalyzeTopicIntroduction,
+    TopicIntroductionAnalysis,
+)
 from aether.domain.common import DomainValidationError
 from aether.domain.content import Article
 
@@ -61,6 +65,7 @@ class ArticleAnalysisReport:
     #: describe the published page, which does not exist yet, so findings about
     #: them would be about the CMS template rather than the draft.
     is_draft: bool = False
+    topic_introduction_analysis: Optional[TopicIntroductionAnalysis] = None
 
     def __post_init__(self) -> None:
         analyses = [
@@ -78,8 +83,11 @@ class ArticleAnalysisReport:
             analyses.append(self.heading_structure_analysis)
         if self.internal_link_analysis is not None:
             analyses.append(self.internal_link_analysis)
+        if self.topic_introduction_analysis is not None:
+            analyses.append(self.topic_introduction_analysis)
         article_ids = {analysis.article_id for analysis in analyses}
         version_ids = {analysis.article_version_id for analysis in analyses}
+
         if len(article_ids) != 1 or len(version_ids) != 1:
             raise DomainValidationError(
                 "all report analyses must refer to the same article version"
@@ -100,6 +108,7 @@ class BuildArticleAnalysisReport:
         heading_structure_analysis: Optional[AnalyzeHeadingStructure] = None,
         internal_link_analysis: Optional[AnalyzeInternalLinks] = None,
         is_draft: bool = False,
+        topic_introduction_analysis: Optional[AnalyzeTopicIntroduction] = None,
     ) -> None:
         self._structure_analysis = structure_analysis
         self._metadata_analysis = metadata_analysis
@@ -110,31 +119,44 @@ class BuildArticleAnalysisReport:
         self._heading_structure_analysis = heading_structure_analysis
         self._internal_link_analysis = internal_link_analysis
         self._is_draft = is_draft
+        self._topic_introduction_analysis = topic_introduction_analysis
 
     def execute(self, article: Article, article_version_id: str) -> ArticleAnalysisReport:
         return ArticleAnalysisReport(
-            structural_analysis=self._structure_analysis.execute(article, article_version_id),
-            metadata_analysis=self._metadata_analysis.execute(article, article_version_id),
+            structural_analysis=self._structure_analysis.execute(
+                article, article_version_id
+            ),
+            metadata_analysis=self._metadata_analysis.execute(
+                article, article_version_id
+            ),
             passage_quality_analysis=self._passage_quality_analysis.execute(
                 article, article_version_id
             ),
             content_duplication_analysis=(
-                self._content_duplication_analysis.execute(article, article_version_id)
+                self._content_duplication_analysis.execute(
+                    article, article_version_id
+                )
                 if self._content_duplication_analysis is not None
                 else None
             ),
             structured_data_analysis=(
-                self._structured_data_analysis.execute(article, article_version_id)
+                self._structured_data_analysis.execute(
+                    article, article_version_id
+                )
                 if self._structured_data_analysis is not None
                 else None
             ),
             declared_consistency_analysis=(
-                self._declared_consistency_analysis.execute(article, article_version_id)
+                self._declared_consistency_analysis.execute(
+                    article, article_version_id
+                )
                 if self._declared_consistency_analysis is not None
                 else None
             ),
             heading_structure_analysis=(
-                self._heading_structure_analysis.execute(article, article_version_id)
+                self._heading_structure_analysis.execute(
+                    article, article_version_id
+                )
                 if self._heading_structure_analysis is not None
                 else None
             ),
@@ -144,4 +166,11 @@ class BuildArticleAnalysisReport:
                 else None
             ),
             is_draft=self._is_draft,
+            topic_introduction_analysis=(
+                self._topic_introduction_analysis.execute(
+                    article, article_version_id
+                )
+                if self._topic_introduction_analysis is not None
+                else None
+            ),
         )

@@ -63,6 +63,19 @@ at all. The gate in front of it, and the reasoning, are
 Its `content_fingerprint` is a SHA-256 over the paragraph text alone. **That
 exact hash is what duplicate detection matches on** — nothing else is compared.
 
+**Section — derived, never stored.** There is no Section record and no section
+is persisted. A section is computed on demand in `analyze_passage_readiness.py`
+from `DeclaredHeading.body_position`, which records how many body paragraphs
+preceded a heading in the source markup. A heading owns the passages between its
+own position and the next heading's; paragraphs before the first heading form a
+section with no heading.
+
+Two consequences are permanent rather than provisional. Sections exist only for
+an article ingested from HTML, because only the parser observes the ordering — a
+snapshot assembled without positions reports every heading at zero. And section
+membership is a fact about markup, not about meaning: an article whose headings
+sit in the wrong places produces sections that faithfully report those places.
+
 **Publisher — a grouping key, not an entity.** There is no Publisher record. It
 is a free-text `str` field on Article. When a caller supplies none, presentation
 derives it from the source URL's hostname with a leading `www.` removed. It has
@@ -120,6 +133,8 @@ decides what to advise.
 analyze_article_metadata.py      Which metadata fields the page carries
 analyze_article_structure.py     Size of the stored article
 analyze_passage_quality.py       Per-paragraph detail
+analyze_passage_readiness.py     How the article divides, and what each part states alone
+passage_sentence_rules.py        Sentence rules: definitions, and ties to nearby text
 analyze_content_duplication.py   Text shared with the publisher's other articles
 analyze_declared_consistency.py  Whether declared titles and summaries agree
 analyze_heading_structure.py     The outline the article declares

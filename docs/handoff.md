@@ -44,6 +44,28 @@ capabilities.
 
 ## In progress
 
+**Passage / RAG readiness analysis.** Implemented, unreleased, and deliberately
+inert: `AnalyzePassageReadiness` reports section and per-passage signals, and
+nothing consumes them. It is not wired into the pipeline in `web/app.py`, emits
+no recommendation code, and reaches no user-visible surface.
+
+- What it reports: sections derived from heading positions, and per passage a
+  word count, a definition-shaped opening if it has one, and per sentence
+  whether a marker was found tying it to neighbouring text.
+- Ingestion now records `DeclaredHeading.body_position`. It defaults to zero, so
+  every caller that predates it stays valid.
+- **No score, no combined signal, no good/bad classification**, per the task and
+  per decisions 0001 and 0003.
+- **Whether any of this becomes a finding is undecided.** Nothing has been
+  through the test in [decision 0004](decisions/0004-every-finding-names-who-can-act.md).
+- Measured against the four TRT fixtures: one definition opening found (Ebeveyn
+  Akademisi), two context-dependent sentences, no empty sections. The Ebeveyn
+  Akademisi legal-notice box appears as its own `h5` section — the same template
+  furniture that withdrew `skipped_heading_levels`
+  ([decision 0005](decisions/0005-fail-toward-silence.md)). It is reported as a
+  section here, which is correct, but it is the reason no rule about heading
+  quality was written.
+
 **Check a draft before publishing.** Implemented, unreleased. Its usefulness is
 under review rather than settled — the checks are thinner than the reporting
 frame around them. See [`product-discovery.md`](product-discovery.md).
@@ -78,7 +100,7 @@ ordinary bug-fixing.
 
 | Level | Status |
 |---|---|
-| **tests pass** | Yes — 208 tests |
+| **tests pass** | Yes — 244 tests |
 | **served-page verified** | **No** — the app has not been exercised in a browser against the in-progress work |
 | **feature complete** | **No** — the Turkish edition has not landed |
 

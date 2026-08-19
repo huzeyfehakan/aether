@@ -50,16 +50,38 @@ class DeclaredTitle:
 
 @dataclass(frozen=True)
 class DeclaredHeading:
-    """One heading from the article body, with its outline level."""
+    """One heading from the article body, with its outline level and place.
+
+    ``body_position`` is the number of body paragraphs that preceded this
+    heading in the source document. It is an observed fact about the markup --
+    the parser counts paragraphs it has already emitted -- and not a judgement
+    about the writing, so it stays inside the declared inventory alongside the
+    level and the text.
+
+    It exists because the outline and the body were previously retained as two
+    unrelated lists. A reader could see that an article declared four headings
+    and eleven paragraphs, but not which paragraphs sat under which heading.
+    Any question of the form "does this heading actually divide the article"
+    needs that ordering, and the markup is the only place it is stated.
+
+    It defaults to zero so that a snapshot assembled without positional
+    information -- every caller that predates this field -- remains valid and
+    describes an article whose headings all precede its body.
+    """
 
     level: int
     text: str
+    body_position: int = 0
 
     def __post_init__(self) -> None:
         if not 1 <= self.level <= 6:
             raise DomainValidationError("heading level must be between 1 and 6")
         if not self.text or not self.text.strip():
             raise DomainValidationError("declared heading text is required")
+        if self.body_position < 0:
+            raise DomainValidationError(
+                "declared heading body_position cannot be negative"
+            )
 
 
 class DescriptionSource(str, Enum):

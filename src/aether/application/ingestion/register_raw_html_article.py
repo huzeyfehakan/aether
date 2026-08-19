@@ -96,8 +96,13 @@ class _ArticleHtmlCollector(HTMLParser):
         self.json_ld_documents: List[str] = []
         self.application_json_documents: List[str] = []
         self.title_parts: List[str] = []
-        # (containment priority, heading level, text)
-        self.headings: List[Tuple[int, int, str]] = []
+        # (containment priority, heading level, text, paragraphs seen so far).
+        # The last member is an index into ``paragraphs`` taken when the
+        # heading closes, which is what preserves the document order between
+        # the outline and the body. Both lists still hold every containment
+        # priority at this point, so the index is resolved to a body position
+        # only once the winning priority is known.
+        self.headings: List[Tuple[int, int, str, int]] = []
         self.paragraphs: List[Tuple[int, str]] = []
         self._article_depth = 0
         self._main_depth = 0
@@ -191,7 +196,12 @@ class _ArticleHtmlCollector(HTMLParser):
             text = _normalize_text(" ".join(self._heading_parts))
             if text and self._heading_is_body:
                 self.headings.append(
-                    (self._heading_priority, self._heading_level, text)
+                    (
+                        self._heading_priority,
+                        self._heading_level,
+                        text,
+                        len(self.paragraphs),
+                    )
                 )
             self._heading_parts = None
             self._heading_priority = 0
@@ -376,13 +386,35 @@ class HtmlArticleNormalizer:
 
         The same containment ranking that selects body paragraphs selects
         headings, so a site banner heading is not mistaken for the article's.
+
+        Each heading also carries how many *retained* body paragraphs preceded
+        it. The collector recorded an index into every paragraph it saw; only
+        paragraphs at the winning containment priority become the body, so the
+        index is counted against that priority here. Both rankings are computed
+        independently, exactly as they were before, and a page whose body comes
+        from a hydration payload rather than from paragraph markup retains no
+        positions at all -- every heading reports zero, which is what an
+        article with no paragraph markup ahead of its headings looks like.
         """
         if not collector.headings:
             return ()
-        top = max(priority for priority, _, _ in collector.headings)
+        top = max(priority for priority, _, _, _ in collector.headings)
+        body_priority = (
+            max(priority for priority, _ in collector.paragraphs)
+            if collector.paragraphs
+            else None
+        )
         return tuple(
-            DeclaredHeading(level=level, text=text)
-            for priority, level, text in collector.headings
+            DeclaredHeading(
+                level=level,
+                text=text,
+                body_position=sum(
+                    1
+                    for paragraph_priority, _ in collector.paragraphs[:paragraph_index]
+                    if paragraph_priority == body_priority
+                ),
+            )
+            for priority, level, text, paragraph_index in collector.headings
             if priority == top
         )
 
@@ -563,7 +595,7 @@ class HtmlArticleNormalizer:
         return urljoin(source_url, canonical_href)
 
     @staticmethod
-    def _innermost_heading(headings: List[Tuple[int, int, str]]) -> str:
+    def _innermost_heading(headings: List[Tuple[int, int, str, int]]) -> str:
         """Return the first heading from the most article-specific container.
 
         Headings are ranked exactly like paragraphs: article-contained first,
@@ -575,9 +607,9 @@ class HtmlArticleNormalizer:
         top_level = [item for item in headings if item[1] == 1]
         if not top_level:
             return ""
-        highest_priority = max(priority for priority, _, _ in top_level)
+        highest_priority = max(priority for priority, _, _, _ in top_level)
         return next(
-            text for priority, _, text in top_level if priority == highest_priority
+            text for priority, _, text, _ in top_level if priority == highest_priority
         )
 
     @staticmethod

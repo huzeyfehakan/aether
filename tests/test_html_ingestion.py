@@ -709,6 +709,65 @@ class RawHtmlIngestionTests(unittest.TestCase):
         self.assertIsNone(result.article.initial_published_at)
         self.assertIsNone(result.article_version.source_published_at)
 
+    def test_each_declared_heading_records_the_body_paragraphs_before_it(self):
+        html = """
+            <html lang="tr"><head><title>Title</title></head>
+            <body><article>
+              <h1>Ana başlık</h1>
+              <p>Birinci paragraf.</p>
+              <p>İkinci paragraf.</p>
+              <h2>Alt başlık</h2>
+              <p>Üçüncü paragraf.</p>
+            </article></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+        headings = self.repository.get_source_data(
+            result.article_version.article_version_id
+        ).declared_headings
+
+        self.assertEqual(
+            [(heading.level, heading.text, heading.body_position) for heading in headings],
+            [(1, "Ana başlık", 0), (2, "Alt başlık", 2)],
+        )
+
+    def test_heading_positions_count_only_paragraphs_kept_as_body(self):
+        """A nav paragraph never becomes body, so it never shifts a position."""
+        html = """
+            <html lang="tr"><head><title>Title</title></head>
+            <body>
+              <nav><p>Menü bağlantısı.</p></nav>
+              <article>
+                <p>Gövde paragrafı.</p>
+                <h2>Bölüm</h2>
+                <p>Bölüm paragrafı.</p>
+              </article>
+            </body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+        headings = self.repository.get_source_data(
+            result.article_version.article_version_id
+        ).declared_headings
+
+        self.assertEqual([heading.body_position for heading in headings], [1])
+
+    def test_a_heading_after_all_body_paragraphs_records_the_full_count(self):
+        html = """
+            <html lang="tr"><head><title>Title</title></head>
+            <body><article>
+              <p>Tek paragraf.</p>
+              <h2>Sonda gelen başlık</h2>
+            </article></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+        headings = self.repository.get_source_data(
+            result.article_version.article_version_id
+        ).declared_headings
+
+        self.assertEqual([heading.body_position for heading in headings], [1])
+
 
 if __name__ == "__main__":
     unittest.main()

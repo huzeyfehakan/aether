@@ -49,6 +49,7 @@ class RecommendationCode(str, Enum):
     NO_TOP_LEVEL_HEADING = "no_top_level_heading"
     MULTIPLE_TOP_LEVEL_HEADINGS = "multiple_top_level_headings"
     WEAK_ARTICLE_OPENING = "weak_article_opening"
+    WEAK_TOPIC_INTRODUCTION = "weak_topic_introduction"
 
 
 #: Structured data is declared by the page template, so correcting it is a CMS
@@ -71,6 +72,7 @@ _CATEGORIES = {
     RecommendationCode.NO_TOP_LEVEL_HEADING: RecommendationCategory.EDITOR,
     RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS: RecommendationCategory.EDITOR,
     RecommendationCode.WEAK_ARTICLE_OPENING: RecommendationCategory.EDITOR,
+    RecommendationCode.WEAK_TOPIC_INTRODUCTION: RecommendationCategory.EDITOR,
     # The CMS stamps this on save; an editor has no field for it.
     RecommendationCode.MISSING_LAST_MODIFIED_DATE: RecommendationCategory.TECHNICAL,
     RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: RecommendationCategory.TECHNICAL,
@@ -143,6 +145,7 @@ class DeriveEditorRecommendations:
             + self._declared_consistency(report)
             + self._repeated_text(report)
             + self._structured_data(report)
+            + self._topic_introduction(report)
         )
 
     @staticmethod
@@ -229,6 +232,26 @@ class DeriveEditorRecommendations:
         if total_word_count < 150 or profiles[0].word_count > 20:
             return ()
         return (EditorRecommendation(code=RecommendationCode.WEAK_ARTICLE_OPENING),)
+    @staticmethod
+    def _topic_introduction(
+        report: ArticleAnalysisReport,
+    ) -> Tuple[EditorRecommendation, ...]:
+        analysis = report.topic_introduction_analysis
+
+        if analysis is None:
+            return ()
+
+        if len(analysis.meaningful_title_terms) < 3:
+            return ()
+
+        if analysis.coverage >= 0.40:
+            return ()
+
+        return (
+            EditorRecommendation(
+                code=RecommendationCode.WEAK_TOPIC_INTRODUCTION,
+            ),
+        )
 
     @staticmethod
     def _declared_consistency(

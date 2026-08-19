@@ -30,6 +30,9 @@ from aether.application.ingestion.assess_page_content import (
     AssessPageContent,
     PageAssessment,
 )
+from aether.application.analysis.analyze_topic_introduction import (
+    AnalyzeTopicIntroduction,
+)
 from aether.application.ingestion.register_raw_html_article import (
     RawHtmlArticle,
     RegisterRawHtmlArticle,
@@ -74,17 +77,15 @@ class AIReadinessPipeline:
         self.repository = repository
         self._register_article = RegisterRawHtmlArticle(repository)
         self._build_analysis_report = BuildArticleAnalysisReport(
-            AnalyzeArticleStructure(repository),
-            AnalyzeArticleMetadata(repository),
-            AnalyzePassageQuality(repository),
-            # Corpus-aware: each analysed article joins this publisher's
-            # corpus, so repeated text is reported once a second article
-            # from the same publisher has been analysed.
-            AnalyzeContentDuplication(repository),
-            AnalyzeStructuredData(repository),
-            AnalyzeDeclaredConsistency(repository),
-            AnalyzeHeadingStructure(repository),
-        )
+    AnalyzeArticleStructure(repository),
+    AnalyzeArticleMetadata(repository),
+    AnalyzePassageQuality(repository),
+    AnalyzeContentDuplication(repository),
+    AnalyzeStructuredData(repository),
+    AnalyzeDeclaredConsistency(repository),
+    AnalyzeHeadingStructure(repository),
+    topic_introduction_analysis=AnalyzeTopicIntroduction(repository),
+)
         # A draft composes only the analyses its own text can answer.
         self._build_draft_report = BuildArticleAnalysisReport(
             AnalyzeArticleStructure(repository),

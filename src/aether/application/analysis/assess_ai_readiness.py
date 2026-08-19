@@ -213,7 +213,7 @@ class AssessAIReadiness:
         if struct and struct.total_word_count > 0:
             # Ratio of structured words
             struct_words = struct.table_word_count + struct.list_word_count + struct.blockquote_word_count
-            richness_score = (struct_words / struct.total_word_count) * 100.0
+            richness_score = min((struct_words / struct.total_word_count) * 100.0, 100.0)
             
             # Answered questions boost
             total_q = struct.answered_question_heading_count + struct.unanswered_question_heading_count

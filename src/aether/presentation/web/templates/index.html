@@ -111,15 +111,7 @@
         
         <!-- YENİ: AI Readiness Score Bölümü -->
         <div class="section" id="score-section" style="margin-top: 0;">
-          <div style="margin-bottom: 24px;">
-            <h3 style="color: #086ad8; margin-bottom: 12px; font-size: 1.2rem;">Overall AI Readiness Score</h3>
-            <div class="score-headline" style="justify-content: flex-start;">
-              <span id="overall-score-total" class="score-total" style="font-size: 3rem;">0</span>
-              <span style="font-size: 1.2rem; color: #58677b;">/ 100</span>
-            </div>
-          </div>
-          
-          <div style="display: flex; gap: 32px; flex-wrap: wrap; padding-top: 20px; border-top: 1px solid #e8edf3;">
+          <div style="display: flex; gap: 32px; flex-wrap: wrap;">
             <div style="flex: 1; min-width: 300px;">
               <h3 style="color: #0768d7; margin-bottom: 12px;">SEO Score</h3>
               <div class="score-headline">
@@ -215,12 +207,8 @@
       function renderReport(view, rawReport) {
         
         const assessment = view.assessment;
-        
-        let seoScoreVal = 0;
-        let geoScoreVal = 0;
 
         if (assessment.seo_score) {
-            seoScoreVal = assessment.seo_score.total;
             document.querySelector('#seo-score-total').textContent = assessment.seo_score.total;
             const seoDimensions = [
                 assessment.seo_score.entity_coverage,
@@ -242,7 +230,6 @@
         }
 
         if (assessment.geo_score) {
-            geoScoreVal = assessment.geo_score.total;
             document.querySelector('#geo-score-total').textContent = assessment.geo_score.total;
             const geoDimensions = [
                 assessment.geo_score.semantic_completeness,
@@ -258,18 +245,6 @@
                     <strong style="color: #45617d;">${d.val !== null ? d.val.toFixed(1) + ' / 100' : 'N/A'}</strong>
                 </div>
             `).join('');
-        }
-        
-        // Compute and show overall score (average of SEO and GEO)
-        if (assessment.seo_score && assessment.geo_score) {
-            const overall = Math.round((seoScoreVal + geoScoreVal) / 2);
-            document.querySelector('#overall-score-total').textContent = overall;
-        } else if (assessment.seo_score) {
-            document.querySelector('#overall-score-total').textContent = seoScoreVal;
-        } else if (assessment.geo_score) {
-            document.querySelector('#overall-score-total').textContent = geoScoreVal;
-        } else {
-            document.querySelector('#overall-score-total').textContent = 0;
         }
 
         const cards = [

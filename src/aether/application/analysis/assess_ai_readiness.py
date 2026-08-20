@@ -265,8 +265,9 @@ class AssessAIReadiness:
             )
 
         # 2. Entity & Authority (30%)
-        # Citation coverage across article passages.
+        # Citation coverage across article passages combined with claim evidence.
         entity_auth = 0.0
+        claim_evidence = report.claim_evidence_analysis
 
         if passage_quality and passage_quality.passage_profiles:
             profiles = passage_quality.passage_profiles
@@ -277,9 +278,21 @@ class AssessAIReadiness:
                 if profile.contains_citation
             )
 
-            entity_auth = (
-                citation_count / len(profiles)
-            ) * 100.0
+            citation_score = citation_count / len(profiles)
+
+            if (
+                claim_evidence is not None
+                and claim_evidence.detectable_claim_count > 0
+            ):
+                claim_evidence_score = (
+                    claim_evidence.claim_evidence_coverage
+                )
+                entity_auth = (
+                    citation_score * 0.5
+                    + claim_evidence_score * 0.5
+                ) * 100.0
+            else:
+                entity_auth = citation_score * 100.0
 
         # 3. Structural Richness (15%)
         # Based on retained structural content and answered questions.

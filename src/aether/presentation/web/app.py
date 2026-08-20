@@ -34,6 +34,7 @@ from aether.application.analysis.analyze_topic_introduction import (
     AnalyzeTopicIntroduction,
 )
 from aether.application.analysis.analyze_fluency import AnalyzeFluency
+from aether.application.analysis.analyze_claim_evidence import AnalyzeClaimEvidence
 from aether.application.ingestion.register_raw_html_article import (
     RawHtmlArticle,
     RegisterRawHtmlArticle,
@@ -77,27 +78,34 @@ class AIReadinessPipeline:
         repository = InMemoryContentRepository()
         self.repository = repository
         self._register_article = RegisterRawHtmlArticle(repository)
+        passage_quality_analysis = AnalyzePassageQuality(repository)
+
         self._build_analysis_report = BuildArticleAnalysisReport(
-    AnalyzeArticleStructure(repository),
-    AnalyzeArticleMetadata(repository),
-    AnalyzePassageQuality(repository),
-    AnalyzeContentDuplication(repository),
-    AnalyzeStructuredData(repository),
-    AnalyzeDeclaredConsistency(repository),
-    AnalyzeHeadingStructure(repository),
-    topic_introduction_analysis=AnalyzeTopicIntroduction(repository),
-    fluency_analysis=AnalyzeFluency(repository),
-)
+            AnalyzeArticleStructure(repository),
+            AnalyzeArticleMetadata(repository),
+            passage_quality_analysis,
+            AnalyzeContentDuplication(repository),
+            AnalyzeStructuredData(repository),
+            AnalyzeDeclaredConsistency(repository),
+            AnalyzeHeadingStructure(repository),
+            topic_introduction_analysis=AnalyzeTopicIntroduction(repository),
+            fluency_analysis=AnalyzeFluency(repository),
+            claim_evidence_analysis=AnalyzeClaimEvidence(
+                repository,
+                passage_quality_analysis,
+            ),
+        )
         # A draft composes only the analyses its own text can answer.
+        draft_passage_quality_analysis = AnalyzePassageQuality(repository)
         self._build_draft_report = BuildArticleAnalysisReport(
-    AnalyzeArticleStructure(repository),
-    AnalyzeArticleMetadata(repository),
-    AnalyzePassageQuality(repository),
-    AnalyzeContentDuplication(repository),
-    heading_structure_analysis=AnalyzeHeadingStructure(repository),
-    is_draft=True,
-    fluency_analysis=AnalyzeFluency(repository),
-)
+            AnalyzeArticleStructure(repository),
+            AnalyzeArticleMetadata(repository),
+            draft_passage_quality_analysis,
+            AnalyzeContentDuplication(repository),
+            heading_structure_analysis=AnalyzeHeadingStructure(repository),
+            is_draft=True,
+            fluency_analysis=AnalyzeFluency(repository),
+        )
         self._build_draft_review = BuildDraftReview()
         self._assess_page = AssessPageContent()
         self._assess_readiness = AssessAIReadiness()

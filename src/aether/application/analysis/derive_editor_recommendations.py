@@ -54,8 +54,6 @@ class RecommendationCode(str, Enum):
     BODY_MOSTLY_REPEATED_TEXT = "body_mostly_repeated_text"
     NO_TOP_LEVEL_HEADING = "no_top_level_heading"
     MULTIPLE_TOP_LEVEL_HEADINGS = "multiple_top_level_headings"
-<<<<<<< Updated upstream
-=======
     WEAK_ARTICLE_OPENING = "weak_article_opening"
     WEAK_TOPIC_INTRODUCTION = "weak_topic_introduction"
     # New GEO metric codes
@@ -70,7 +68,6 @@ class RecommendationCode(str, Enum):
     UNSUPPORTED_ENTITIES = "unsupported_entities"
     LOW_TRUST_INDEX = "low_trust_index"
     MISSING_SAME_AS_SCHEMA = "missing_same_as_schema"
->>>>>>> Stashed changes
 
 
 #: Structured data is declared by the page template, so correcting it is a CMS
@@ -92,8 +89,6 @@ _CATEGORIES = {
     # Editors write the headings inside an article.
     RecommendationCode.NO_TOP_LEVEL_HEADING: RecommendationCategory.EDITOR,
     RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS: RecommendationCategory.EDITOR,
-<<<<<<< Updated upstream
-=======
     RecommendationCode.WEAK_ARTICLE_OPENING: RecommendationCategory.EDITOR,
     RecommendationCode.WEAK_TOPIC_INTRODUCTION: RecommendationCategory.EDITOR,
     # New GEO codes
@@ -106,7 +101,6 @@ _CATEGORIES = {
     RecommendationCode.SKIPPED_HEADING_LEVEL: RecommendationCategory.EDITOR,
     RecommendationCode.UNSUPPORTED_ENTITIES: RecommendationCategory.EDITOR,
     RecommendationCode.LOW_TRUST_INDEX: RecommendationCategory.EDITOR,
->>>>>>> Stashed changes
     # The CMS stamps this on save; an editor has no field for it.
     RecommendationCode.MISSING_LAST_MODIFIED_DATE: RecommendationCategory.TECHNICAL,
     RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: RecommendationCategory.TECHNICAL,
@@ -205,30 +199,20 @@ class DeriveEditorRecommendations:
             # A draft has no published page, so only the checks its own text
             # can answer are run. Nothing is inferred about what the CMS will
             # publish around it.
-<<<<<<< Updated upstream
-            return self._heading_structure(report) + self._repeated_text(report)
-        return (
-=======
             draft_recommendations = list(
                 self._heading_structure(report)
-                + self._weak_article_opening(report)
                 + self._repeated_text(report)
                 + self._geo_evidence_and_discoverability(report)
             )
             draft_recommendations.sort(key=lambda r: r.priority)
             return tuple(draft_recommendations)
         recommendations = list(
->>>>>>> Stashed changes
             self._missing_metadata(report)
             + self._heading_structure(report)
             + self._declared_consistency(report)
             + self._repeated_text(report)
             + self._structured_data(report)
-<<<<<<< Updated upstream
-=======
-            + self._topic_introduction(report)
             + self._geo_evidence_and_discoverability(report)
->>>>>>> Stashed changes
         )
         # Sort by priority
         recommendations.sort(key=lambda r: r.priority)
@@ -420,3 +404,4 @@ class DeriveEditorRecommendations:
             )
             for repeated in duplication.repeated_passages
         )
+

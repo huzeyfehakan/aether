@@ -206,27 +206,15 @@
 
       function renderReport(view, rawReport) {
         
-        // YENİ: Skoru düz metin rapordan (rawReport) Regex ile çekiyoruz
-        const seoTotalMatch = rawReport.match(/SEO Score[\s\S]*?Total Score:\s*(\d+)/);
-        const geoTotalMatch = rawReport.match(/GEO Score[\s\S]*?Total Score:\s*(\d+)/);
+        const assessment = view.assessment;
 
-        const entityMatch = rawReport.match(/Entity Coverage\s*\((\d+)%\):\s*([\d\.]+)/);
-        const structMatch = rawReport.match(/Structured Data\s*\((\d+)%\):\s*([\d\.]+)/);
-        const semQualityMatch = rawReport.match(/Semantic Quality\s*\((\d+)%\):\s*([\d\.]+)/);
-        const techMatch = rawReport.match(/Technical Access\s*\((\d+)%\):\s*([\d\.]+)/);
-
-        const semCompMatch = rawReport.match(/Semantic Completeness\s*\((\d+)%\):\s*([\d\.]+)/);
-        const entAuthMatch = rawReport.match(/Entity Authority\s*\((\d+)%\):\s*([\d\.]+)/);
-        const structRichMatch = rawReport.match(/Structural Richness\s*\((\d+)%\):\s*([\d\.]+)/);
-        const discMatch = rawReport.match(/Discoverability\s*\((\d+)%\):\s*([\d\.]+)/);
-
-        if (seoTotalMatch && entityMatch && structMatch && semQualityMatch && techMatch) {
-            document.querySelector('#seo-score-total').textContent = seoTotalMatch[1];
+        if (assessment.seo_score) {
+            document.querySelector('#seo-score-total').textContent = assessment.seo_score.total;
             const seoDimensions = [
-                { label: 'Entity Coverage', weight: entityMatch[1], val: parseFloat(entityMatch[2]) },
-                { label: 'Structured Data', weight: structMatch[1], val: parseFloat(structMatch[2]) },
-                { label: 'Semantic Quality', weight: semQualityMatch[1], val: parseFloat(semQualityMatch[2]) },
-                { label: 'Technical Access', weight: techMatch[1], val: parseFloat(techMatch[2]) }
+                assessment.seo_score.entity_coverage,
+                assessment.seo_score.structured_data,
+                assessment.seo_score.semantic_quality,
+                assessment.seo_score.technical_access
             ];
             
             document.querySelector('#seo-score-grid').innerHTML = seoDimensions.map(d => `
@@ -241,13 +229,13 @@
             document.querySelector('#score-section').classList.add('hidden');
         }
 
-        if (geoTotalMatch && semCompMatch && entAuthMatch && structRichMatch && discMatch) {
-            document.querySelector('#geo-score-total').textContent = geoTotalMatch[1];
+        if (assessment.geo_score) {
+            document.querySelector('#geo-score-total').textContent = assessment.geo_score.total;
             const geoDimensions = [
-                { label: 'Semantic Completeness', weight: semCompMatch[1], val: parseFloat(semCompMatch[2]) },
-                { label: 'Entity Authority', weight: entAuthMatch[1], val: parseFloat(entAuthMatch[2]) },
-                { label: 'Structural Richness', weight: structRichMatch[1], val: parseFloat(structRichMatch[2]) },
-                { label: 'Discoverability', weight: discMatch[1], val: parseFloat(discMatch[2]) }
+                assessment.geo_score.semantic_completeness,
+                assessment.geo_score.entity_authority,
+                assessment.geo_score.structural_richness,
+                assessment.geo_score.discoverability
             ];
             
             document.querySelector('#geo-score-grid').innerHTML = geoDimensions.map(d => `
@@ -259,7 +247,6 @@
             `).join('');
         }
 
-        const assessment = view.assessment;
         const cards = [
           ['Metadata', assessment.metadata, 'Fields an AI system needs to identify and attribute this article'],
         ].filter(([, value]) => Boolean(value));

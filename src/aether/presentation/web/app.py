@@ -52,16 +52,21 @@ from aether.presentation.ai_readiness_report_renderers import (
 from aether.application.analysis.derive_editor_recommendations import (
     RecommendationCategory,
 )
+from aether.presentation.draft_check_text import (
+    performed_check_text,
+    unavailable_check_text,
+)
 from aether.presentation.editor_recommendation_text import (
     category_subtitle,
-    heading_count_phrase,
-    shared_words_phrase,
-    title_source_label,
     compared_articles_phrase,
+    heading_count_phrase,
     missing_properties_phrase,
     recommendation_text,
     repeated_in_phrase,
+    shared_words_phrase,
+    title_source_label,
 )
+from aether.presentation.score_dimension_text import seo_dimension_text, geo_dimension_text
 
 
 class HtmlFetcher(Protocol):
@@ -79,7 +84,6 @@ class AIReadinessPipeline:
         self.repository = repository
         self._register_article = RegisterRawHtmlArticle(repository)
         self._build_analysis_report = BuildArticleAnalysisReport(
-<<<<<<< Updated upstream
             AnalyzeArticleStructure(repository),
             AnalyzeArticleMetadata(repository),
             AnalyzePassageQuality(repository),
@@ -90,19 +94,8 @@ class AIReadinessPipeline:
             AnalyzeStructuredData(repository),
             AnalyzeDeclaredConsistency(repository),
             AnalyzeHeadingStructure(repository),
+            AnalyzeInternalLinks(repository),
         )
-=======
-    AnalyzeArticleStructure(repository),
-    AnalyzeArticleMetadata(repository),
-    AnalyzePassageQuality(repository),
-    AnalyzeContentDuplication(repository),
-    AnalyzeStructuredData(repository),
-    AnalyzeDeclaredConsistency(repository),
-    AnalyzeHeadingStructure(repository),
-    internal_link_analysis=AnalyzeInternalLinks(repository),
-    topic_introduction_analysis=AnalyzeTopicIntroduction(repository),
-)
->>>>>>> Stashed changes
         # A draft composes only the analyses its own text can answer.
         self._build_draft_report = BuildArticleAnalysisReport(
             AnalyzeArticleStructure(repository),
@@ -346,6 +339,20 @@ def _report_view(report: Any) -> Dict[str, Any]:
     return {
         "assessment": {
             "metadata": assessment.metadata_completeness.value,
+            "seo_score": {
+                "total": report.seo_score.total,
+                "entity_coverage": {"val": report.seo_score.entity_coverage.dimension_score, "label": seo_dimension_text("entity_coverage")["label"], "weight": report.seo_score.entity_coverage.weight_percentage},
+                "structured_data": {"val": report.seo_score.structured_data.dimension_score, "label": seo_dimension_text("structured_data")["label"], "weight": report.seo_score.structured_data.weight_percentage},
+                "semantic_quality": {"val": report.seo_score.semantic_quality.dimension_score, "label": seo_dimension_text("semantic_quality")["label"], "weight": report.seo_score.semantic_quality.weight_percentage},
+                "technical_access": {"val": report.seo_score.technical_access.dimension_score, "label": seo_dimension_text("technical_access")["label"], "weight": report.seo_score.technical_access.weight_percentage},
+            } if hasattr(report, 'seo_score') else None,
+            "geo_score": {
+                "total": report.geo_score.total,
+                "semantic_completeness": {"val": report.geo_score.semantic_completeness.dimension_score, "label": geo_dimension_text("semantic_completeness")["label"], "weight": report.geo_score.semantic_completeness.weight_percentage},
+                "entity_authority": {"val": report.geo_score.entity_authority.dimension_score, "label": geo_dimension_text("entity_authority")["label"], "weight": report.geo_score.entity_authority.weight_percentage},
+                "structural_richness": {"val": report.geo_score.structural_richness.dimension_score, "label": geo_dimension_text("structural_richness")["label"], "weight": report.geo_score.structural_richness.weight_percentage},
+                "discoverability": {"val": report.geo_score.discoverability.dimension_score, "label": geo_dimension_text("discoverability")["label"], "weight": report.geo_score.discoverability.weight_percentage},
+            } if hasattr(report, 'geo_score') else None,
         },
         "metadata": (
             {"label": "Publication date", "available": metadata.publication_date_available},
@@ -565,3 +572,4 @@ def create_app(fetcher: Optional[HtmlFetcher] = None) -> FastAPI:
 
 
 app = create_app()
+

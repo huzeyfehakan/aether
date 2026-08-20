@@ -49,8 +49,9 @@ under review rather than settled — the checks are thinner than the reporting
 frame around them. See [`product-discovery.md`](product-discovery.md).
 
 **Proportional Dual Scoring (SEO/GEO).** Implemented, unreleased.
-- Dual scores (`seo_score` and `geo_score`) are successfully calculated using rule-based deterministic metrics (no thresholds). 
-- Ingestion layer, analysis modules, presentation renderers, and `index.html` template have been updated to present both scores gracefully.
+- Dual scores (`seo_score` and `geo_score`) are successfully calculated using rule-based deterministic metrics. Thresholds, arbitrary constants, and speculative regex logic have been completely removed.
+- [Decision 0010](decisions/0010-dual-scoring-supersedes-0003.md) is recorded, documenting the rationale and superseding 0003.
+- Ingestion layer, analysis modules, presentation renderers, and `index.html` template have been updated to present both scores gracefully, supporting unmeasured `null` dimensions (`Optional[float]`).
 - All unit and acceptance tests have been updated and are green.
 
 **Turkish interface edition.** Uncommitted, and not ready to land.

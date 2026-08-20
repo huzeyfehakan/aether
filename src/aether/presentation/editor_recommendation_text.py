@@ -222,17 +222,6 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
             "Add relevant outbound links to authoritative external sources to back up your claims."
         ),
     ),
-    RecommendationCode.NO_CITATIONS: RecommendationText(
-        headline="This article lacks formal citations",
-        why_it_matters=(
-            "AI engines trust factual content supported by explicit references. "
-            "Formal citation marks like [1] or (Source: Example) are strong signals of "
-            "Entity Authority."
-        ),
-        what_to_do=(
-            "Add explicit citation markers like [1] or [2] next to your claims to prove their source."
-        ),
-    ),
     RecommendationCode.NO_STATISTICS: RecommendationText(
         headline="This article contains no statistics or data points",
         why_it_matters=(
@@ -241,16 +230,6 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
         ),
         what_to_do=(
             "Include concrete statistics, percentages, and numerical data points to support your arguments."
-        ),
-    ),
-    RecommendationCode.ORPHAN_PAGE: RecommendationText(
-        headline="This article is an orphan page (No incoming links)",
-        why_it_matters=(
-            "Without any other articles on your site linking to it, AI crawlers will "
-            "struggle to discover and index this page. It severely hurts your Discoverability score."
-        ),
-        what_to_do=(
-            "Link to this article from relevant, older articles on your website to establish a content cluster."
         ),
     ),
     RecommendationCode.NO_INTERNAL_BODY_LINKS: RecommendationText(
@@ -300,15 +279,6 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
         ),
         what_to_do=(
             "Yapay zeka motorlarının bu varlıkları (entity) güvenilir bir kaynak olarak referans alabilmesi için, ilgili paragraflara iddialarınızı kanıtlayan istatistiksel veriler veya bağımsız dış atıflar ekleyin."
-        ),
-    ),
-    RecommendationCode.LOW_TRUST_INDEX: RecommendationText(
-        headline="Otoriter Kaynak Referanslarını Güçlendirin",
-        why_it_matters=(
-            "Wikipedia ve .gov gibi otoriter domainlere atıf yapmak, yapay zeka modelleri nezdinde makalenin güvenilirliğini artırır."
-        ),
-        what_to_do=(
-            "İddialarınızı ve kurumları desteklemek için Wikipedia veya resmî kurumlara (.gov, .edu) dış bağlantılar ekleyin."
         ),
     ),
     RecommendationCode.MISSING_SAME_AS_SCHEMA: RecommendationText(

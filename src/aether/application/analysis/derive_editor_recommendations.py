@@ -227,32 +227,29 @@ class DeriveEditorRecommendations:
         # GEO Evidence
         if report.passage_quality_analysis and report.passage_quality_analysis.passage_profiles:
             profiles = report.passage_quality_analysis.passage_profiles
-            cit_count = sum(1 for p in profiles if p.contains_citation)
             stat_count = sum(1 for p in profiles if p.contains_statistics)
             
-            if cit_count == 0:
-                recommendations.append(EditorRecommendation(code=RecommendationCode.NO_CITATIONS))
             if stat_count == 0:
                 recommendations.append(EditorRecommendation(code=RecommendationCode.NO_STATISTICS))
                 
         # Discoverability & Link Authority
         links = report.internal_link_analysis
         if links:
-            if not links.outbound_domains:
+            if not getattr(links, 'outbound_domains', ()):
                 recommendations.append(EditorRecommendation(code=RecommendationCode.NO_OUTBOUND_LINKS))
             if links.body_link_count == 0:
                 recommendations.append(EditorRecommendation(code=RecommendationCode.NO_INTERNAL_BODY_LINKS))
-            if links.potential_orphan:
-                recommendations.append(EditorRecommendation(code=RecommendationCode.ORPHAN_PAGE))
                 
-            # Trust Index recommendations
-            if getattr(links, 'trust_index', 0.0) < 0.5:
-                recommendations.append(EditorRecommendation(code=RecommendationCode.LOW_TRUST_INDEX))
+        # Structured Data Identity
+        sd_analysis = report.structured_data_analysis
+        if sd_analysis is not None:
+            has_same_as = "sameas" in [p.lower() for p in sd_analysis.all_declared_properties]
+            if not has_same_as:
                 recommendations.append(EditorRecommendation(code=RecommendationCode.MISSING_SAME_AS_SCHEMA))
                 
-        # Content Bloat
+        # Content Bloat & Unsupported Entities
         if report.structural_analysis:
-            if report.structural_analysis.heading_passage_overlap_ratio == 0.0 and report.structural_analysis.definitive_stance_ratio == 0.0:
+            if getattr(report.structural_analysis, 'heading_passage_overlap_ratio', 1.0) == 0.0 and getattr(report.structural_analysis, 'definitive_stance_ratio', 1.0) == 0.0:
                 if report.structural_analysis.total_passage_count > 3: # Only for longer articles
                     recommendations.append(EditorRecommendation(code=RecommendationCode.CONTENT_BLOAT))
             if getattr(report.structural_analysis, 'unsupported_entity_ratio', 0.0) > 0.0:

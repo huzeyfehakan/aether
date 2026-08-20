@@ -63,6 +63,13 @@ class InMemoryContentRepository(ContentRepository):
             if version_id != excluding and self._is_published_by(version, publisher)
         )
 
+    def list_articles_by_publisher(self, publisher: str) -> Tuple[Article, ...]:
+        return tuple(
+            article
+            for article in self._articles_by_id.values()
+            if article.publisher == publisher
+        )
+
     def find_passage_fingerprint_occurrences(
         self, publisher: str, fingerprints: Tuple[str, ...]
     ) -> Mapping[str, Tuple[str, ...]]:

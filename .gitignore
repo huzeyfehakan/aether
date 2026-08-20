@@ -26,3 +26,4 @@ dist/
 
 # Local agent settings. Personal to one machine, never shared.
 .claude/settings.local.json
+venv/ 

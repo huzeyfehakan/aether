@@ -14,6 +14,7 @@ from aether.application.analysis.analyze_article_metadata import AnalyzeArticleM
 from aether.application.analysis.analyze_article_structure import AnalyzeArticleStructure
 from aether.application.analysis.analyze_content_duplication import AnalyzeContentDuplication
 from aether.application.analysis.analyze_passage_quality import AnalyzePassageQuality
+from aether.application.analysis.analyze_internal_links import AnalyzeInternalLinks
 from aether.application.analysis.analyze_heading_structure import AnalyzeHeadingStructure
 from aether.application.analysis.analyze_structured_data import AnalyzeStructuredData
 from aether.application.analysis.analyze_declared_consistency import AnalyzeDeclaredConsistency
@@ -21,6 +22,10 @@ from aether.application.analysis.assess_ai_readiness import AssessAIReadiness
 from aether.application.analysis.build_ai_readiness_report import BuildAIReadinessReport
 from aether.application.analysis.build_article_analysis_report import BuildArticleAnalysisReport
 from aether.application.analysis.build_draft_review import BuildDraftReview
+from aether.application.analysis.derive_editor_recommendations import (
+    DeriveEditorRecommendations,
+    RecommendationCode,
+)
 from aether.application.ingestion.prepare_draft import (
     DraftContentRequired,
     DraftHeadlineRequired,
@@ -74,6 +79,7 @@ class AIReadinessPipeline:
         self.repository = repository
         self._register_article = RegisterRawHtmlArticle(repository)
         self._build_analysis_report = BuildArticleAnalysisReport(
+<<<<<<< Updated upstream
             AnalyzeArticleStructure(repository),
             AnalyzeArticleMetadata(repository),
             AnalyzePassageQuality(repository),
@@ -85,6 +91,18 @@ class AIReadinessPipeline:
             AnalyzeDeclaredConsistency(repository),
             AnalyzeHeadingStructure(repository),
         )
+=======
+    AnalyzeArticleStructure(repository),
+    AnalyzeArticleMetadata(repository),
+    AnalyzePassageQuality(repository),
+    AnalyzeContentDuplication(repository),
+    AnalyzeStructuredData(repository),
+    AnalyzeDeclaredConsistency(repository),
+    AnalyzeHeadingStructure(repository),
+    internal_link_analysis=AnalyzeInternalLinks(repository),
+    topic_introduction_analysis=AnalyzeTopicIntroduction(repository),
+)
+>>>>>>> Stashed changes
         # A draft composes only the analyses its own text can answer.
         self._build_draft_report = BuildArticleAnalysisReport(
             AnalyzeArticleStructure(repository),
@@ -243,6 +261,35 @@ def _publisher_from(source_url: str, publisher: Optional[str]) -> str:
     return hostname.removeprefix("www.")
 
 
+_IMPACT_MAP = {
+    RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: "Structured Data",
+    RecommendationCode.INCOMPLETE_ARTICLE_STRUCTURED_DATA: "Structured Data",
+    RecommendationCode.MISSING_LAST_MODIFIED_DATE: "Metadata",
+    RecommendationCode.MISSING_PUBLICATION_DATE: "Metadata",
+    RecommendationCode.MISSING_AUTHOR: "Metadata",
+    RecommendationCode.MISSING_SUMMARY: "Metadata",
+    RecommendationCode.TITLE_SOURCES_DISAGREE: "Semantic Quality",
+    RecommendationCode.DESCRIPTION_SOURCES_DISAGREE: "Semantic Quality",
+    RecommendationCode.NO_OUTBOUND_LINKS: "Entity Authority",
+    RecommendationCode.NO_CITATIONS: "Entity Authority",
+    RecommendationCode.NO_STATISTICS: "Semantic Completeness",
+    RecommendationCode.ORPHAN_PAGE: "Discoverability",
+    RecommendationCode.NO_INTERNAL_BODY_LINKS: "Discoverability",
+    RecommendationCode.NO_TOP_LEVEL_HEADING: "Structural Richness",
+    RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS: "Structural Richness",
+    RecommendationCode.WEAK_ARTICLE_OPENING: "Semantic Completeness",
+    RecommendationCode.WEAK_TOPIC_INTRODUCTION: "Semantic Completeness",
+    RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY: "Semantic Quality",
+    RecommendationCode.BODY_MOSTLY_REPEATED_TEXT: "Semantic Quality",
+    RecommendationCode.CONTENT_BLOAT: "Semantic Completeness",
+    RecommendationCode.SKIPPED_HEADING_LEVEL: "Structural Richness",
+    RecommendationCode.CONFLICTING_PUBLISHED_DATES: "Metadata",
+    RecommendationCode.UNSUPPORTED_ENTITIES: "Entity Authority",
+    RecommendationCode.LOW_TRUST_INDEX: "Entity Authority",
+    RecommendationCode.MISSING_SAME_AS_SCHEMA: "Semantic Completeness",
+}
+
+
 def _recommendation_views(report: Any, category) -> list:
     """Shape one category of recommendations for display.
 
@@ -260,6 +307,7 @@ def _recommendation_views(report: Any, category) -> list:
                 "headline": text.headline,
                 "why_it_matters": text.why_it_matters,
                 "what_to_do": text.what_to_do,
+                "impact": _IMPACT_MAP.get(recommendation.code, ""),
                 "occurrences": [],
             },
         )

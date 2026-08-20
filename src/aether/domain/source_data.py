@@ -15,9 +15,10 @@ needs. Retaining the raw document would store unbounded publisher data in an
 immutable record and invite analyses that are no longer deterministic.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
-from typing import Tuple
+from typing import Tuple, Optional
 
 from .common import DomainValidationError
 
@@ -128,11 +129,19 @@ class ArticleVersionSourceData:
     declared_descriptions: Tuple[DeclaredDescription, ...] = ()
     declared_headings: Tuple[DeclaredHeading, ...] = ()
     internal_links: Tuple[InternalLink, ...] = ()
+    outbound_domains: Tuple[str, ...] = ()
     table_word_count: int = 0
     list_word_count: int = 0
     blockquote_word_count: int = 0
     answered_question_heading_count: int = 0
     unanswered_question_heading_count: int = 0
+    heading_passage_overlap_ratio: float = 0.0
+    definitive_stance_ratio: float = 0.0
+    
+    # Layered Dates for Sanity Check
+    json_ld_published_date: Optional[str] = None
+    meta_published_date: Optional[str] = None
+    time_tag_published_date: Optional[str] = None
 
     def __post_init__(self) -> None:
         if not self.article_version_id or not self.article_version_id.strip():

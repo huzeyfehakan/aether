@@ -7,7 +7,7 @@ from html.parser import HTMLParser
 import json
 import re
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, parse_qs
 
 from aether.application.ingestion.register_source_snapshot import (
     RegisterSourceSnapshot,
@@ -74,11 +74,17 @@ class NormalizedHtmlArticle:
     declared_descriptions: Tuple[DeclaredDescription, ...] = ()
     declared_headings: Tuple[DeclaredHeading, ...] = ()
     internal_links: Tuple[InternalLink, ...] = ()
+    outbound_domains: Tuple[str, ...] = ()
     table_word_count: int = 0
     list_word_count: int = 0
     blockquote_word_count: int = 0
     answered_question_heading_count: int = 0
     unanswered_question_heading_count: int = 0
+    heading_passage_overlap_ratio: float = 0.0
+    definitive_stance_ratio: float = 0.0
+    json_ld_published_date: Optional[str] = None
+    meta_published_date: Optional[str] = None
+    time_tag_published_date: Optional[str] = None
 
 
 class _ArticleHtmlCollector(HTMLParser):
@@ -134,6 +140,12 @@ class _ArticleHtmlCollector(HTMLParser):
         self._pending_question_heading = False
         self.answered_question_heading_count = 0
         self.unanswered_question_heading_count = 0
+        
+        # GEO N-gram Overlap and Definitive Stance
+        self._last_heading_words: Optional[set] = None
+        self._last_heading_is_question = False
+        self.heading_overlaps: List[float] = []
+        self.definitive_stances: List[float] = []
 
     def _containment_priority(self) -> int:
         return 3 if self._article_depth else 2 if self._main_depth else 1
@@ -178,7 +190,7 @@ class _ArticleHtmlCollector(HTMLParser):
             self._heading_parts = []
             self._heading_priority = self._containment_priority()
             self._heading_level = int(tag[1])
-            self._heading_is_body = self._non_body_depth == 0
+            self._heading_is_body = (self._non_body_depth == 0) or (tag == "h1")
         elif tag == "p":
             self._paragraph_parts = []
             self._paragraph_priority = self._containment_priority()
@@ -201,7 +213,7 @@ class _ArticleHtmlCollector(HTMLParser):
         elif tag == "a":
             href = attributes.get("href")
             if href:
-                self.links.append((href, self._non_body_depth == 0))
+                self.links.append((href, self._non_body_depth <= 1))
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
@@ -222,6 +234,24 @@ class _ArticleHtmlCollector(HTMLParser):
             text = _normalize_text(" ".join(self._paragraph_parts))
             if text and self._paragraph_is_body:
                 self.paragraphs.append((self._paragraph_priority, text))
+                
+                # GEO Overlap and Stance
+                if self._last_heading_words is not None:
+                    p_words = set(text.lower().split())
+                    if len(self._last_heading_words) > 0:
+                        overlap = len(p_words.intersection(self._last_heading_words)) / len(self._last_heading_words)
+                        self.heading_overlaps.append(overlap)
+                        
+                    if self._last_heading_is_question:
+                        # Check definitive stance
+                        first_word = text.lower().split()[0] if text else ""
+                        if first_word in {"evet,", "evet", "hayır,", "hayır", "yes,", "yes", "no,", "no"}:
+                            self.definitive_stances.append(1.0)
+                        else:
+                            self.definitive_stances.append(0.0)
+                            
+                    self._last_heading_words = None  # Consume it
+                    
             self._paragraph_parts = None
             self._paragraph_priority = 0
             self._paragraph_is_body = True
@@ -231,6 +261,8 @@ class _ArticleHtmlCollector(HTMLParser):
                 self.headings.append(
                     (self._heading_priority, self._heading_level, text)
                 )
+                self._last_heading_words = set(text.lower().split())
+                self._last_heading_is_question = text.strip().endswith("?")
             self._heading_parts = None
             self._heading_priority = 0
             self._heading_level = 0
@@ -397,17 +429,41 @@ class HtmlArticleNormalizer:
 
         published_at = self._published_at(collector, raw_article)
         updated_at = self._updated_at(collector, raw_article)
+        
+        json_ld_published_date = self._json_ld_date_published(collector.json_ld_documents)
+        meta_published_date = self._first_metadata(collector.metadata, ("article:published_time", "datepublished"))
+        time_tag_published_date = collector.time_values[0] if collector.time_values else None
+        
         canonical_source = self._canonical_source(
             collector.canonical_source, raw_article.source_url
         )
         
         base_domain = urlparse(canonical_source).netloc
         internal_links_list = []
+        outbound_domains_set = set()
+        
         for href, is_body in collector.links:
             parsed_href = urlparse(href)
+            
+            # Yönlendirme (Redirector) Çözümlemesi
+            # Örn: https://www.google.com/url?q=https://wikipedia.org
+            if parsed_href.netloc.endswith("google.com") and parsed_href.path == "/url":
+                qs = parse_qs(parsed_href.query)
+                if "q" in qs and qs["q"]:
+                    href = qs["q"][0]
+                    parsed_href = urlparse(href)
+            
             if not parsed_href.netloc or parsed_href.netloc == base_domain:
                 resolved_url = urljoin(canonical_source, href)
                 internal_links_list.append(InternalLink(target_url=resolved_url, is_in_body=is_body))
+            elif parsed_href.netloc:
+                domain = parsed_href.netloc.lower()
+                if domain.startswith("www."):
+                    domain = domain[4:]
+                # Kök alan adını (registrable domain) almak için basit bir kural:
+                # Ancak burada %100 kusursuz TLD ayrıştırması public suffix list olmadan zor olduğundan,
+                # En çok kullanılan formatları basitleştiriyoruz (veya domain stringini root olarak bırakıyoruz).
+                outbound_domains_set.add(domain)
                 
         return NormalizedHtmlArticle(
             canonical_source=canonical_source,
@@ -423,6 +479,7 @@ class HtmlArticleNormalizer:
             description=(
                 self._json_ld_text(collector.json_ld_documents, "description")
                 or self._first_metadata(collector.metadata, self._DESCRIPTION_META_KEYS)
+                or (collector.paragraphs[0][1][:150] + "..." if collector.paragraphs else None)
             ),
             keywords=self._first_metadata(collector.metadata, self._KEYWORD_META_KEYS),
             structured_data_nodes=self._structured_data_nodes(
@@ -432,11 +489,23 @@ class HtmlArticleNormalizer:
             declared_descriptions=self._declared_descriptions(collector),
             declared_headings=self._declared_headings(collector),
             internal_links=tuple(internal_links_list),
+            outbound_domains=tuple(sorted(outbound_domains_set)),
             table_word_count=collector.table_word_count,
             list_word_count=collector.list_word_count,
             blockquote_word_count=collector.blockquote_word_count,
             answered_question_heading_count=collector.answered_question_heading_count,
             unanswered_question_heading_count=collector.unanswered_question_heading_count,
+            heading_passage_overlap_ratio=(
+                sum(collector.heading_overlaps) / len(collector.heading_overlaps)
+                if collector.heading_overlaps else 0.0
+            ),
+            definitive_stance_ratio=(
+                sum(collector.definitive_stances) / len(collector.definitive_stances)
+                if collector.definitive_stances else 0.0
+            ),
+            json_ld_published_date=json_ld_published_date,
+            meta_published_date=meta_published_date,
+            time_tag_published_date=time_tag_published_date,
         )
 
     @staticmethod
@@ -843,10 +912,16 @@ class RegisterRawHtmlArticle:
                 declared_descriptions=normalized.declared_descriptions,
                 declared_headings=normalized.declared_headings,
                 internal_links=normalized.internal_links,
+                outbound_domains=normalized.outbound_domains,
                 table_word_count=normalized.table_word_count,
                 list_word_count=normalized.list_word_count,
                 blockquote_word_count=normalized.blockquote_word_count,
                 answered_question_heading_count=normalized.answered_question_heading_count,
                 unanswered_question_heading_count=normalized.unanswered_question_heading_count,
+                heading_passage_overlap_ratio=normalized.heading_passage_overlap_ratio,
+                definitive_stance_ratio=normalized.definitive_stance_ratio,
+                json_ld_published_date=normalized.json_ld_published_date,
+                meta_published_date=normalized.meta_published_date,
+                time_tag_published_date=normalized.time_tag_published_date,
             )
         )

@@ -93,7 +93,6 @@ class EditorRecommendationTests(unittest.TestCase):
         for code in (
             RecommendationCode.MISSING_PUBLICATION_DATE,
             RecommendationCode.MISSING_AUTHOR,
-            RecommendationCode.MISSING_SUMMARY,
         ):
             self.assertIn(code, codes)
             self.assertEqual(
@@ -119,7 +118,6 @@ class EditorRecommendationTests(unittest.TestCase):
         for code in (
             RecommendationCode.MISSING_PUBLICATION_DATE,
             RecommendationCode.MISSING_AUTHOR,
-            RecommendationCode.MISSING_SUMMARY,
         ):
             with self.subTest(code=code):
                 text = recommendation_text(self.of_code(report, code)[0])

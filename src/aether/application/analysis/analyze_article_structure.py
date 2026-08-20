@@ -1,5 +1,6 @@
 """Produce raw structural metrics for an existing immutable Article Version."""
 
+import re
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -21,6 +22,9 @@ class ArticleStructuralAnalysis:
     blockquote_word_count: int
     answered_question_heading_count: int
     unanswered_question_heading_count: int
+    heading_passage_overlap_ratio: float = 0.0
+    definitive_stance_ratio: float = 0.0
+    unsupported_entity_ratio: float = 0.0
 
 
 class AnalyzeArticleStructure:
@@ -44,6 +48,24 @@ class AnalyzeArticleStructure:
         if source_data is None:
             raise DomainValidationError("source data must exist for structural analysis")
 
+        # Niche Entity / Evidence Logic
+        entity_regex = re.compile(r'\b[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)+\b')
+        evidence_regex = re.compile(r'\d+%|\b(?:19|20)\d{2}\b|[$€£₺]\d+|\b\d+(?:\.\d+)?\b|\[\s*[a-zA-Z0-9]+\s*\]')
+        
+        entity_paragraphs = 0
+        unsupported_entity_paragraphs = 0
+        
+        for passage in passages:
+            text = passage.text
+            if entity_regex.search(text):
+                entity_paragraphs += 1
+                if not evidence_regex.search(text):
+                    unsupported_entity_paragraphs += 1
+                    
+        unsupported_ratio = 0.0
+        if entity_paragraphs > 0:
+            unsupported_ratio = unsupported_entity_paragraphs / entity_paragraphs
+
         return ArticleStructuralAnalysis(
             article_id=article.article_id,
             article_version_id=article_version.article_version_id,
@@ -54,6 +76,9 @@ class AnalyzeArticleStructure:
             blockquote_word_count=source_data.blockquote_word_count,
             answered_question_heading_count=source_data.answered_question_heading_count,
             unanswered_question_heading_count=source_data.unanswered_question_heading_count,
+            heading_passage_overlap_ratio=source_data.heading_passage_overlap_ratio,
+            definitive_stance_ratio=source_data.definitive_stance_ratio,
+            unsupported_entity_ratio=unsupported_ratio,
         )
 
     @staticmethod

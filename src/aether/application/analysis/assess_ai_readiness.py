@@ -187,7 +187,13 @@ class AssessAIReadiness:
         if passage_quality and len(passage_quality.passage_profiles) > 0:
             profiles = passage_quality.passage_profiles
             stats_count = sum(1 for p in profiles if p.contains_statistics)
-            base_score = (stats_count / len(profiles)) * 100.0
+            stats_score = (stats_count / len(profiles)) * 100.0
+            
+            # Add N-gram overlap and definitive stance as positive signals
+            overlap_score = report.structural_analysis.heading_passage_overlap_ratio * 100.0
+            stance_score = report.structural_analysis.definitive_stance_ratio * 100.0
+            
+            base_score = (stats_score + overlap_score + stance_score) / 3.0
             
             # Fluency balance multiplier (up to 1.0)
             balance = passage_quality.passage_balance_ratio
@@ -199,12 +205,36 @@ class AssessAIReadiness:
             semantic_comp = max(0.0, (base_score * balance) - penalty)
         
         # 2. Entity & Authority (30%)
-        # Based on citations
+        # Based on citations and outbound domains
         entity_auth = 0.0
-        if passage_quality and len(passage_quality.passage_profiles) > 0:
+        
+        # Sanity Check (Cross Validation): If there are no outbound domains,
+        # entity authority must be 0, regardless of raw citation marks.
+        outbound_domains = report.internal_link_analysis.outbound_domains if report.internal_link_analysis else ()
+        
+        _SOCIAL_DOMAINS = {"reddit.com", "twitter.com", "x.com", "facebook.com", "instagram.com", "tiktok.com", "linkedin.com", "pinterest.com"}
+        
+        social_count = sum(1 for d in outbound_domains if d in _SOCIAL_DOMAINS or any(d.endswith(f".{s}") for s in _SOCIAL_DOMAINS))
+        earned_count = len(outbound_domains) - social_count
+        
+        earned_media_multiplier = getattr(report.internal_link_analysis, 'third_party_ratio', 0.0) if report.internal_link_analysis else 0.0
+        
+        if len(outbound_domains) > 0 and passage_quality and len(passage_quality.passage_profiles) > 0:
             profiles = passage_quality.passage_profiles
             cit_count = sum(1 for p in profiles if p.contains_citation)
-            entity_auth = (cit_count / len(profiles)) * 100.0
+            effective_cit_count = cit_count + earned_count
+            
+            # Apply unsupported entities penalty
+            unsupported_penalty = 1.0
+            if report.structural_analysis:
+                unsupported_ratio = getattr(report.structural_analysis, 'unsupported_entity_ratio', 0.0)
+                if unsupported_ratio > 0:
+                    unsupported_penalty = 1.0 - (unsupported_ratio * 0.5) # Up to 50% penalty
+                    
+            # Base authority purely on citations, but strictly gated by third-party multiplier and trust index
+            trust_index = getattr(report.internal_link_analysis, 'trust_index', 0.0) if report.internal_link_analysis else 0.0
+            
+            entity_auth = min((effective_cit_count / len(profiles)) * 100.0, 100.0) * earned_media_multiplier * unsupported_penalty * (0.5 + trust_index / 2)
             
         # 3. Structural Richness (15%)
         # Direct Answer Patterns + Table/List Density

@@ -101,8 +101,8 @@ class AnalyzePassageQuality:
         text = passage.text
         # Matches numbers, percentages, years like 202x, and currencies ($, €, £, ₺)
         has_stats = bool(re.search(r'\d+%|\b(?:19|20)\d{2}\b|[$€£₺]\d+|\b\d+(?:\.\d+)?\b', text))
-        # Matches academic citations like [1] or [12]
-        has_citation = bool(re.search(r'\[\d+\]', text))
+        # Matches academic citations like [1], [ 12 ], or Wikipedia notes like [ a ]
+        has_citation = bool(re.search(r'\[\s*[a-zA-Z0-9]+\s*\]', text))
         
         return PassageProfile(
             passage_id=passage.passage_id,

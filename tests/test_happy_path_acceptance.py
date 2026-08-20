@@ -93,7 +93,7 @@ class HappyPathPublisherArticleAcceptanceTests(unittest.TestCase):
         self.assertEqual(payload["assessment_summary"]["metadata_completeness"], "complete")
         self.assertIn("seo_score", payload["assessment_summary"])
         self.assertIn("geo_score", payload["assessment_summary"])
-        self.assertEqual(payload["assessment_summary"]["seo_score"]["total"], 75)
+        self.assertEqual(payload["assessment_summary"]["seo_score"]["total"], 100)
         self.assertNotIn("raw_html", rendered)
         self.assertNotIn("structured_data_raw", rendered)
 

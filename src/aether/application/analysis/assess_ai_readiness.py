@@ -231,32 +231,32 @@ class AssessAIReadiness:
         sd_analysis = report.structured_data_analysis
         
         if sd_analysis is not None:
-            # Puanlama: author (35), publisher (35), sameAs/Entity node'lari (30)
+            # Puanlama: author (40), publisher (40), sameAs (20)
             base_score = 0.0
             
             # Yazar ve Yayinci beyani
             if "author" in sd_analysis.declared_article_properties:
-                base_score += 35.0
+                base_score += 40.0
             if "publisher" in sd_analysis.declared_article_properties:
-                base_score += 35.0
+                base_score += 40.0
                 
-            # Kimlik dogrulama (Entity nodes or sameAs)
-            node_types = [t.lower() for t in sd_analysis.declared_node_types]
-            has_entity_node = "person" in node_types or "organization" in node_types or "brand" in node_types
+            # Kimlik dogrulama (Knowledge Graph mapping)
+            # Sadece Person/Organization dugumu olmasi yetmez (cunku author/publisher zaten onlari olusturur).
+            # Gercek bir GEO kurali olarak 'sameAs' baglantisi aranmalidir.
             has_same_as = "sameas" in [p.lower() for p in sd_analysis.all_declared_properties]
-            
-            if has_entity_node or has_same_as:
-                base_score += 30.0
+            if has_same_as:
+                base_score += 20.0
                 
-            # Earned media çarpanı (Sosyal medya dışı dış bağlantılar skoru %20'ye kadar artırabilir)
+            # Earned media (Sosyal medya disi dis baglantilar) skoru cap'i asacak sekilde %25'e kadar artirabilir.
+            # Eger sadece author + publisher varsa (80 puan), 4 dis link (80 * 1.2 = 96) veya 5 dis link (80 * 1.25 = 100) alabilir.
             outbound_domains = getattr(report.internal_link_analysis, 'outbound_domains', ()) if report.internal_link_analysis else ()
             _SOCIAL_DOMAINS = {"reddit.com", "twitter.com", "x.com", "facebook.com", "instagram.com", "tiktok.com", "linkedin.com", "pinterest.com"}
             
             social_count = sum(1 for d in outbound_domains if d in _SOCIAL_DOMAINS or any(d.endswith(f".{s}") for s in _SOCIAL_DOMAINS))
             earned_count = len(outbound_domains) - social_count
             
-            # Her bir earned media linki %5 bonus sağlar (Maksimum %20)
-            earned_media_bonus = min(earned_count * 0.05, 0.20)
+            # Her bir earned media linki %5 bonus saglar (Maksimum %25)
+            earned_media_bonus = min(earned_count * 0.05, 0.25)
             
             entity_auth = min(base_score * (1.0 + earned_media_bonus), 100.0)
             

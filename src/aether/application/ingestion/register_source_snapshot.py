@@ -41,6 +41,7 @@ class SourceArticleSnapshot:
     declared_headings: Tuple[DeclaredHeading, ...] = ()
     internal_links: Tuple[InternalLink, ...] = ()
     outbound_domains: Tuple[str, ...] = ()
+    outbound_body_domains: Tuple[str, ...] = ()
     table_word_count: int = 0
     list_word_count: int = 0
     blockquote_word_count: int = 0
@@ -147,6 +148,7 @@ class RegisterSourceSnapshot:
                 declared_headings=snapshot.declared_headings,
                 internal_links=snapshot.internal_links,
                 outbound_domains=snapshot.outbound_domains,
+                outbound_body_domains=snapshot.outbound_body_domains,
                 table_word_count=snapshot.table_word_count,
                 list_word_count=snapshot.list_word_count,
                 blockquote_word_count=snapshot.blockquote_word_count,

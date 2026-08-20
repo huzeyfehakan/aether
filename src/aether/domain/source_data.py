@@ -130,6 +130,7 @@ class ArticleVersionSourceData:
     declared_headings: Tuple[DeclaredHeading, ...] = ()
     internal_links: Tuple[InternalLink, ...] = ()
     outbound_domains: Tuple[str, ...] = ()
+    outbound_body_domains: Tuple[str, ...] = ()
     table_word_count: int = 0
     list_word_count: int = 0
     blockquote_word_count: int = 0

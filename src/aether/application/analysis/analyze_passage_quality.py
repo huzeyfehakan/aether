@@ -30,7 +30,6 @@ class PassageQualityAnalysis:
     article_version_id: str
     passage_profiles: Tuple[PassageProfile, ...]
     passage_balance_ratio: float
-    keyword_stuffing_ratio: float
 
 
 class AnalyzePassageQuality:
@@ -45,56 +44,26 @@ class AnalyzePassageQuality:
             raise DomainValidationError(
                 "article version must belong to the article being analyzed"
             )
-        passages = self._content_repository.list_passages_for_version(article_version_id)
-        if any(
-            passage.article_version_id != article_version.article_version_id
-            for passage in passages
-        ):
-            raise DomainValidationError(
-                "analysis passages must belong to the analyzed article version"
-            )
 
-        ordered_passages = tuple(
-            sorted(passages, key=lambda passage: passage.ordinal_position)
-        )
-        
-        profiles = tuple(self._profile(passage) for passage in ordered_passages)
-        
+        passages = self._content_repository.list_passages_for_version(article_version_id)
+        ordered_passages = tuple(sorted(passages, key=lambda p: p.ordinal_position))
+        profiles = tuple(self._profile(p) for p in ordered_passages)
+
         # Calculate passage balance ratio
         if not profiles:
             balance_ratio = 1.0
-            stuffing_ratio = 0.0
         else:
             word_counts = [p.word_count for p in profiles]
             avg_word_count = sum(word_counts) / len(word_counts)
             max_word_count = max(word_counts) if max(word_counts) > 0 else 1
             balance_ratio = avg_word_count / max_word_count
-            
-            # Simple keyword stuffing check: most frequent bigram ratio
-            stuffing_ratio = self._calculate_stuffing_ratio(ordered_passages)
 
         return PassageQualityAnalysis(
             article_id=article.article_id,
             article_version_id=article_version.article_version_id,
             passage_profiles=profiles,
             passage_balance_ratio=balance_ratio,
-            keyword_stuffing_ratio=stuffing_ratio,
         )
-
-    @staticmethod
-    def _calculate_stuffing_ratio(passages: Tuple[Passage, ...]) -> float:
-        from collections import Counter
-        bigrams = []
-        for p in passages:
-            words = [w.lower() for w in re.findall(r'\b\w+\b', p.text)]
-            for i in range(len(words) - 1):
-                bigrams.append((words[i], words[i+1]))
-        if not bigrams:
-            return 0.0
-        most_common = Counter(bigrams).most_common(1)
-        if most_common:
-            return most_common[0][1] / len(bigrams)
-        return 0.0
 
     @staticmethod
     def _profile(passage: Passage) -> PassageProfile:

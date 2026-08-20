@@ -50,7 +50,7 @@ class AnalyzeArticleStructure:
 
         # Niche Entity / Evidence Logic
         entity_regex = re.compile(r'\b[A-ZÇĞİÖŞÜ][a-zçğıöşü]+(?:\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+)+\b')
-        evidence_regex = re.compile(r'\d+%|\b(?:19|20)\d{2}\b|[$€£₺]\d+|\b\d+(?:\.\d+)?\b|\[\s*[a-zA-Z0-9]+\s*\]')
+        evidence_regex = re.compile(r'\d+%|\b(?:19|20)\d{2}\b|[$€£₺]\d+|\[\s*[a-zA-Z0-9]+\s*\]')
         
         entity_paragraphs = 0
         unsupported_entity_paragraphs = 0

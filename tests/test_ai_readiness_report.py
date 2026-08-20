@@ -69,7 +69,6 @@ class AIReadinessReportTests(unittest.TestCase):
                     ),
                 ),
                 passage_balance_ratio=1.0,
-                keyword_stuffing_ratio=0.0,
             ),
         )
         return AssessAIReadiness().execute(report)

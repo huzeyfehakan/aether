@@ -64,7 +64,7 @@ class AnalyzeInternalLinks:
                             break
 
         # Third-Party & Trust Index
-        outbound = source_data.outbound_domains
+        outbound = source_data.outbound_body_domains
         third_party_ratio = 1.0
         trust_index = 0.0
         
@@ -73,12 +73,12 @@ class AnalyzeInternalLinks:
             # Reconstruct text to find entities
             passages = self._content_repository.list_passages_for_version(article_version_id)
             full_text = " ".join(p.text for p in passages)
-            entities = set(re.findall(r'\b[A-ZÇĞİÖŞÜ][a-zçğıöşü]+\b', full_text))
+            entities = set(re.findall(r'\b[A-ZÇÖŞİÜ][a-zçöşğüİı]+\b', full_text))
             
             # Trust weights
             t1 = {"wikipedia.org", ".gov", ".edu", "who.int"}
             t2 = {"statista.com", "reuters.com", "indeed.com", "randstad"}
-            t0 = {"reddit.com", "twitter.com", "x.com", "facebook.com", "instagram.com", "tiktok.com", "linkedin.com", "pinterest.com"}
+            t0 = {"reddit.com", "twitter.com", "x.com", "facebook.com", "instagram.com", "tiktok.com", "linkedin.com", "pinterest.com", "youtube.com"}
             
             total_weight = 0
             third_party_count = 0
@@ -92,14 +92,15 @@ class AnalyzeInternalLinks:
                 else:
                     third_party_count += 1
                     
-                # 2. Trust Index Check
-                weight = 1
-                if any(domain.endswith(x) or domain == x for x in t1):
+                # 2. Authority Index
+                weight = 1 # Neutral
+                if any(d in domain for d in t1):
                     weight = 3
-                elif any(domain.endswith(x) or domain == x for x in t2):
+                elif any(d in domain for d in t2):
                     weight = 2
-                elif any(domain.endswith(x) or domain == x for x in t0):
+                elif any(d in domain for d in t0):
                     weight = 0
+                    
                 total_weight += weight
                 
             third_party_ratio = third_party_count / len(outbound)
@@ -113,7 +114,7 @@ class AnalyzeInternalLinks:
             body_link_count=body_link_count,
             incoming_link_count=incoming_link_count,
             potential_orphan=(incoming_link_count == 0),
-            outbound_domains=source_data.outbound_domains,
+            outbound_domains=source_data.outbound_body_domains,
             third_party_ratio=third_party_ratio,
             trust_index=trust_index,
         )

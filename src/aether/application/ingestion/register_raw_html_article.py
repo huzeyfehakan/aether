@@ -75,6 +75,7 @@ class NormalizedHtmlArticle:
     declared_headings: Tuple[DeclaredHeading, ...] = ()
     internal_links: Tuple[InternalLink, ...] = ()
     outbound_domains: Tuple[str, ...] = ()
+    outbound_body_domains: Tuple[str, ...] = ()
     table_word_count: int = 0
     list_word_count: int = 0
     blockquote_word_count: int = 0
@@ -441,6 +442,7 @@ class HtmlArticleNormalizer:
         base_domain = urlparse(canonical_source).netloc
         internal_links_list = []
         outbound_domains_set = set()
+        outbound_body_domains_set = set()
         
         for href, is_body in collector.links:
             parsed_href = urlparse(href)
@@ -464,6 +466,8 @@ class HtmlArticleNormalizer:
                 # Ancak burada %100 kusursuz TLD ayrıştırması public suffix list olmadan zor olduğundan,
                 # En çok kullanılan formatları basitleştiriyoruz (veya domain stringini root olarak bırakıyoruz).
                 outbound_domains_set.add(domain)
+                if is_body:
+                    outbound_body_domains_set.add(domain)
                 
         return NormalizedHtmlArticle(
             canonical_source=canonical_source,
@@ -490,6 +494,7 @@ class HtmlArticleNormalizer:
             declared_headings=self._declared_headings(collector),
             internal_links=tuple(internal_links_list),
             outbound_domains=tuple(sorted(outbound_domains_set)),
+            outbound_body_domains=tuple(sorted(outbound_body_domains_set)),
             table_word_count=collector.table_word_count,
             list_word_count=collector.list_word_count,
             blockquote_word_count=collector.blockquote_word_count,
@@ -913,6 +918,7 @@ class RegisterRawHtmlArticle:
                 declared_headings=normalized.declared_headings,
                 internal_links=normalized.internal_links,
                 outbound_domains=normalized.outbound_domains,
+                outbound_body_domains=normalized.outbound_body_domains,
                 table_word_count=normalized.table_word_count,
                 list_word_count=normalized.list_word_count,
                 blockquote_word_count=normalized.blockquote_word_count,

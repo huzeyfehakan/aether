@@ -51,11 +51,11 @@ class SEOScore:
     technical_access: ScoreDimension
 
     @property
-    def total(self) -> int:
+    def total(self) -> Optional[int]:
         dimensions = [self.entity_coverage, self.structured_data, self.semantic_quality, self.technical_access]
         available_weight = sum(d.weight_percentage for d in dimensions if d.dimension_score is not None)
         if available_weight == 0:
-            return 0
+            return None
         calculated_total = sum(d.weighted_contribution for d in dimensions)
         return round(calculated_total / (available_weight / 100.0))
 
@@ -69,11 +69,11 @@ class GEOScore:
     discoverability: ScoreDimension         # %15
 
     @property
-    def total(self) -> int:
+    def total(self) -> Optional[int]:
         dimensions = [self.semantic_completeness, self.entity_authority, self.structural_richness, self.discoverability]
         available_weight = sum(d.weight_percentage for d in dimensions if d.dimension_score is not None)
         if available_weight == 0:
-            return 0
+            return None
         calculated_total = sum(d.weighted_contribution for d in dimensions)
         return round(calculated_total / (available_weight / 100.0))
 
@@ -180,10 +180,6 @@ class AssessAIReadiness:
         technical_score = None
         cons_analysis = report.declared_consistency_analysis
         if cons_analysis is not None:
-            # Here we actually calculate consistency if present!
-            # e.g. based on consistent declarations vs inconsistent ones.
-            # Wait, declared_consistency_analysis has what fields?
-            # Since the user just said it was dead code, we can just use None or 100 if no conflicts?
             if getattr(cons_analysis, 'title_sources_disagree', False) or getattr(cons_analysis, 'description_sources_disagree', False):
                 technical_score = 0.0
             else:
@@ -214,16 +210,10 @@ class AssessAIReadiness:
             overlap_score = getattr(report.structural_analysis, 'heading_passage_overlap_ratio', 0.0) * 100.0
             stance_score = getattr(report.structural_analysis, 'definitive_stance_ratio', 0.0) * 100.0
             
-            base_score = (stats_score + overlap_score + stance_score) / 3.0
+            base_score = (stats_score * 0.4) + (overlap_score * 0.3) + (stance_score * 0.3)
             
-            # Fluency balance multiplier (up to 1.0)
             balance = passage_quality.passage_balance_ratio
-            
-            # Keyword stuffing penalty (deduct up to 20 points based on ratio)
-            penalty = passage_quality.keyword_stuffing_ratio * 100.0 * 2.0 # Arbitrary simple scaling
-            penalty = min(penalty, 20.0)
-            
-            semantic_comp = max(0.0, (base_score * balance) - penalty)
+            semantic_comp = max(0.0, (base_score * balance))
         
         # 2. Entity & Authority (30%)
         # Based on Structured Data identity declarations & Earned Media multiplier
@@ -232,33 +222,25 @@ class AssessAIReadiness:
         
         if sd_analysis is not None:
             # Puanlama (Toplam 100):
-            # 1. Schema.org Identity (Maks 60): author (20), publisher (20), sameAs (20)
-            # 2. Earned Media/Citations (Maks 40): Her otoriter/dis link (sosyal medya harici) +10 puan
+            # article-scoped veriler uzerinden gerceklesir:
+            author_declared = 100.0 if "author" in sd_analysis.declared_article_properties else 0.0
             
-            schema_score = 0.0
-            
-            # Yazar ve Yayinci beyani
-            if "author" in sd_analysis.declared_article_properties:
-                schema_score += 20.0
-            if "publisher" in sd_analysis.declared_article_properties:
-                schema_score += 20.0
+            citation_quality = 0.0
+            independence = 0.0
+            links = report.internal_link_analysis
+            if links:
+                citation_quality = links.trust_index * 100.0
+                independence = links.third_party_ratio * 100.0
                 
-            # Kimlik dogrulama (Knowledge Graph mapping)
-            has_same_as = "sameas" in [p.lower() for p in sd_analysis.all_declared_properties]
-            if has_same_as:
-                schema_score += 20.0
-                
-            # Earned media (Sosyal medya disi dis baglantilar / Atiflar)
-            outbound_domains = getattr(report.internal_link_analysis, 'outbound_domains', ()) if report.internal_link_analysis else ()
-            _SOCIAL_DOMAINS = {"reddit.com", "twitter.com", "x.com", "facebook.com", "instagram.com", "tiktok.com", "linkedin.com", "pinterest.com"}
-            
-            social_count = sum(1 for d in outbound_domains if d in _SOCIAL_DOMAINS or any(d.endswith(f".{s}") for s in _SOCIAL_DOMAINS))
-            earned_count = len(outbound_domains) - social_count
-            
-            # Her bir dis atif (citation) +10 puan saglar, maks 40.
-            earned_media_score = min(earned_count * 10.0, 40.0)
-            
-            entity_auth = min(schema_score + earned_media_score, 100.0)
+            evidence = 0.0
+            struct = report.structural_analysis
+            if struct:
+                evidence = (1.0 - struct.unsupported_entity_ratio) * 100.0
+
+            # schema eksikse (None ise) boyut dusurulmeli, bu 0 demek degil.
+            entity_auth = (author_declared + citation_quality + independence + evidence) / 4.0
+        else:
+            entity_auth = 0.0
             
         # 3. Structural Richness (15%)
         # Direct Answer Patterns + Table/List Density

@@ -55,7 +55,6 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             article_version_id="version-1",
             passage_profiles=(),
             passage_balance_ratio=1.0,
-            keyword_stuffing_ratio=0.0,
         )
         return ArticleAnalysisReport(
             structural_analysis=structural,
@@ -125,6 +124,57 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             first.metadata_completeness = CompletenessClassification.MISSING
         self.assertIsInstance(first, AIReadinessAssessment)
 
+    def test_geo_entity_authority_scores_correctly_with_body_vs_non_body_links(self):
+        # Makalenin body_links kisminda hic link yok ama footer/header'da 5 dis link var.
+        # Ayrica schema'da sadece author ve publisher var (sameAs yok).
+        # Entity Authority -> base score: 40 (author: 20 + publisher: 20)
+        # Earned Media -> 0 (body link yok)
+        # Total Entity Authority -> 10.0 (40/4.0 = 10)
+        from aether.application.analysis.analyze_internal_links import InternalLinkAnalysisResult
+        from aether.application.analysis.analyze_structured_data import StructuredDataAnalysis
+        from dataclasses import replace
+        
+        report = self.report(
+            metadata_available=(True, True, True, True, True, True, True),
+            coverage_ratio=1.0,
+            covered_paragraphs=2,
+            structural_counts=(2, 10, 2),
+        )
+        
+        # Override with our specific test data
+        report = replace(report,
+            structured_data_analysis=StructuredDataAnalysis(
+                article_id="article-1",
+                article_version_id="version-1",
+                article_node_present=True,
+                declared_node_types=("Article", "Person", "Organization"),
+                declared_article_properties=("author", "publisher"),
+                all_declared_properties=("author", "publisher"),
+                missing_article_properties=("datePublished",)
+            ),
+            internal_link_analysis=InternalLinkAnalysisResult(
+                article_id="article-1",
+                article_version_id="version-1",
+                outgoing_link_count=5,
+                unique_target_count=5,
+                body_link_count=0,
+                incoming_link_count=1,
+                potential_orphan=False,
+                outbound_domains=("footer1.com", "footer2.com", "footer3.com", "footer4.com", "footer5.com"),
+                third_party_ratio=1.0,
+                trust_index=0.0,
+            )
+        )
+        
+        assessment = AssessAIReadiness().execute(report)
+        self.assertIsNotNone(assessment.geo_score)
+        # Base values in test:
+        # author_declared = 100.0
+        # trust_index = 0.0 -> citation_quality = 0.0
+        # third_party_ratio = 1.0 -> independence = 100.0
+        # unsupported_entity_ratio = 0.0 -> evidence = 100.0
+        # (100 + 0 + 100 + 100) / 4 = 75.0
+        self.assertEqual(assessment.geo_score.entity_authority.dimension_score, 75.0)
 
 if __name__ == "__main__":
     unittest.main()

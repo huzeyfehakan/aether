@@ -216,31 +216,35 @@ class AssessAIReadiness:
             semantic_comp = max(0.0, (base_score * balance))
         
         # 2. Entity & Authority (30%)
-        # Based on Structured Data identity declarations & Earned Media multiplier
-        entity_auth = None
+        # Her bilesen makale-kapsamli ve bagimsiz olculur. Olculemeyen bir
+        # bilesen ortalamaya sifir olarak girmez, ortalamadan tamamen duser:
+        # sabit /4.0 paydasi, calistirilmamis bir analizi kotu bir sonuc gibi
+        # puanliyordu (0005).
         sd_analysis = report.structured_data_analysis
-        
-        if sd_analysis is not None:
-            # Puanlama (Toplam 100):
-            # article-scoped veriler uzerinden gerceklesir:
-            author_declared = 100.0 if "author" in sd_analysis.declared_article_properties else 0.0
-            
-            citation_quality = 0.0
-            independence = 0.0
-            links = report.internal_link_analysis
-            if links:
-                citation_quality = links.trust_index * 100.0
-                independence = links.third_party_ratio * 100.0
-                
-            evidence = 0.0
-            struct = report.structural_analysis
-            if struct:
-                evidence = (1.0 - struct.unsupported_entity_ratio) * 100.0
+        links = report.internal_link_analysis
+        struct = report.structural_analysis
 
-            # schema eksikse (None ise) boyut dusurulmeli, bu 0 demek degil.
-            entity_auth = (author_declared + citation_quality + independence + evidence) / 4.0
-        else:
-            entity_auth = 0.0
+        components = []
+
+        # Beyan edilmemis yazar olculmus bir eksikliktir. Yapisal veri analizi
+        # hic komposize edilmemisse (taslak akisi) hicbir sey olculmemistir.
+        if sd_analysis is not None:
+            components.append(
+                100.0 if "author" in sd_analysis.declared_article_properties else 0.0
+            )
+
+        if links is not None:
+            # Esik gerektirmeyen ikili olcum: govde disariya atif yapiyor mu?
+            components.append(100.0 if links.outbound_body_domains else 0.0)
+            if links.trust_index is not None:
+                components.append(links.trust_index * 100.0)
+            if links.third_party_ratio is not None:
+                components.append(links.third_party_ratio * 100.0)
+
+        if struct is not None and struct.unsupported_entity_ratio is not None:
+            components.append((1.0 - struct.unsupported_entity_ratio) * 100.0)
+
+        entity_auth = sum(components) / len(components) if components else None
             
         # 3. Structural Richness (15%)
         # Direct Answer Patterns + Table/List Density

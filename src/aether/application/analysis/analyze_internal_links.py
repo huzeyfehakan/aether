@@ -1,6 +1,7 @@
 """Discoverability metrics via internal link analysis."""
 
 from dataclasses import dataclass
+from typing import Optional
 
 from aether.domain.common import DomainValidationError
 from aether.domain.content import Article
@@ -18,9 +19,15 @@ class InternalLinkAnalysisResult:
     body_link_count: int
     incoming_link_count: int
     potential_orphan: bool
-    outbound_domains: tuple[str, ...] = ()
-    third_party_ratio: float = 1.0
-    trust_index: float = 0.0
+    outbound_body_domains: tuple[str, ...] = ()
+    #: Both are ratios over the set of domains the body cites. When that set is
+    #: empty there is nothing to take a ratio of, so both are ``None``: a
+    #: default of 1.0 awarded full independence to an article that cited
+    #: nothing, and 0.0 would pass judgement on citations that do not exist.
+    #: Whether the body cites anything at all is a separate, always-measurable
+    #: fact, and it is already reported as NO_OUTBOUND_LINKS.
+    third_party_ratio: Optional[float] = None
+    trust_index: Optional[float] = None
 
 
 class AnalyzeInternalLinks:
@@ -65,8 +72,8 @@ class AnalyzeInternalLinks:
 
         # Third-Party & Trust Index
         outbound = source_data.outbound_body_domains
-        third_party_ratio = 1.0
-        trust_index = 0.0
+        third_party_ratio = None
+        trust_index = None
         
         if outbound:
             import re
@@ -114,7 +121,7 @@ class AnalyzeInternalLinks:
             body_link_count=body_link_count,
             incoming_link_count=incoming_link_count,
             potential_orphan=(incoming_link_count == 0),
-            outbound_domains=source_data.outbound_body_domains,
+            outbound_body_domains=source_data.outbound_body_domains,
             third_party_ratio=third_party_ratio,
             trust_index=trust_index,
         )

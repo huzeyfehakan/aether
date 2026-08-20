@@ -234,8 +234,8 @@ class DeriveEditorRecommendations:
                 
         # Discoverability & Link Authority
         links = report.internal_link_analysis
-        if links:
-            if not getattr(links, 'outbound_domains', ()):
+        if links is not None:
+            if not getattr(links, 'outbound_body_domains', ()):
                 recommendations.append(EditorRecommendation(code=RecommendationCode.NO_OUTBOUND_LINKS))
             if links.body_link_count == 0:
                 recommendations.append(EditorRecommendation(code=RecommendationCode.NO_INTERNAL_BODY_LINKS))
@@ -248,11 +248,12 @@ class DeriveEditorRecommendations:
                 recommendations.append(EditorRecommendation(code=RecommendationCode.MISSING_SAME_AS_SCHEMA))
                 
         # Content Bloat & Unsupported Entities
-        if report.structural_analysis:
+        if report.structural_analysis is not None:
             if getattr(report.structural_analysis, 'heading_passage_overlap_ratio', 1.0) == 0.0 and getattr(report.structural_analysis, 'definitive_stance_ratio', 1.0) == 0.0:
                 if report.structural_analysis.total_passage_count > 3: # Only for longer articles
                     recommendations.append(EditorRecommendation(code=RecommendationCode.CONTENT_BLOAT))
-            if getattr(report.structural_analysis, 'unsupported_entity_ratio', 0.0) > 0.0:
+            unsupported = report.structural_analysis.unsupported_entity_ratio
+            if unsupported is not None and unsupported > 0.0:
                 recommendations.append(EditorRecommendation(code=RecommendationCode.UNSUPPORTED_ENTITIES))
                 
         return tuple(recommendations)

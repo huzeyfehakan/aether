@@ -2,7 +2,7 @@
 
 import re
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Optional, Tuple
 
 from aether.domain.common import DomainValidationError
 from aether.domain.content import Article, ArticleVersion, Passage
@@ -24,7 +24,9 @@ class ArticleStructuralAnalysis:
     unanswered_question_heading_count: int
     heading_passage_overlap_ratio: float = 0.0
     definitive_stance_ratio: float = 0.0
-    unsupported_entity_ratio: float = 0.0
+    #: None when no paragraph names an entity: there is no population to take
+    #: the ratio over, and 0.0 read as "every entity is supported".
+    unsupported_entity_ratio: Optional[float] = None
 
 
 class AnalyzeArticleStructure:
@@ -62,7 +64,7 @@ class AnalyzeArticleStructure:
                 if not evidence_regex.search(text):
                     unsupported_entity_paragraphs += 1
                     
-        unsupported_ratio = 0.0
+        unsupported_ratio = None
         if entity_paragraphs > 0:
             unsupported_ratio = unsupported_entity_paragraphs / entity_paragraphs
 

@@ -39,6 +39,10 @@ from aether.application.analysis.analyze_topic_introduction import (
     AnalyzeTopicIntroduction,
     TopicIntroductionAnalysis,
 )
+from aether.application.analysis.analyze_fluency import (
+    AnalyzeFluency,
+    FluencyAnalysis,
+)
 from aether.domain.common import DomainValidationError
 from aether.domain.content import Article
 
@@ -61,11 +65,9 @@ class ArticleAnalysisReport:
     declared_consistency_analysis: Optional[DeclaredConsistencyAnalysis] = None
     heading_structure_analysis: Optional[HeadingStructureAnalysis] = None
     internal_link_analysis: Optional[InternalLinkAnalysisResult] = None
-    #: An unpublished draft. Metadata, declared consistency and structured data
-    #: describe the published page, which does not exist yet, so findings about
-    #: them would be about the CMS template rather than the draft.
     is_draft: bool = False
     topic_introduction_analysis: Optional[TopicIntroductionAnalysis] = None
+    fluency_analysis: Optional[FluencyAnalysis] = None
 
     def __post_init__(self) -> None:
         analyses = [
@@ -73,18 +75,28 @@ class ArticleAnalysisReport:
             self.metadata_analysis,
             self.passage_quality_analysis,
         ]
+
         if self.content_duplication_analysis is not None:
             analyses.append(self.content_duplication_analysis)
+
         if self.structured_data_analysis is not None:
             analyses.append(self.structured_data_analysis)
+
         if self.declared_consistency_analysis is not None:
             analyses.append(self.declared_consistency_analysis)
+
         if self.heading_structure_analysis is not None:
             analyses.append(self.heading_structure_analysis)
+
         if self.internal_link_analysis is not None:
             analyses.append(self.internal_link_analysis)
+
         if self.topic_introduction_analysis is not None:
             analyses.append(self.topic_introduction_analysis)
+
+        if self.fluency_analysis is not None:
+            analyses.append(self.fluency_analysis)
+
         article_ids = {analysis.article_id for analysis in analyses}
         version_ids = {analysis.article_version_id for analysis in analyses}
 
@@ -92,7 +104,6 @@ class ArticleAnalysisReport:
             raise DomainValidationError(
                 "all report analyses must refer to the same article version"
             )
-
 
 class BuildArticleAnalysisReport:
     """Compose a report by executing the already-defined raw analysis use cases."""
@@ -109,6 +120,7 @@ class BuildArticleAnalysisReport:
         internal_link_analysis: Optional[AnalyzeInternalLinks] = None,
         is_draft: bool = False,
         topic_introduction_analysis: Optional[AnalyzeTopicIntroduction] = None,
+        fluency_analysis: Optional[AnalyzeFluency] = None,
     ) -> None:
         self._structure_analysis = structure_analysis
         self._metadata_analysis = metadata_analysis
@@ -120,6 +132,7 @@ class BuildArticleAnalysisReport:
         self._internal_link_analysis = internal_link_analysis
         self._is_draft = is_draft
         self._topic_introduction_analysis = topic_introduction_analysis
+        self._fluency_analysis = fluency_analysis
 
     def execute(self, article: Article, article_version_id: str) -> ArticleAnalysisReport:
         return ArticleAnalysisReport(
@@ -173,4 +186,11 @@ class BuildArticleAnalysisReport:
                 if self._topic_introduction_analysis is not None
                 else None
             ),
+            fluency_analysis=(
+    self._fluency_analysis.execute(
+        article, article_version_id
+    )
+    if self._fluency_analysis is not None
+    else None
+),
         )

@@ -221,7 +221,7 @@
                 <div class="metric-card">
                     <p class="score-weight">%${d.weight}</p>
                     <h4 style="margin: 0 0 5px; font-size: 1rem;">${d.label}</h4>
-                    <strong style="color: #45617d;">${d.val.toFixed(1)} / 100</strong>
+                    <strong style="color: #45617d;">${d.val !== null ? d.val.toFixed(1) + ' / 100' : 'N/A'}</strong>
                 </div>
             `).join('');
             document.querySelector('#score-section').classList.remove('hidden');
@@ -242,7 +242,7 @@
                 <div class="metric-card">
                     <p class="score-weight">%${d.weight}</p>
                     <h4 style="margin: 0 0 5px; font-size: 1rem;">${d.label}</h4>
-                    <strong style="color: #45617d;">${d.val.toFixed(1)} / 100</strong>
+                    <strong style="color: #45617d;">${d.val !== null ? d.val.toFixed(1) + ' / 100' : 'N/A'}</strong>
                 </div>
             `).join('');
         }

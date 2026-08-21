@@ -342,6 +342,27 @@ def _recommendation_views(report: Any, category) -> list:
     return list(grouped.values())
 
 
+def _geo_dimension_view(name: str, dimension: Any, detail: Any) -> Dict[str, Any]:
+    return {
+        "key": name,
+        "val": dimension.dimension_score,
+        "label": geo_dimension_text(name)["label"],
+        "weight": dimension.weight_percentage,
+        "detail": {
+            "label": detail.label,
+            "dimension_score": detail.dimension_score,
+            "signals": [
+                {
+                    "label": signal.label,
+                    "value": signal.value,
+                    "explanation": signal.explanation,
+                }
+                for signal in detail.signals
+            ],
+        },
+    }
+
+
 def _report_view(report: Any) -> Dict[str, Any]:
     """Expose existing report facts for the web UI without re-assessing them."""
 
@@ -360,10 +381,26 @@ def _report_view(report: Any) -> Dict[str, Any]:
             } if hasattr(report, 'assessment_summary') and hasattr(report.assessment_summary, 'seo_score') else None,
             "geo_score": {
                 "total": report.assessment_summary.geo_score.total,
-                "semantic_completeness": {"val": report.assessment_summary.geo_score.semantic_completeness.dimension_score, "label": geo_dimension_text("semantic_completeness")["label"], "weight": report.assessment_summary.geo_score.semantic_completeness.weight_percentage},
-                "entity_authority": {"val": report.assessment_summary.geo_score.entity_authority.dimension_score, "label": geo_dimension_text("entity_authority")["label"], "weight": report.assessment_summary.geo_score.entity_authority.weight_percentage},
-                "structural_richness": {"val": report.assessment_summary.geo_score.structural_richness.dimension_score, "label": geo_dimension_text("structural_richness")["label"], "weight": report.assessment_summary.geo_score.structural_richness.weight_percentage},
-                "discoverability": {"val": report.assessment_summary.geo_score.discoverability.dimension_score, "label": geo_dimension_text("discoverability")["label"], "weight": report.assessment_summary.geo_score.discoverability.weight_percentage},
+                "semantic_completeness": _geo_dimension_view(
+                    "semantic_completeness",
+                    report.assessment_summary.geo_score.semantic_completeness,
+                    report.assessment_summary.geo_score.semantic_completeness_detail,
+                ),
+                "entity_authority": _geo_dimension_view(
+                    "entity_authority",
+                    report.assessment_summary.geo_score.entity_authority,
+                    report.assessment_summary.geo_score.entity_authority_detail,
+                ),
+                "structural_richness": _geo_dimension_view(
+                    "structural_richness",
+                    report.assessment_summary.geo_score.structural_richness,
+                    report.assessment_summary.geo_score.structural_richness_detail,
+                ),
+                "discoverability": _geo_dimension_view(
+                    "discoverability",
+                    report.assessment_summary.geo_score.discoverability,
+                    report.assessment_summary.geo_score.discoverability_detail,
+                ),
             } if hasattr(report, 'assessment_summary') and hasattr(report.assessment_summary, 'geo_score') else None,
         },
         "metadata": (

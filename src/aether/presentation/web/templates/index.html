@@ -36,6 +36,15 @@
       .technical { margin-top: 28px; } .technical pre { background: #101d2c; border-radius: 10px; color: #dce9f7; margin: 14px 0 0; overflow: auto; padding: 16px; white-space: pre-wrap; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
       .score-headline { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; } .score-total { font-size: 2.2rem; font-weight: 800; color: #086ad8; line-height: 1; }
       .score-weight { color: #d63c30; font-weight: 800; font-size: 1.1rem; margin: 0 0 4px; }
+      .geo-dimension-button { background: transparent; border: 0; color: inherit; cursor: pointer; font: inherit; padding: 0; text-align: left; width: 100%; }
+      .geo-dimension-button:focus-visible { outline: 3px solid #086ad833; outline-offset: 4px; }
+      .geo-detail-hint { color: #0768d7; display: inline-block; font-size: .8rem; font-weight: 700; margin-top: 9px; }
+      .geo-dimension-detail { border-top: 1px solid #e0e8f1; margin-top: 13px; padding-top: 13px; }
+      .geo-dimension-detail h5 { font-size: .92rem; margin: 0 0 10px; }
+      .geo-signal-list { list-style: none; margin: 0; padding: 0; }
+      .geo-signal-row { align-items: baseline; display: flex; gap: 10px; justify-content: space-between; padding: 5px 0; }
+      .geo-signal-row span { color: #58677b; font-size: .84rem; }
+      .geo-signal-row strong { font-size: .86rem; white-space: nowrap; }
       @media (max-width: 640px) { .shell { width: min(100% - 28px, 1120px); padding-top: 30px; } .form-panel, #report-card { padding: 19px; } .tabs { overflow-x: auto; } }
     </style>
   </head>
@@ -151,6 +160,30 @@
       const titleCase = (value) => String(value || '').charAt(0).toUpperCase() + String(value || '').slice(1);
       const statusBadge = (value) => `<span class="badge ${value}">${titleCase(value)}</span>`;
       const metric = (label, value) => `<div class="metric-card"><p>${label}</p><strong>${value}</strong></div>`;
+      const scoreValue = (value) => value !== null ? `${value.toFixed(1)} / 100` : 'Not measured';
+      const geoDimensionCard = (dimension) => {
+        if (!dimension.detail) {
+          return `<div class="metric-card"><p class="score-weight">%${dimension.weight}</p><h4 style="margin: 0 0 5px; font-size: 1rem;">${dimension.label}</h4><strong style="color: #45617d;">${scoreValue(dimension.val)}</strong></div>`;
+        }
+        const detailId = `geo-${dimension.key.replaceAll('_', '-')}-detail`;
+        const rows = dimension.detail.signals.map((signal) => `
+          <li class="geo-signal-row" title="${signal.explanation}">
+            <span>&bull; ${signal.label}</span><strong>${signal.value === null ? 'Not measured' : signal.value.toFixed(1)}</strong>
+          </li>
+        `).join('');
+        return `<div class="metric-card">
+          <button type="button" class="geo-dimension-button" data-geo-detail-toggle aria-expanded="false" aria-controls="${detailId}">
+            <p class="score-weight">%${dimension.weight}</p>
+            <h4 style="margin: 0 0 5px; font-size: 1rem;">${dimension.label}</h4>
+            <strong style="color: #45617d;">${scoreValue(dimension.val)}</strong>
+            <span class="geo-detail-hint">Details &#9662;</span>
+          </button>
+          <div id="${detailId}" class="geo-dimension-detail hidden">
+            <h5>${dimension.detail.label}: ${scoreValue(dimension.detail.dimension_score)}</h5>
+            <ul class="geo-signal-list">${rows}</ul>
+          </div>
+        </div>`;
+      };
 
       // A recommendation reads the same whether it came from a draft or a
       // published article, so these live here rather than inside one renderer.
@@ -238,13 +271,21 @@
                 assessment.geo_score.discoverability
             ];
             
-            document.querySelector('#geo-score-grid').innerHTML = geoDimensions.map(d => `
-                <div class="metric-card">
-                    <p class="score-weight">%${d.weight}</p>
-                    <h4 style="margin: 0 0 5px; font-size: 1rem;">${d.label}</h4>
-                    <strong style="color: #45617d;">${d.val !== null ? d.val.toFixed(1) + ' / 100' : 'N/A'}</strong>
-                </div>
-            `).join('');
+            document.querySelector('#geo-score-grid').innerHTML = geoDimensions.map(geoDimensionCard).join('');
+            const geoToggleButtons = document.querySelectorAll('[data-geo-detail-toggle]');
+            geoToggleButtons.forEach((button) => {
+              button.addEventListener('click', () => {
+                const detail = document.querySelector(`#${button.getAttribute('aria-controls')}`);
+                const expanded = button.getAttribute('aria-expanded') === 'true';
+                geoToggleButtons.forEach((otherButton) => {
+                  if (otherButton === button) return;
+                  otherButton.setAttribute('aria-expanded', 'false');
+                  document.querySelector(`#${otherButton.getAttribute('aria-controls')}`).classList.add('hidden');
+                });
+                button.setAttribute('aria-expanded', String(!expanded));
+                detail.classList.toggle('hidden', expanded);
+              });
+            });
         }
 
         const cards = [

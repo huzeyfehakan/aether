@@ -79,6 +79,28 @@ class AIReadinessReportRendererTests(unittest.TestCase):
         self.assertEqual(payload["article_identity"]["article_id"], "article-1")
         self.assertEqual(payload["structural_summary"]["total_word_count"], 4)
         self.assertTrue(payload["metadata_summary"]["author_available"])
+        entity_detail = payload["assessment_summary"]["geo_score"][
+            "entity_authority"
+        ]["detail"]
+        signals = {
+            signal["label"]: signal["value"]
+            for signal in entity_detail["signals"]
+        }
+        self.assertEqual(signals["Citation coverage"], 0.0)
+        self.assertIsNone(signals["Claim evidence coverage"])
+        geo_score = payload["assessment_summary"]["geo_score"]
+        for dimension in (
+            "semantic_completeness",
+            "entity_authority",
+            "structural_richness",
+            "discoverability",
+        ):
+            self.assertIn("detail", geo_score[dimension])
+        structural_signals = {
+            signal["label"]: signal["value"]
+            for signal in geo_score["structural_richness"]["detail"]["signals"]
+        }
+        self.assertIsNone(structural_signals["Answered question ratio"])
         self.assertNotIn("score", payload)
         self.assertNotIn("recommendations", payload)
 
@@ -90,6 +112,7 @@ class AIReadinessReportRendererTests(unittest.TestCase):
         self.assertIn("Structural Summary", rendered)
         self.assertIn("Extracted Metadata", rendered)
         self.assertIn("Metadata Completeness: partial", rendered)
+        self.assertIn("Claim evidence coverage: Not measured", rendered)
         # Optional sections are absent when their analysis was not composed.
         self.assertNotIn("Structured Data (Schema.org)", rendered)
         self.assertIn("Metadata Completeness: partial", rendered)

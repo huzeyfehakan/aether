@@ -319,6 +319,102 @@ class WebPresentationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return response.json()["view"]
 
+    def test_entity_authority_detail_is_exposed_from_report_signals(self):
+        entity_authority = self._analysed_view()["assessment"]["geo_score"][
+            "entity_authority"
+        ]
+        detail = entity_authority["detail"]
+
+        self.assertEqual(detail["label"], "Entity Authority")
+        self.assertEqual(detail["dimension_score"], entity_authority["val"])
+        self.assertEqual(
+            [signal["label"] for signal in detail["signals"]],
+            [
+                "Author declaration",
+                "Outbound body sources",
+                "Trust index",
+                "Third-party source ratio",
+                "Supported entities",
+                "Citation coverage",
+                "Claim evidence coverage",
+            ],
+        )
+
+    def test_all_geo_dimension_details_are_exposed_from_report_signals(self):
+        geo_score = self._analysed_view()["assessment"]["geo_score"]
+
+        self.assertEqual(
+            [
+                signal["label"]
+                for signal in geo_score["semantic_completeness"]["detail"]["signals"]
+            ],
+            [
+                "Statistics coverage",
+                "Heading-passage overlap",
+                "Definitive stance",
+                "Passage balance",
+                "Sentence balance",
+                "Structural variety",
+            ],
+        )
+        self.assertEqual(
+            [
+                signal["label"]
+                for signal in geo_score["structural_richness"]["detail"]["signals"]
+            ],
+            [
+                "Table word share",
+                "List word share",
+                "Blockquote word share",
+                "Structured content ratio",
+                "Answered question ratio",
+            ],
+        )
+        self.assertEqual(
+            [
+                signal["label"]
+                for signal in geo_score["discoverability"]["detail"]["signals"]
+            ],
+            ["Outgoing links", "Body links", "Body link ratio", "Unique targets"],
+        )
+
+    def test_all_geo_cards_have_accessible_toggles_and_detail_rows(self):
+        template = self._template()
+        self.assertIn("data-geo-detail-toggle", template)
+        self.assertIn('aria-expanded="false"', template)
+        self.assertIn('aria-controls="${detailId}"', template)
+
+        view = self._analysed_view()
+        dom = run_page_script(
+            f"renderReport({json.dumps(view)}, 'report');"
+        )
+        rendered = dom["#geo-score-grid"]["html"]
+        self.assertEqual(rendered.count('aria-expanded="false"'), 4)
+        self.assertEqual(rendered.count("aria-controls="), 4)
+        self.assertEqual(rendered.count("Details"), 4)
+        self.assertIn("Semantic Completeness", rendered)
+        self.assertIn("Entity Authority", rendered)
+        self.assertIn("Structural Richness", rendered)
+        self.assertIn("Discoverability", rendered)
+        self.assertIn("Statistics coverage", rendered)
+        self.assertIn("Author declaration", rendered)
+        self.assertIn("Citation coverage", rendered)
+        self.assertIn("Claim evidence coverage", rendered)
+        self.assertIn("Structured content ratio", rendered)
+        self.assertIn("Body link ratio", rendered)
+        self.assertIn("Not measured", rendered)
+
+    def test_geo_toggle_closes_other_dimension_panels(self):
+        template = self._template()
+
+        self.assertIn("geoToggleButtons.forEach((otherButton)", template)
+        self.assertIn("if (otherButton === button) return;", template)
+        self.assertIn(
+            "otherButton.setAttribute('aria-expanded', 'false');",
+            template,
+        )
+        self.assertIn("classList.add('hidden')", template)
+
     def test_template_only_reads_view_fields_the_server_sends(self):
         """Guards the drift that removing a report field previously caused."""
         referenced = set(re.findall(r"view\.([a-z_]+)", self._template()))

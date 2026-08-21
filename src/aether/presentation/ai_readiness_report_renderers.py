@@ -79,6 +79,26 @@ def _score_mapping(score) -> dict:
             "dimension_score": score.discoverability.dimension_score,
             "weighted_contribution": score.discoverability.weighted_contribution,
         }
+    for dimension_name in (
+        "semantic_completeness",
+        "entity_authority",
+        "structural_richness",
+        "discoverability",
+    ):
+        detail = getattr(score, f"{dimension_name}_detail", None)
+        if detail is not None:
+            result[dimension_name]["detail"] = {
+                "label": detail.label,
+                "dimension_score": detail.dimension_score,
+                "signals": [
+                    {
+                        "label": signal.label,
+                        "value": signal.value,
+                        "explanation": signal.explanation,
+                    }
+                    for signal in detail.signals
+                ],
+            }
     return result
 
 def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
@@ -180,9 +200,13 @@ class PlainTextAIReadinessReportRenderer:
             "GEO Score (Generative Engine Optimization)",
             f" Total Score: {geo.total}",
             f" - Semantic Completeness ({geo.semantic_completeness.weight_percentage}%): {'N/A' if geo.semantic_completeness.dimension_score is None else f'{geo.semantic_completeness.dimension_score:.1f}'}",
+            *self._geo_detail_lines(geo.semantic_completeness_detail),
             f" - Entity Authority ({geo.entity_authority.weight_percentage}%): {'N/A' if geo.entity_authority.dimension_score is None else f'{geo.entity_authority.dimension_score:.1f}'}",
+            *self._geo_detail_lines(geo.entity_authority_detail),
             f" - Structural Richness ({geo.structural_richness.weight_percentage}%): {'N/A' if geo.structural_richness.dimension_score is None else f'{geo.structural_richness.dimension_score:.1f}'}",
+            *self._geo_detail_lines(geo.structural_richness_detail),
             f" - Discoverability ({geo.discoverability.weight_percentage}%): {'N/A' if geo.discoverability.dimension_score is None else f'{geo.discoverability.dimension_score:.1f}'}",
+            *self._geo_detail_lines(geo.discoverability_detail),
             "",
             "Structural Summary",
             f"Total Passages: {structural.total_passage_count}",
@@ -198,6 +222,14 @@ class PlainTextAIReadinessReportRenderer:
             f"Metadata Completeness: {assessment.metadata_completeness.value}",
         ) + self._structured_data_lines(report)
         return "\n".join(list(lines) + list(self._recommendation_lines(report)))
+
+    @staticmethod
+    def _geo_detail_lines(detail) -> tuple:
+        return tuple(
+            f"   - {signal.label}: "
+            f"{'Not measured' if signal.value is None else f'{signal.value:.1f}'}"
+            for signal in detail.signals
+        )
 
     @staticmethod
     def _structured_data_lines(report: AIReadinessReport) -> tuple:
@@ -329,9 +361,13 @@ class MarkdownAIReadinessReportRenderer:
             f"**Total Score: {geo.total} / 100**",
             "",
             f"- **Semantic Completeness ({geo.semantic_completeness.weight_percentage}%)**: {'N/A' if geo.semantic_completeness.dimension_score is None else f'{geo.semantic_completeness.dimension_score:.1f}'}",
+            *self._markdown_geo_detail_lines(geo.semantic_completeness_detail),
             f"- **Entity Authority ({geo.entity_authority.weight_percentage}%)**: {'N/A' if geo.entity_authority.dimension_score is None else f'{geo.entity_authority.dimension_score:.1f}'}",
+            *self._markdown_geo_detail_lines(geo.entity_authority_detail),
             f"- **Structural Richness ({geo.structural_richness.weight_percentage}%)**: {'N/A' if geo.structural_richness.dimension_score is None else f'{geo.structural_richness.dimension_score:.1f}'}",
+            *self._markdown_geo_detail_lines(geo.structural_richness_detail),
             f"- **Discoverability ({geo.discoverability.weight_percentage}%)**: {'N/A' if geo.discoverability.dimension_score is None else f'{geo.discoverability.dimension_score:.1f}'}",
+            *self._markdown_geo_detail_lines(geo.discoverability_detail),
             "",
             "## Structural Summary",
             "",
@@ -365,3 +401,11 @@ class MarkdownAIReadinessReportRenderer:
             )
         )
         return "\n".join(lines)
+
+    @staticmethod
+    def _markdown_geo_detail_lines(detail) -> tuple:
+        return tuple(
+            f"  - {signal.label}: "
+            f"{'Not measured' if signal.value is None else f'{signal.value:.1f}'}"
+            for signal in detail.signals
+        )

@@ -184,6 +184,12 @@
           </div>
         </div>`;
       };
+      const toggleGeoDetail = (button) => {
+        const detail = document.querySelector(`#${button.getAttribute('aria-controls')}`);
+        const expanded = button.getAttribute('aria-expanded') === 'true';
+        button.setAttribute('aria-expanded', String(!expanded));
+        detail.classList.toggle('hidden', expanded);
+      };
 
       // A recommendation reads the same whether it came from a draft or a
       // published article, so these live here rather than inside one renderer.
@@ -274,17 +280,7 @@
             document.querySelector('#geo-score-grid').innerHTML = geoDimensions.map(geoDimensionCard).join('');
             const geoToggleButtons = document.querySelectorAll('[data-geo-detail-toggle]');
             geoToggleButtons.forEach((button) => {
-              button.addEventListener('click', () => {
-                const detail = document.querySelector(`#${button.getAttribute('aria-controls')}`);
-                const expanded = button.getAttribute('aria-expanded') === 'true';
-                geoToggleButtons.forEach((otherButton) => {
-                  if (otherButton === button) return;
-                  otherButton.setAttribute('aria-expanded', 'false');
-                  document.querySelector(`#${otherButton.getAttribute('aria-controls')}`).classList.add('hidden');
-                });
-                button.setAttribute('aria-expanded', String(!expanded));
-                detail.classList.toggle('hidden', expanded);
-              });
+              button.addEventListener('click', () => toggleGeoDetail(button));
             });
         }
 

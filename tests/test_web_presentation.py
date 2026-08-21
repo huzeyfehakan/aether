@@ -404,16 +404,37 @@ class WebPresentationTests(unittest.TestCase):
         self.assertIn("Body link ratio", rendered)
         self.assertIn("Not measured", rendered)
 
-    def test_geo_toggle_closes_other_dimension_panels(self):
-        template = self._template()
+    def test_geo_dimension_panels_toggle_independently(self):
+        dom = run_page_script("""
+          const semanticButton = document.querySelector('#semantic-button');
+          const entityButton = document.querySelector('#entity-button');
+          semanticButton.setAttribute('aria-controls', 'semantic-panel');
+          entityButton.setAttribute('aria-controls', 'entity-panel');
+          semanticButton.setAttribute('aria-expanded', 'false');
+          entityButton.setAttribute('aria-expanded', 'false');
+          document.querySelector('#semantic-panel').classList.add('hidden');
+          document.querySelector('#entity-panel').classList.add('hidden');
 
-        self.assertIn("geoToggleButtons.forEach((otherButton)", template)
-        self.assertIn("if (otherButton === button) return;", template)
-        self.assertIn(
-            "otherButton.setAttribute('aria-expanded', 'false');",
-            template,
-        )
-        self.assertIn("classList.add('hidden')", template)
+          toggleGeoDetail(semanticButton);
+          toggleGeoDetail(entityButton);
+          document.querySelector('#both-open').textContent = [
+            semanticButton.getAttribute('aria-expanded'),
+            entityButton.getAttribute('aria-expanded'),
+            document.querySelector('#semantic-panel').classList.contains('hidden'),
+            document.querySelector('#entity-panel').classList.contains('hidden')
+          ].join(',');
+
+          toggleGeoDetail(semanticButton);
+          document.querySelector('#one-closed').textContent = [
+            semanticButton.getAttribute('aria-expanded'),
+            entityButton.getAttribute('aria-expanded'),
+            document.querySelector('#semantic-panel').classList.contains('hidden'),
+            document.querySelector('#entity-panel').classList.contains('hidden')
+          ].join(',');
+        """)
+
+        self.assertEqual(dom["#both-open"]["text"], "true,true,false,false")
+        self.assertEqual(dom["#one-closed"]["text"], "false,true,true,false")
 
     def test_template_only_reads_view_fields_the_server_sends(self):
         """Guards the drift that removing a report field previously caused."""

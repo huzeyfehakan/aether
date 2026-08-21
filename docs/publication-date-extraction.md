@@ -13,9 +13,11 @@ deterministic precedence order:
 JSON-LD scripts and JSON objects are considered in document order. A
 malformed JSON-LD script is not a parseable Article candidate. Once an
 Article/NewsArticle exposes `datePublished`, that selected value is validated
-as an aware ISO-8601 datetime. A missing, blank, malformed, or timezone-naive
-selected value produces an explicit validation error; Aether does not silently
-use a lower-priority value.
+as an ISO-8601 date or datetime. A valid datetime without a timezone is
+deterministically normalized to UTC, as is a date-only value at midnight;
+timezone-aware values retain their declared offset. A missing, blank, or
+malformed selected value produces an explicit validation error; Aether does not
+silently use a lower-priority value.
 
 This is publisher-agnostic. It uses HTML and Schema.org semantics only, not
 publisher names, domains, or URL patterns.

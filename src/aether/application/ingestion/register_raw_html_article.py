@@ -329,7 +329,9 @@ def canonical_url_from_html(html: str, base_url: Optional[str] = None) -> Option
 _DATE_ONLY_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}\Z")
 
 
-def _parse_source_timestamp(value: str, field_name: str) -> datetime:
+def _parse_source_timestamp(
+    value: str, field_name: str, *, normalize_naive_to_utc: bool = False
+) -> datetime:
     """Parse a publisher timestamp, normalizing a date-only value to midnight UTC.
 
     Schema.org types ``datePublished`` and ``dateModified`` as Date or DateTime,
@@ -338,9 +340,8 @@ def _parse_source_timestamp(value: str, field_name: str) -> datetime:
     an instant the publisher did not state, which is acceptable here because the
     product exposes only the calendar date and whether one is available.
 
-    A value that does state a time of day without a timezone remains an error.
-    Unlike a date, it asserts a time in an unknown zone, so normalizing it would
-    silently move the instant by up to a day.
+    A value that states a time of day without a timezone remains an error unless
+    the caller explicitly opts into deterministic UTC normalization.
     """
     normalized = value.strip().replace("Z", "+00:00")
     if _DATE_ONLY_PATTERN.match(normalized):
@@ -353,6 +354,8 @@ def _parse_source_timestamp(value: str, field_name: str) -> datetime:
         parsed = datetime.fromisoformat(normalized)
     except ValueError as error:
         raise DomainValidationError(f"{field_name} must be ISO-8601") from error
+    if normalize_naive_to_utc and parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
     require_aware(parsed, field_name)
     return parsed
 
@@ -725,7 +728,9 @@ class HtmlArticleNormalizer:
         )
         if json_ld_published_value is not None:
             return _parse_source_timestamp(
-                json_ld_published_value, "JSON-LD Article datePublished"
+                json_ld_published_value,
+                "JSON-LD Article datePublished",
+                normalize_naive_to_utc=True,
             )
         published_value = self._first_metadata(
             collector.metadata, ("article:published_time",)

@@ -162,8 +162,7 @@ class RawHtmlIngestionTests(unittest.TestCase):
             "2026-08-03T00:00:00+00:00",
         )
 
-    def test_still_rejects_a_time_of_day_without_a_timezone(self):
-        """A date carries no time; a naive datetime asserts one in an unknown zone."""
+    def test_normalizes_timezone_naive_json_ld_date_published_to_utc(self):
         html = """
             <html lang="en"><head><title>Naive datetime</title>
               <script type="application/ld+json">
@@ -172,10 +171,12 @@ class RawHtmlIngestionTests(unittest.TestCase):
             </head><body><main><p>Visible article paragraph.</p></main></body></html>
         """
 
-        with self.assertRaisesRegex(
-            DomainValidationError, "JSON-LD Article datePublished must be timezone-aware"
-        ):
-            self.register.execute(self.raw_article(html))
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(
+            result.article_version.source_published_at.isoformat(),
+            "2026-08-03T10:00:00+00:00",
+        )
 
     def test_rejects_a_malformed_date_only_value(self):
         html = """
@@ -596,7 +597,7 @@ class RawHtmlIngestionTests(unittest.TestCase):
             "2026-07-22T09:00:00+00:00",
         )
 
-    def test_rejects_invalid_selected_json_ld_date_without_falling_back(self):
+    def test_normalizes_naive_selected_json_ld_date_without_falling_back(self):
         html = """
             <html lang="en"><head>
               <meta property="article:published_time" content="2026-07-22T08:00:00+00:00" />
@@ -608,10 +609,12 @@ class RawHtmlIngestionTests(unittest.TestCase):
             </head><body><article><p>Visible article paragraph.</p></article></body></html>
         """
 
-        with self.assertRaisesRegex(
-            DomainValidationError, "JSON-LD Article datePublished must be timezone-aware"
-        ):
-            self.register.execute(self.raw_article(html))
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(
+            result.article_version.source_published_at.isoformat(),
+            "2026-07-22T10:00:00+00:00",
+        )
 
     def test_ingests_paragraphs_from_a_matching_server_supplied_json_payload(self):
         html = """

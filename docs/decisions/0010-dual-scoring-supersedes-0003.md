@@ -19,7 +19,7 @@ By separating SEO (traditional metadata, structured data, semantic quality, and 
 - **GEO vs SEO Split:** Traditional SEO focuses on crawlers (metadata, tags). GEO focuses on LLMs and RAG systems (entities, statistics, explicit declarations, and earned media). Combining them creates conflicting incentives. Separating them allows editors to optimize for the distinct requirements of AI Answer Engines (ChatGPT, Gemini, Perplexity).
 - **Deterministic Metrics:** The GEO score relies on strict, parser-driven metrics (e.g., `body_link_count / outgoing_link_count`, schema.org `author` / `publisher` presence) instead of arbitrary regex heuristics. 
 - **Fail Toward Silence:** In accordance with [0005](0005-fail-toward-silence.md), missing or unmeasurable data paths (e.g., a missing duplication analysis) do not yield `0.0` or `100.0`. They are evaluated as `None`, and the composite score dynamically recalculates its total using only the available weight percentages, preventing false penalties or free points.
-- **Earned Media Multiplier:** Entity Authority leverages outbound domains not as a base score, but as a bounded multiplier (up to 20%), rewarding real external citations while ignoring social media links.
+- **Entity Authority:** Calculated as an average of deterministic, article-scoped components: author declaration, presence of outbound body domains, citation trust (Trust Index), citation independence (Third-Party Ratio), and evidence (unsupported entity ratio). The scoring avoids arbitrary multipliers and uses a dynamic average to gracefully ignore unmeasurable components.
 
 ## Consequences
 

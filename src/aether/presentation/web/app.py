@@ -264,9 +264,7 @@ _IMPACT_MAP = {
     RecommendationCode.TITLE_SOURCES_DISAGREE: "Semantic Quality",
     RecommendationCode.DESCRIPTION_SOURCES_DISAGREE: "Semantic Quality",
     RecommendationCode.NO_OUTBOUND_LINKS: "Entity Authority",
-    RecommendationCode.NO_CITATIONS: "Entity Authority",
     RecommendationCode.NO_STATISTICS: "Semantic Completeness",
-    RecommendationCode.ORPHAN_PAGE: "Discoverability",
     RecommendationCode.NO_INTERNAL_BODY_LINKS: "Discoverability",
     RecommendationCode.NO_TOP_LEVEL_HEADING: "Structural Richness",
     RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS: "Structural Richness",
@@ -278,7 +276,6 @@ _IMPACT_MAP = {
     RecommendationCode.SKIPPED_HEADING_LEVEL: "Structural Richness",
     RecommendationCode.CONFLICTING_PUBLISHED_DATES: "Metadata",
     RecommendationCode.UNSUPPORTED_ENTITIES: "Entity Authority",
-    RecommendationCode.LOW_TRUST_INDEX: "Entity Authority",
     RecommendationCode.MISSING_SAME_AS_SCHEMA: "Semantic Completeness",
 }
 

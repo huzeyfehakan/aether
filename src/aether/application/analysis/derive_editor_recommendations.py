@@ -58,15 +58,12 @@ class RecommendationCode(str, Enum):
     WEAK_TOPIC_INTRODUCTION = "weak_topic_introduction"
     # New GEO metric codes
     NO_OUTBOUND_LINKS = "no_outbound_links"
-    NO_CITATIONS = "no_citations"
     NO_STATISTICS = "no_statistics"
-    ORPHAN_PAGE = "orphan_page"
     NO_INTERNAL_BODY_LINKS = "no_internal_body_links"
     CONTENT_BLOAT = "content_bloat"
     SKIPPED_HEADING_LEVEL = "skipped_heading_level"
     CONFLICTING_PUBLISHED_DATES = "conflicting_published_dates"
     UNSUPPORTED_ENTITIES = "unsupported_entities"
-    LOW_TRUST_INDEX = "low_trust_index"
     MISSING_SAME_AS_SCHEMA = "missing_same_as_schema"
 
 
@@ -93,14 +90,11 @@ _CATEGORIES = {
     RecommendationCode.WEAK_TOPIC_INTRODUCTION: RecommendationCategory.EDITOR,
     # New GEO codes
     RecommendationCode.NO_OUTBOUND_LINKS: RecommendationCategory.EDITOR,
-    RecommendationCode.NO_CITATIONS: RecommendationCategory.EDITOR,
     RecommendationCode.NO_STATISTICS: RecommendationCategory.EDITOR,
-    RecommendationCode.ORPHAN_PAGE: RecommendationCategory.EDITOR,
     RecommendationCode.NO_INTERNAL_BODY_LINKS: RecommendationCategory.EDITOR,
     RecommendationCode.CONTENT_BLOAT: RecommendationCategory.EDITOR,
     RecommendationCode.SKIPPED_HEADING_LEVEL: RecommendationCategory.EDITOR,
     RecommendationCode.UNSUPPORTED_ENTITIES: RecommendationCategory.EDITOR,
-    RecommendationCode.LOW_TRUST_INDEX: RecommendationCategory.EDITOR,
     # The CMS stamps this on save; an editor has no field for it.
     RecommendationCode.MISSING_LAST_MODIFIED_DATE: RecommendationCategory.TECHNICAL,
     RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: RecommendationCategory.TECHNICAL,
@@ -126,12 +120,9 @@ _PRIORITIES = {
     
     # P2: Primary Evidence (GEO Authority)
     RecommendationCode.NO_OUTBOUND_LINKS: RecommendationPriority.P2_PRIMARY_EVIDENCE,
-    RecommendationCode.NO_CITATIONS: RecommendationPriority.P2_PRIMARY_EVIDENCE,
     RecommendationCode.NO_STATISTICS: RecommendationPriority.P2_PRIMARY_EVIDENCE,
-    RecommendationCode.ORPHAN_PAGE: RecommendationPriority.P2_PRIMARY_EVIDENCE,
     RecommendationCode.NO_INTERNAL_BODY_LINKS: RecommendationPriority.P2_PRIMARY_EVIDENCE,
     RecommendationCode.UNSUPPORTED_ENTITIES: RecommendationPriority.P2_PRIMARY_EVIDENCE,
-    RecommendationCode.LOW_TRUST_INDEX: RecommendationPriority.P2_PRIMARY_EVIDENCE,
     
     # P3: Structural Format
     RecommendationCode.NO_TOP_LEVEL_HEADING: RecommendationPriority.P3_STRUCTURAL_FORMAT,

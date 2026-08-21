@@ -61,7 +61,6 @@ class AIReadinessReportRendererTests(unittest.TestCase):
                         word_count=4,
                         character_count=20,
                         contains_statistics=False,
-                        contains_citation=False,
                     ),
                 ),
                 passage_balance_ratio=1.0,

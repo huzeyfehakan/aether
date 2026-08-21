@@ -212,54 +212,53 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
         ),
     ),
     RecommendationCode.NO_OUTBOUND_LINKS: RecommendationText(
-        headline="This article contains no outbound links",
+        headline="Dış Atıf Bulunmuyor",
         why_it_matters=(
-            "Generative AI engines measure Entity Authority by checking if an article "
-            "links to external references. Providing citations to other domains signals "
-            "trustworthiness and deep research."
+            "Yapay zeka motorları, makalenin dış kaynaklara referans verip vermediğini kontrol ederek Varlık Otoritesini (Entity Authority) ölçer. "
+            "Dışarıya bağlantı vermek, derin araştırmayı ve güvenilirliği gösterir."
         ),
         what_to_do=(
-            "Add relevant outbound links to authoritative external sources to back up your claims."
+            "İddialarınızı desteklemek için makale gövdesinden güvenilir ve otoriter dış kaynaklara bağlantılar ekleyin."
         ),
     ),
     RecommendationCode.NO_STATISTICS: RecommendationText(
-        headline="This article contains no statistics or data points",
+        headline="İstatistik veya Veri Noktası Yok",
         why_it_matters=(
-            "Quantitative data significantly boosts an article's Semantic Completeness. "
-            "AI engines prioritize content that can support its claims with hard numbers."
+            "Sayısal veriler, bir makalenin Anlamsal Bütünlüğünü (Semantic Completeness) büyük ölçüde artırır. "
+            "Yapay zeka motorları iddialarını somut rakamlarla destekleyen içerikleri tercih eder."
         ),
         what_to_do=(
-            "Include concrete statistics, percentages, and numerical data points to support your arguments."
+            "Argümanlarınızı güçlendirmek için metin içine istatistik, yüzdelik oran ve net sayısal veriler ekleyin."
         ),
     ),
     RecommendationCode.NO_INTERNAL_BODY_LINKS: RecommendationText(
-        headline="This article contains no internal links in its body",
+        headline="Gövde İçinde İç Bağlantı Yok",
         why_it_matters=(
-            "Articles that don't link to other related content create dead ends for "
-            "readers and AI crawlers. Internal linking distributes authority and context."
+            "Site içindeki diğer içeriklere bağlantı vermeyen makaleler, okuyucular ve yapay zeka tarayıcıları için çıkmaz sokak (dead end) oluşturur. "
+            "İç linkleme otoriteyi dağıtır ve bağlam sağlar."
         ),
         what_to_do=(
-            "Add internal links within the main body text to other relevant articles on your site."
+            "Sitenizdeki diğer ilgili makalelere ana metin gövdesi içinden bağlantılar verin."
         ),
     ),
     RecommendationCode.CONTENT_BLOAT: RecommendationText(
         headline="İzole ve Şişirme İçeriği Sadeleştirin",
         why_it_matters=(
-            "AI engines penalize 'content bloat'. Paragraphs that don't share vocabulary "
-            "with their heading and lack a definitive stance dilute your Semantic Completeness."
+            "Yapay zeka motorları 'içerik şişirmesini' cezalandırır. "
+            "Başlığıyla aynı kelime dağarcığını paylaşmayan ve kesin bir duruş sergilemeyen paragraflar Anlamsal Bütünlüğünüzü zayıflatır."
         ),
         what_to_do=(
-            "Remove filler paragraphs that have weak ties to the main heading or associate them with the main theme."
+            "Ana başlıkla zayıf bağları olan doldurma paragrafları kaldırın veya onları ana temayla ilişkilendirin."
         ),
     ),
     RecommendationCode.SKIPPED_HEADING_LEVEL: RecommendationText(
         headline="Anlamsal Kopukluk: Başlık Hiyerarşisi Atlanmış",
         why_it_matters=(
-            "AI crawlers parse heading structures (H1, H2, H3, H4) as a logical outline. "
-            "Skipping heading levels (like jumping directly from H2 to H4) breaks the document's semantic structure."
+            "Yapay zeka tarayıcıları başlık yapılarını (H1, H2, H3, H4) mantıksal bir taslak olarak okur. "
+            "Başlık seviyelerini atlamak (örneğin H2'den doğrudan H4'e atlamak) belgenin anlamsal yapısını bozar."
         ),
         what_to_do=(
-            "Fix your heading hierarchy so that every heading level steps down linearly without skipping numbers."
+            "Başlık hiyerarşinizi, sayılar arasında atlama yapmadan doğrusal olarak aşağı inecek şekilde düzeltin."
         ),
     ),
     RecommendationCode.CONFLICTING_PUBLISHED_DATES: RecommendationText(
@@ -278,7 +277,7 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
             "Özel isimlerin, kurum veya spesifik ürünlerin geçtiği paragraflarda birincil kanıt eksikliği bulunuyor."
         ),
         what_to_do=(
-            "Yapay zeka motorlarının bu varlıkları (entity) güvenilir bir kaynak olarak referans alabilmesi için, ilgili paragraflara iddialarınızı kanıtlayan istatistiksel veriler veya bağımsız dış atıflar ekleyin."
+            "Yapay zeka motorlarının bu varlıkları güvenilir bir kaynak olarak referans alabilmesi için, ilgili paragraflara iddialarınızı kanıtlayan istatistiksel veriler veya bağımsız dış atıflar ekleyin."
         ),
     ),
     RecommendationCode.MISSING_SAME_AS_SCHEMA: RecommendationText(

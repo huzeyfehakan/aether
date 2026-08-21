@@ -57,7 +57,6 @@ class AIReadinessReportTests(unittest.TestCase):
                         word_count=6,
                         character_count=30,
                         contains_statistics=False,
-                        contains_citation=False,
                     ),
                     PassageProfile(
                         passage_id="version-1:p1",
@@ -65,7 +64,6 @@ class AIReadinessReportTests(unittest.TestCase):
                         word_count=6,
                         character_count=34,
                         contains_statistics=False,
-                        contains_citation=False,
                     ),
                 ),
                 passage_balance_ratio=1.0,

@@ -32,6 +32,7 @@
       .recommendation { border: 1px solid #e0e8f1; border-left: 3px solid #0768d7; border-radius: 10px; margin-bottom: 12px; padding: 15px 17px; } .recommendation h4 { font-size: 1rem; margin: 0 0 6px; } .recommendation p { color: #4c5b6e; font-size: .9rem; line-height: 1.5; margin: 9px 0 0; } .recommendation strong { color: #24374d; }
       .declared { margin-top: 11px; } .declared td:last-child { text-align: left; color: #24374d; }
       .repeat-count { background: #eef3fa; border-radius: 99px; color: #3f5876; font-size: .8rem; font-weight: 680; padding: 3px 9px; } .recommendation blockquote { border-left: 2px solid #dbe3ec; color: #5d6b7e; font-style: italic; margin: 11px 0 0; padding: 2px 0 2px 12px; }
+      .impact-badge { background: #e3f2fd; color: #0288d1; border: 1px solid #b3e5fc; padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; margin-left: 8px; vertical-align: middle; }
       .technical { margin-top: 28px; } .technical pre { background: #101d2c; border-radius: 10px; color: #dce9f7; margin: 14px 0 0; overflow: auto; padding: 16px; white-space: pre-wrap; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
       .score-headline { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; } .score-total { font-size: 2.2rem; font-weight: 800; color: #086ad8; line-height: 1; }
       .score-weight { color: #d63c30; font-weight: 800; font-size: 1.1rem; margin: 0 0 4px; }
@@ -158,7 +159,7 @@
       // them, and only a draft with nothing to report ever rendered.
       const declaredRows = (o) => (o.declared || []).map((d) => `<tr><td>${d.label}</td><td>${d.value}</td></tr>`).join('');
       const occurrence = (o) => `${o.detail ? `<span class="repeat-count">${o.detail}</span>` : ''}${o.declared ? `<table class="metadata-table declared">${declaredRows(o)}</table>` : ''}${o.excerpt ? `<blockquote>${o.excerpt}</blockquote>` : ''}`;
-      const card = (item) => `<div class="recommendation"><h4>${item.headline}</h4>${item.occurrences.map(occurrence).join('')}<p><strong>Why it matters.</strong> ${item.why_it_matters}</p><p><strong>What to do.</strong> ${item.what_to_do}</p></div>`;
+      const card = (item) => `<div class="recommendation"><h4>${item.headline} ${item.impact ? `<span class="badge impact-badge">[Impacts: ${item.impact}]</span>` : ''}</h4>${item.occurrences.map(occurrence).join('')}<p><strong>Why it matters.</strong> ${item.why_it_matters}</p><p><strong>What to do.</strong> ${item.what_to_do}</p></div>`;
 
       document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach((item) => item.setAttribute('aria-selected', String(item === tab)));
@@ -205,34 +206,22 @@
 
       function renderReport(view, rawReport) {
         
-        // YENİ: Skoru düz metin rapordan (rawReport) Regex ile çekiyoruz
-        const seoTotalMatch = rawReport.match(/SEO Score[\s\S]*?Total Score:\s*(\d+)/);
-        const geoTotalMatch = rawReport.match(/GEO Score[\s\S]*?Total Score:\s*(\d+)/);
+        const assessment = view.assessment;
 
-        const entityMatch = rawReport.match(/Entity Coverage\s*\((\d+)%\):\s*([\d\.]+)/);
-        const structMatch = rawReport.match(/Structured Data\s*\((\d+)%\):\s*([\d\.]+)/);
-        const semQualityMatch = rawReport.match(/Semantic Quality\s*\((\d+)%\):\s*([\d\.]+)/);
-        const techMatch = rawReport.match(/Technical Access\s*\((\d+)%\):\s*([\d\.]+)/);
-
-        const semCompMatch = rawReport.match(/Semantic Completeness\s*\((\d+)%\):\s*([\d\.]+)/);
-        const entAuthMatch = rawReport.match(/Entity Authority\s*\((\d+)%\):\s*([\d\.]+)/);
-        const structRichMatch = rawReport.match(/Structural Richness\s*\((\d+)%\):\s*([\d\.]+)/);
-        const discMatch = rawReport.match(/Discoverability\s*\((\d+)%\):\s*([\d\.]+)/);
-
-        if (seoTotalMatch && entityMatch && structMatch && semQualityMatch && techMatch) {
-            document.querySelector('#seo-score-total').textContent = seoTotalMatch[1];
+        if (assessment.seo_score) {
+            document.querySelector('#seo-score-total').textContent = assessment.seo_score.total;
             const seoDimensions = [
-                { label: 'Entity Coverage', weight: entityMatch[1], val: parseFloat(entityMatch[2]) },
-                { label: 'Structured Data', weight: structMatch[1], val: parseFloat(structMatch[2]) },
-                { label: 'Semantic Quality', weight: semQualityMatch[1], val: parseFloat(semQualityMatch[2]) },
-                { label: 'Technical Access', weight: techMatch[1], val: parseFloat(techMatch[2]) }
+                assessment.seo_score.entity_coverage,
+                assessment.seo_score.structured_data,
+                assessment.seo_score.semantic_quality,
+                assessment.seo_score.technical_access
             ];
             
             document.querySelector('#seo-score-grid').innerHTML = seoDimensions.map(d => `
                 <div class="metric-card">
                     <p class="score-weight">%${d.weight}</p>
                     <h4 style="margin: 0 0 5px; font-size: 1rem;">${d.label}</h4>
-                    <strong style="color: #45617d;">${d.val.toFixed(1)} / 100</strong>
+                    <strong style="color: #45617d;">${d.val !== null ? d.val.toFixed(1) + ' / 100' : 'N/A'}</strong>
                 </div>
             `).join('');
             document.querySelector('#score-section').classList.remove('hidden');
@@ -240,25 +229,24 @@
             document.querySelector('#score-section').classList.add('hidden');
         }
 
-        if (geoTotalMatch && semCompMatch && entAuthMatch && structRichMatch && discMatch) {
-            document.querySelector('#geo-score-total').textContent = geoTotalMatch[1];
+        if (assessment.geo_score) {
+            document.querySelector('#geo-score-total').textContent = assessment.geo_score.total;
             const geoDimensions = [
-                { label: 'Semantic Completeness', weight: semCompMatch[1], val: parseFloat(semCompMatch[2]) },
-                { label: 'Entity Authority', weight: entAuthMatch[1], val: parseFloat(entAuthMatch[2]) },
-                { label: 'Structural Richness', weight: structRichMatch[1], val: parseFloat(structRichMatch[2]) },
-                { label: 'Discoverability', weight: discMatch[1], val: parseFloat(discMatch[2]) }
+                assessment.geo_score.semantic_completeness,
+                assessment.geo_score.entity_authority,
+                assessment.geo_score.structural_richness,
+                assessment.geo_score.discoverability
             ];
             
             document.querySelector('#geo-score-grid').innerHTML = geoDimensions.map(d => `
                 <div class="metric-card">
                     <p class="score-weight">%${d.weight}</p>
                     <h4 style="margin: 0 0 5px; font-size: 1rem;">${d.label}</h4>
-                    <strong style="color: #45617d;">${d.val.toFixed(1)} / 100</strong>
+                    <strong style="color: #45617d;">${d.val !== null ? d.val.toFixed(1) + ' / 100' : 'N/A'}</strong>
                 </div>
             `).join('');
         }
 
-        const assessment = view.assessment;
         const cards = [
           ['Metadata', assessment.metadata, 'Fields an AI system needs to identify and attribute this article'],
         ].filter(([, value]) => Boolean(value));

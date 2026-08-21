@@ -48,6 +48,10 @@ class ContentRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def list_articles_by_publisher(self, publisher: str) -> Tuple[Article, ...]:
+        raise NotImplementedError
+
+    @abstractmethod
     def save_article(self, article: Article) -> None:
         raise NotImplementedError
 

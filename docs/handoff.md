@@ -42,7 +42,10 @@ frame around them. See [`product-discovery.md`](product-discovery.md).
 - Dual scores (`seo_score` and `geo_score`) are calculated using deterministic
   rule-based metrics.
 - Ingestion, analysis, presentation renderers, and the `index.html` template
-  support both scores.
+  support both scores and gracefully represent unmeasured dimensions as
+  `null` (`Optional[float]`).
+- [Decision 0011](decisions/0011-dual-scoring-supersedes-0003.md) records the
+  rationale and supersedes decision 0003.
 - The implementation is being evaluated before release.
 
 **Topic introduction recommendation.** Implemented as a deterministic

@@ -52,7 +52,6 @@ class AnalyzePassageQuality:
             raise DomainValidationError(
                 "article version must belong to the article being analyzed"
             )
-
         passages = self._content_repository.list_passages_for_version(
             article_version_id
         )
@@ -76,7 +75,6 @@ class AnalyzePassageQuality:
             self._profile(passage)
             for passage in ordered_passages
         )
-
         if not profiles:
             balance_ratio = 1.0
             stuffing_ratio = 0.0
@@ -156,7 +154,7 @@ class AnalyzePassageQuality:
         # Citation markers such as [1] or [12] are evidence markers,
         # not statistical claims. Remove them before detecting numbers.
         text_without_citations = re.sub(
-            r"\[\d+\]",
+            r"\[\s*[a-zA-Z0-9]+\s*\]",
             " ",
             text,
         )
@@ -175,7 +173,7 @@ class AnalyzePassageQuality:
         # Detect academic-style citations such as [1] or [12].
         has_citation = bool(
             re.search(
-                r"\[\d+\]",
+                r"\[\s*[a-zA-Z0-9]+\s*\]",
                 text,
             )
         )

@@ -45,7 +45,7 @@ class PassageQualitySummary:
 class ScoreDimensionSummary:
     """A user-facing summary of a single score dimension."""
     weight_percentage: int
-    dimension_score: float
+    dimension_score: Optional[float]
     weighted_contribution: float
 
 

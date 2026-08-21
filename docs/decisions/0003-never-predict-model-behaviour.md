@@ -1,4 +1,6 @@
-# 0003 — Never predict model behaviour
+# 0003 - Never predict model behaviour (SUPERSEDED)
+
+**Note:** The rejection of numerical readiness scores in this decision has been superseded by [0010 - Dual Scoring System](0010-dual-scoring-supersedes-0003.md). The core principle of not predicting model behaviour remains, but deterministic numerical scores are now permitted as a measurement of structural readiness.
 
 ## Decision
 

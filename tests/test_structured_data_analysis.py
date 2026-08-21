@@ -216,6 +216,7 @@ class StructuredDataAnalysisTests(unittest.TestCase):
             '{"@context": "https://schema.org", "@type": "NewsArticle",'
             ' "headline": "Bir başlık", "publisher": "TRT", "image": "x",'
             ' "inLanguage": "tr", "datePublished": "2026-08-03T10:00:00+03:00",'
+            ' "description": "Bir özet.",'
             ' "dateModified": "2026-08-04T10:00:00+03:00"}',
         )
         analysis = BuildArticleAnalysisReport(

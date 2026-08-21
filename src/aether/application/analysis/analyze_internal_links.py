@@ -1,6 +1,7 @@
 """Discoverability metrics via internal link analysis."""
 
 from dataclasses import dataclass
+from typing import Optional
 
 from aether.domain.common import DomainValidationError
 from aether.domain.content import Article
@@ -18,6 +19,15 @@ class InternalLinkAnalysisResult:
     body_link_count: int
     incoming_link_count: int
     potential_orphan: bool
+    outbound_body_domains: tuple[str, ...] = ()
+    #: Both are ratios over the set of domains the body cites. When that set is
+    #: empty there is nothing to take a ratio of, so both are ``None``: a
+    #: default of 1.0 awarded full independence to an article that cited
+    #: nothing, and 0.0 would pass judgement on citations that do not exist.
+    #: Whether the body cites anything at all is a separate, always-measurable
+    #: fact, and it is already reported as NO_OUTBOUND_LINKS.
+    third_party_ratio: Optional[float] = None
+    trust_index: Optional[float] = None
 
 
 class AnalyzeInternalLinks:
@@ -47,7 +57,7 @@ class AnalyzeInternalLinks:
         # (This is bound by the process-scoped ContentRepository in Aether)
         incoming_link_count = 0
         canonical_source = article.canonical_source
-        
+
         # A simple iteration over all articles. In a real DB this would be a query.
         for other_article in self._content_repository.list_articles_by_publisher(article.publisher):
             if other_article.article_id == article.article_id:
@@ -60,6 +70,49 @@ class AnalyzeInternalLinks:
                             incoming_link_count += 1
                             break
 
+        # Third-Party & Trust Index
+        outbound = source_data.outbound_body_domains
+        third_party_ratio = None
+        trust_index = None
+
+        if outbound:
+            import re
+            # Reconstruct text to find entities
+            passages = self._content_repository.list_passages_for_version(article_version_id)
+            full_text = " ".join(p.text for p in passages)
+            entities = set(re.findall(r'\b[A-ZÇÖŞİÜ][a-zçöşğüİı]+\b', full_text))
+
+            # Trust weights
+            t1 = {"wikipedia.org", ".gov", ".edu", "who.int"}
+            t2 = {"statista.com", "reuters.com", "indeed.com", "randstad"}
+            t0 = {"reddit.com", "twitter.com", "x.com", "facebook.com", "instagram.com", "tiktok.com", "linkedin.com", "pinterest.com", "youtube.com"}
+
+            total_weight = 0
+            third_party_count = 0
+
+            for domain in outbound:
+                # 1. Third Party Check
+                domain_stem = domain.split(".")[0].title()
+                if domain_stem in entities or domain == article.canonical_source:
+                    # Owned
+                    pass
+                else:
+                    third_party_count += 1
+
+                # 2. Authority Index
+                weight = 1 # Neutral
+                if any(d in domain for d in t1):
+                    weight = 3
+                elif any(d in domain for d in t2):
+                    weight = 2
+                elif any(d in domain for d in t0):
+                    weight = 0
+
+                total_weight += weight
+
+            third_party_ratio = third_party_count / len(outbound)
+            trust_index = total_weight / (len(outbound) * 3)
+
         return InternalLinkAnalysisResult(
             article_id=article.article_id,
             article_version_id=article_version.article_version_id,
@@ -68,4 +121,7 @@ class AnalyzeInternalLinks:
             body_link_count=body_link_count,
             incoming_link_count=incoming_link_count,
             potential_orphan=(incoming_link_count == 0),
+            outbound_body_domains=source_data.outbound_body_domains,
+            third_party_ratio=third_party_ratio,
+            trust_index=trust_index,
         )

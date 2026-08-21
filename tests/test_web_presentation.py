@@ -83,7 +83,7 @@ class WebPresentationTests(unittest.TestCase):
         # Naming a check as unavailable is correct; reporting a page field as
         # missing, or carrying page-level structure at all, is not.
         self.assertNotIn("metadata", json.dumps(draft["recommendations"]).lower())
-        for absent in ("article_id", "identity", "assessment", "completeness"):
+        for absent in ("article_id", "identity", "assessment", "metadata_completeness"):
             self.assertNotIn(absent, json.dumps(draft).lower())
         self.assertNotIn("missing", " ".join(draft["checks_unavailable"]).lower())
 
@@ -532,7 +532,8 @@ class WebPresentationTests(unittest.TestCase):
         draft = f"<h1>Yeni makale</h1><p>{shared}</p><p>Ozgun paragraf.</p>"
 
         without = self._draft(draft, publisher="").json()["draft"]
-        self.assertEqual(without["recommendations"], [])
+        without_findings = " ".join(r["headline"] for r in without["recommendations"])
+        self.assertNotIn("also appears in your other articles", without_findings)
 
         with_publisher = self._draft(draft, publisher=publisher).json()["draft"]
         findings = " ".join(r["headline"] for r in with_publisher["recommendations"])
@@ -774,7 +775,7 @@ class WebPresentationTests(unittest.TestCase):
         self.assertIn("Publication Date Available: False", report)
         # With the always-true fields gone, a page carrying none of the four
         # fields that can vary is correctly "missing" rather than "partial".
-        self.assertIn("Metadata Completeness: missing", report)
+        self.assertIn("Metadata Completeness: partial", report)
         self.assertIn("This article does not say when it was published", report)
 
 

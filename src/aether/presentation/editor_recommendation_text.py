@@ -232,6 +232,85 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
             "site to publish it outside the article body."
         ),
     ),
+    RecommendationCode.NO_OUTBOUND_LINKS: RecommendationText(
+        headline="This article contains no outbound links",
+        why_it_matters=(
+            "Generative AI engines measure Entity Authority by checking if an article "
+            "links to external references. Providing citations to other domains signals "
+            "trustworthiness and deep research."
+        ),
+        what_to_do=(
+            "Add relevant outbound links to authoritative external sources to back up your claims."
+        ),
+    ),
+    RecommendationCode.NO_STATISTICS: RecommendationText(
+        headline="This article contains no statistics or data points",
+        why_it_matters=(
+            "Quantitative data significantly boosts an article's Semantic Completeness. "
+            "AI engines prioritize content that can support its claims with hard numbers."
+        ),
+        what_to_do=(
+            "Include concrete statistics, percentages, and numerical data points to support your arguments."
+        ),
+    ),
+    RecommendationCode.NO_INTERNAL_BODY_LINKS: RecommendationText(
+        headline="This article contains no internal links in its body",
+        why_it_matters=(
+            "Articles that don't link to other related content create dead ends for "
+            "readers and AI crawlers. Internal linking distributes authority and context."
+        ),
+        what_to_do=(
+            "Add internal links within the main body text to other relevant articles on your site."
+        ),
+    ),
+    RecommendationCode.CONTENT_BLOAT: RecommendationText(
+        headline="İzole ve Şişirme İçeriği Sadeleştirin",
+        why_it_matters=(
+            "AI engines penalize 'content bloat'. Paragraphs that don't share vocabulary "
+            "with their heading and lack a definitive stance dilute your Semantic Completeness."
+        ),
+        what_to_do=(
+            "Remove filler paragraphs that have weak ties to the main heading or associate them with the main theme."
+        ),
+    ),
+    RecommendationCode.SKIPPED_HEADING_LEVEL: RecommendationText(
+        headline="Anlamsal Kopukluk: Başlık Hiyerarşisi Atlanmış",
+        why_it_matters=(
+            "AI crawlers parse heading structures (H1, H2, H3, H4) as a logical outline. "
+            "Skipping heading levels (like jumping directly from H2 to H4) breaks the document's semantic structure."
+        ),
+        what_to_do=(
+            "Fix your heading hierarchy so that every heading level steps down linearly without skipping numbers."
+        ),
+    ),
+    RecommendationCode.CONFLICTING_PUBLISHED_DATES: RecommendationText(
+        headline="Çelişkili Tarih Verileri (Sanity Check Başarısız)",
+        why_it_matters=(
+            "Yapay zeka arama motorları, tazeliği doğrulamak için Meta, JSON-LD ve <time> etiketlerindeki tarihleri çapraz kontrol eder. "
+            "Eğer bu tarihler uyuşmuyorsa kaynağın güvenilirliği sarsılır."
+        ),
+        what_to_do=(
+            "CMS'nizin JSON-LD, meta property='article:published_time' ve HTML <time> etiketlerine aynı (veya uyumlu) tarih damgasını bastığından emin olun."
+        ),
+    ),
+    RecommendationCode.UNSUPPORTED_ENTITIES: RecommendationText(
+        headline="Kanıtsız Varlıkları (Kurum/Ürün) Destekleyin",
+        why_it_matters=(
+            "Özel isimlerin, kurum veya spesifik ürünlerin geçtiği paragraflarda birincil kanıt eksikliği bulunuyor."
+        ),
+        what_to_do=(
+            "Yapay zeka motorlarının bu varlıkları (entity) güvenilir bir kaynak olarak referans alabilmesi için, ilgili paragraflara iddialarınızı kanıtlayan istatistiksel veriler veya bağımsız dış atıflar ekleyin."
+        ),
+    ),
+    RecommendationCode.MISSING_SAME_AS_SCHEMA: RecommendationText(
+        headline="Yapısal Veri (sameAs) Kullanımı Eksik",
+        why_it_matters=(
+            "Yapay zeka motorlarının varlıkları Knowledge Graph ile eşleştirebilmesi için sameAs özelliğine ihtiyacı vardır."
+        ),
+        what_to_do=(
+            "Sayfanın Schema.org JSON-LD bloğunda, yazarın ve kurumun Wikipedia/Wikidata profillerini sameAs özelliğiyle belirtin."
+        ),
+    ),
 }
 
 

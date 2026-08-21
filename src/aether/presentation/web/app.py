@@ -14,6 +14,7 @@ from aether.application.analysis.analyze_article_metadata import AnalyzeArticleM
 from aether.application.analysis.analyze_article_structure import AnalyzeArticleStructure
 from aether.application.analysis.analyze_content_duplication import AnalyzeContentDuplication
 from aether.application.analysis.analyze_passage_quality import AnalyzePassageQuality
+from aether.application.analysis.analyze_internal_links import AnalyzeInternalLinks
 from aether.application.analysis.analyze_heading_structure import AnalyzeHeadingStructure
 from aether.application.analysis.analyze_structured_data import AnalyzeStructuredData
 from aether.application.analysis.analyze_declared_consistency import AnalyzeDeclaredConsistency
@@ -21,6 +22,10 @@ from aether.application.analysis.assess_ai_readiness import AssessAIReadiness
 from aether.application.analysis.build_ai_readiness_report import BuildAIReadinessReport
 from aether.application.analysis.build_article_analysis_report import BuildArticleAnalysisReport
 from aether.application.analysis.build_draft_review import BuildDraftReview
+from aether.application.analysis.derive_editor_recommendations import (
+    DeriveEditorRecommendations,
+    RecommendationCode,
+)
 from aether.application.ingestion.prepare_draft import (
     DraftContentRequired,
     DraftHeadlineRequired,
@@ -52,16 +57,21 @@ from aether.presentation.ai_readiness_report_renderers import (
 from aether.application.analysis.derive_editor_recommendations import (
     RecommendationCategory,
 )
+from aether.presentation.draft_check_text import (
+    performed_check_text,
+    unavailable_check_text,
+)
 from aether.presentation.editor_recommendation_text import (
     category_subtitle,
-    heading_count_phrase,
-    shared_words_phrase,
-    title_source_label,
     compared_articles_phrase,
+    heading_count_phrase,
     missing_properties_phrase,
     recommendation_text,
     repeated_in_phrase,
+    shared_words_phrase,
+    title_source_label,
 )
+from aether.presentation.score_dimension_text import seo_dimension_text, geo_dimension_text
 
 
 class HtmlFetcher(Protocol):
@@ -88,6 +98,7 @@ class AIReadinessPipeline:
             AnalyzeStructuredData(repository),
             AnalyzeDeclaredConsistency(repository),
             AnalyzeHeadingStructure(repository),
+            internal_link_analysis=AnalyzeInternalLinks(repository),
             topic_introduction_analysis=AnalyzeTopicIntroduction(repository),
             fluency_analysis=AnalyzeFluency(repository),
             claim_evidence_analysis=AnalyzeClaimEvidence(
@@ -255,6 +266,35 @@ def _publisher_from(source_url: str, publisher: Optional[str]) -> str:
     return hostname.removeprefix("www.")
 
 
+_IMPACT_MAP = {
+    RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: "Structured Data",
+    RecommendationCode.INCOMPLETE_ARTICLE_STRUCTURED_DATA: "Structured Data",
+    RecommendationCode.MISSING_LAST_MODIFIED_DATE: "Metadata",
+    RecommendationCode.MISSING_PUBLICATION_DATE: "Metadata",
+    RecommendationCode.MISSING_AUTHOR: "Metadata",
+    RecommendationCode.MISSING_SUMMARY: "Metadata",
+    RecommendationCode.TITLE_SOURCES_DISAGREE: "Semantic Quality",
+    RecommendationCode.DESCRIPTION_SOURCES_DISAGREE: "Semantic Quality",
+    RecommendationCode.NO_OUTBOUND_LINKS: "Entity Authority",
+    RecommendationCode.NO_CITATIONS: "Entity Authority",
+    RecommendationCode.NO_STATISTICS: "Semantic Completeness",
+    RecommendationCode.ORPHAN_PAGE: "Discoverability",
+    RecommendationCode.NO_INTERNAL_BODY_LINKS: "Discoverability",
+    RecommendationCode.NO_TOP_LEVEL_HEADING: "Structural Richness",
+    RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS: "Structural Richness",
+    RecommendationCode.WEAK_ARTICLE_OPENING: "Semantic Completeness",
+    RecommendationCode.WEAK_TOPIC_INTRODUCTION: "Semantic Completeness",
+    RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY: "Semantic Quality",
+    RecommendationCode.BODY_MOSTLY_REPEATED_TEXT: "Semantic Quality",
+    RecommendationCode.CONTENT_BLOAT: "Semantic Completeness",
+    RecommendationCode.SKIPPED_HEADING_LEVEL: "Structural Richness",
+    RecommendationCode.CONFLICTING_PUBLISHED_DATES: "Metadata",
+    RecommendationCode.UNSUPPORTED_ENTITIES: "Entity Authority",
+    RecommendationCode.LOW_TRUST_INDEX: "Entity Authority",
+    RecommendationCode.MISSING_SAME_AS_SCHEMA: "Semantic Completeness",
+}
+
+
 def _recommendation_views(report: Any, category) -> list:
     """Shape one category of recommendations for display.
 
@@ -272,6 +312,7 @@ def _recommendation_views(report: Any, category) -> list:
                 "headline": text.headline,
                 "why_it_matters": text.why_it_matters,
                 "what_to_do": text.what_to_do,
+                "impact": _IMPACT_MAP.get(recommendation.code, ""),
                 "occurrences": [],
             },
         )
@@ -310,6 +351,20 @@ def _report_view(report: Any) -> Dict[str, Any]:
     return {
         "assessment": {
             "metadata": assessment.metadata_completeness.value,
+            "seo_score": {
+                "total": report.assessment_summary.seo_score.total,
+                "entity_coverage": {"val": report.assessment_summary.seo_score.entity_coverage.dimension_score, "label": seo_dimension_text("entity_coverage")["label"], "weight": report.assessment_summary.seo_score.entity_coverage.weight_percentage},
+                "structured_data": {"val": report.assessment_summary.seo_score.structured_data.dimension_score, "label": seo_dimension_text("structured_data")["label"], "weight": report.assessment_summary.seo_score.structured_data.weight_percentage},
+                "semantic_quality": {"val": report.assessment_summary.seo_score.semantic_quality.dimension_score, "label": seo_dimension_text("semantic_quality")["label"], "weight": report.assessment_summary.seo_score.semantic_quality.weight_percentage},
+                "technical_access": {"val": report.assessment_summary.seo_score.technical_access.dimension_score, "label": seo_dimension_text("technical_access")["label"], "weight": report.assessment_summary.seo_score.technical_access.weight_percentage},
+            } if hasattr(report, 'assessment_summary') and hasattr(report.assessment_summary, 'seo_score') else None,
+            "geo_score": {
+                "total": report.assessment_summary.geo_score.total,
+                "semantic_completeness": {"val": report.assessment_summary.geo_score.semantic_completeness.dimension_score, "label": geo_dimension_text("semantic_completeness")["label"], "weight": report.assessment_summary.geo_score.semantic_completeness.weight_percentage},
+                "entity_authority": {"val": report.assessment_summary.geo_score.entity_authority.dimension_score, "label": geo_dimension_text("entity_authority")["label"], "weight": report.assessment_summary.geo_score.entity_authority.weight_percentage},
+                "structural_richness": {"val": report.assessment_summary.geo_score.structural_richness.dimension_score, "label": geo_dimension_text("structural_richness")["label"], "weight": report.assessment_summary.geo_score.structural_richness.weight_percentage},
+                "discoverability": {"val": report.assessment_summary.geo_score.discoverability.dimension_score, "label": geo_dimension_text("discoverability")["label"], "weight": report.assessment_summary.geo_score.discoverability.weight_percentage},
+            } if hasattr(report, 'assessment_summary') and hasattr(report.assessment_summary, 'geo_score') else None,
         },
         "metadata": (
             {"label": "Publication date", "available": metadata.publication_date_available},

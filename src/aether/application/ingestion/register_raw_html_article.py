@@ -145,6 +145,7 @@ class _ArticleHtmlCollector(HTMLParser):
         self.table_word_count = 0
         self.list_word_count = 0
         self.blockquote_word_count = 0
+        self.discarded_word_count = 0
         self.links: List[Tuple[str, bool]] = []
 
         self._pending_question_heading = False
@@ -335,6 +336,8 @@ class _ArticleHtmlCollector(HTMLParser):
             self.list_word_count += words
         if self._blockquote_depth > 0:
             self.blockquote_word_count += words
+        if self._non_body_depth > 0 and not is_metadata_or_heading:
+            self.discarded_word_count += words
 
 
 #: Heading tags, in outline order.
@@ -444,6 +447,7 @@ class HtmlArticleNormalizer:
 
         selected_tier = self._selected_tier(collector.paragraphs)
         discarded_words = self._discarded_word_count(collector.paragraphs, selected_tier)
+        discarded_words += collector.discarded_word_count
 
         # og:title outranks a JSON-LD headline deliberately. Both are declared
         # by the publisher, but og:title arrives through the HTML parser with

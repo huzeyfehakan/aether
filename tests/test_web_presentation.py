@@ -404,6 +404,44 @@ class WebPresentationTests(unittest.TestCase):
         self.assertIn("Body link ratio", rendered)
         self.assertIn("Not measured", rendered)
 
+    def test_passage_extractability_is_a_separate_unscored_diagnostic(self):
+        view = self._analysed_view()
+        diagnostic = view["passage_extractability"]
+
+        self.assertEqual(
+            [band["bound"] for band in diagnostic["bands"]],
+            [128, 256, 512],
+        )
+        self.assertFalse(diagnostic["included_in_score"])
+        self.assertNotIn(
+            "passage_extractability", view["assessment"]["geo_score"]
+        )
+
+        template = self._template()
+        self.assertIn('aria-labelledby="passage-extractability-heading"', template)
+        self.assertIn("Experimental diagnostic", template)
+        self.assertIn("Not included in score", template)
+
+    def test_passage_extractability_bands_render_without_classification(self):
+        view = self._analysed_view()
+
+        dom = run_page_script(f"renderReport({json.dumps(view)}, 'report');")
+        rendered = dom["#passage-extractability-metrics"]["html"]
+        self.assertIn("&gt;128 words", rendered)
+        self.assertIn("&gt;256 words", rendered)
+        self.assertIn("&gt;512 words", rendered)
+        self.assertNotIn("good", rendered.lower())
+        self.assertNotIn("bad", rendered.lower())
+
+    def test_unmeasured_passage_extractability_renders_not_measured(self):
+        view = self._analysed_view()
+        for band in view["passage_extractability"]["bands"]:
+            band["rate"] = None
+
+        dom = run_page_script(f"renderReport({json.dumps(view)}, 'report');")
+        rendered = dom["#passage-extractability-metrics"]["html"]
+        self.assertEqual(rendered.count("Not measured"), 3)
+
     def test_geo_dimension_panels_toggle_independently(self):
         dom = run_page_script("""
           const semanticButton = document.querySelector('#semantic-button');

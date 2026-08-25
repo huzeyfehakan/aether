@@ -413,6 +413,24 @@ def _report_view(report: Any) -> Dict[str, Any]:
             "passage_count": structure.total_passage_count,
             "word_count": structure.total_word_count,
         },
+        "passage_extractability": {
+            "passage_count": report.passage_quality_summary.passage_count,
+            "bands": (
+                {
+                    "bound": 128,
+                    "rate": report.passage_quality_summary.oversized_passage_rate_128,
+                },
+                {
+                    "bound": 256,
+                    "rate": report.passage_quality_summary.oversized_passage_rate_256,
+                },
+                {
+                    "bound": 512,
+                    "rate": report.passage_quality_summary.oversized_passage_rate_512,
+                },
+            ),
+            "included_in_score": False,
+        },
         "editor": (
             None
             if report.content_reuse_summary is None

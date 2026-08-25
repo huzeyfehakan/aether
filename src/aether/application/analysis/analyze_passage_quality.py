@@ -3,7 +3,7 @@
 from collections import Counter
 from dataclasses import dataclass
 import re
-from typing import Tuple
+from typing import Optional, Tuple
 
 from aether.domain.common import DomainValidationError
 from aether.domain.content import Article, Passage
@@ -31,6 +31,9 @@ class PassageQualityAnalysis:
     passage_profiles: Tuple[PassageProfile, ...]
     passage_balance_ratio: float
     keyword_stuffing_ratio: float
+    oversized_passage_rate_128: Optional[float] = None
+    oversized_passage_rate_256: Optional[float] = None
+    oversized_passage_rate_512: Optional[float] = None
 
 
 class AnalyzePassageQuality:
@@ -75,6 +78,7 @@ class AnalyzePassageQuality:
             self._profile(passage)
             for passage in ordered_passages
         )
+        oversized_rates = self._calculate_oversized_rates(profiles)
         if not profiles:
             balance_ratio = 1.0
             stuffing_ratio = 0.0
@@ -101,13 +105,27 @@ class AnalyzePassageQuality:
             stuffing_ratio = self._calculate_stuffing_ratio(
                 ordered_passages
             )
-
         return PassageQualityAnalysis(
             article_id=article.article_id,
             article_version_id=article_version.article_version_id,
             passage_profiles=profiles,
             passage_balance_ratio=balance_ratio,
             keyword_stuffing_ratio=stuffing_ratio,
+            oversized_passage_rate_128=oversized_rates[0],
+            oversized_passage_rate_256=oversized_rates[1],
+            oversized_passage_rate_512=oversized_rates[2],
+        )
+
+    @staticmethod
+    def _calculate_oversized_rates(
+        profiles: Tuple[PassageProfile, ...],
+    ) -> Tuple[Optional[float], Optional[float], Optional[float]]:
+        if not profiles:
+            return (None, None, None)
+        passage_count = len(profiles)
+        return tuple(
+            sum(profile.word_count > bound for profile in profiles) / passage_count
+            for bound in (128, 256, 512)
         )
 
     @staticmethod

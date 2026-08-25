@@ -39,6 +39,10 @@ class MetadataSummary:
 @dataclass(frozen=True)
 class PassageQualitySummary:
     passage_profiles: Tuple[PassageProfile, ...]
+    passage_count: int
+    oversized_passage_rate_128: Optional[float]
+    oversized_passage_rate_256: Optional[float]
+    oversized_passage_rate_512: Optional[float]
 
 
 @dataclass(frozen=True)
@@ -233,6 +237,16 @@ class BuildAIReadinessReport:
             ),
             passage_quality_summary=PassageQualitySummary(
                 passage_profiles=passage_quality.passage_profiles,
+                passage_count=len(passage_quality.passage_profiles),
+                oversized_passage_rate_128=(
+                    passage_quality.oversized_passage_rate_128
+                ),
+                oversized_passage_rate_256=(
+                    passage_quality.oversized_passage_rate_256
+                ),
+                oversized_passage_rate_512=(
+                    passage_quality.oversized_passage_rate_512
+                ),
             ),
             assessment_summary=AssessmentSummary(
                 metadata_completeness=assessment.metadata_completeness,

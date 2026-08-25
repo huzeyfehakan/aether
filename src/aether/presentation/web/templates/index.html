@@ -146,6 +146,12 @@
 
         <div class="section"><h3>Article structure</h3><p>How the stored article is organized for deterministic passage analysis.</p><div id="structure-metrics" class="metric-grid"></div></div>
 
+        <section class="section" aria-labelledby="passage-extractability-heading">
+          <h3 id="passage-extractability-heading">Passage Extractability — Experimental diagnostic</h3>
+          <p>Word-count sensitivity bands for extracted passages. Not included in score.</p>
+          <div id="passage-extractability-metrics" class="metric-grid"></div>
+        </section>
+
         <div class="section"><h3>Metadata availability</h3><p id="metadata-summary">Source fields found in the article.</p><table class="metadata-table"><tbody id="metadata-table"></tbody></table><div id="missing-list" class="missing-list"></div></div>
 
         <div class="section" id="editor-section"><h3>Editor Recommendations</h3><p class="muted" id="editor-subtitle"></p><p id="editor-compared"></p><div id="editor-list"></div></div>
@@ -293,6 +299,13 @@
 
         const structure = view.structure;
         document.querySelector('#structure-metrics').innerHTML = [metric('Passages', structure.passage_count), metric('Words', structure.word_count)].join('');
+
+        const passageDiagnostic = view.passage_extractability;
+        document.querySelector('#passage-extractability-metrics').innerHTML =
+          passageDiagnostic.bands.map((band) => metric(
+            `>${band.bound} words`,
+            band.rate === null ? 'Not measured' : `${(band.rate * 100).toFixed(1)}% oversized passages`
+          )).join('');
 
         const missing = view.metadata.filter((field) => !field.available);
         document.querySelector('#metadata-summary').textContent = missing.length ? `${missing.length} metadata field${missing.length === 1 ? '' : 's'} missing from the stored article.` : 'All currently assessed metadata fields are available.';

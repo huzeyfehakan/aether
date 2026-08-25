@@ -188,6 +188,32 @@ class AIReadinessReportTests(unittest.TestCase):
             assessment.metadata_completeness,
         )
 
+    def test_projects_passage_extractability_as_a_separate_diagnostic(self):
+        assessment = self.assessment()
+        assessment = replace(
+            assessment,
+            report=replace(
+                assessment.report,
+                passage_quality_analysis=replace(
+                    assessment.report.passage_quality_analysis,
+                    oversized_passage_rate_128=0.5,
+                    oversized_passage_rate_256=0.25,
+                    oversized_passage_rate_512=0.0,
+                ),
+            ),
+        )
+
+        report = BuildAIReadinessReport().execute(assessment)
+        diagnostic = report.passage_quality_summary
+
+        self.assertEqual(diagnostic.passage_count, 2)
+        self.assertEqual(diagnostic.oversized_passage_rate_128, 0.5)
+        self.assertEqual(diagnostic.oversized_passage_rate_256, 0.25)
+        self.assertEqual(diagnostic.oversized_passage_rate_512, 0.0)
+        self.assertFalse(
+            hasattr(report.assessment_summary.geo_score, "passage_extractability")
+        )
+
     def test_entity_authority_detail_projects_existing_measured_signals(self):
         report = BuildAIReadinessReport().execute(
             self.assessment_with_entity_authority_signals()

@@ -132,6 +132,19 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
                 for profile in report.passage_quality_summary.passage_profiles
             ],
         },
+        "passage_extractability_diagnostic": {
+            "passage_count": report.passage_quality_summary.passage_count,
+            "oversized_passage_rate_128": (
+                report.passage_quality_summary.oversized_passage_rate_128
+            ),
+            "oversized_passage_rate_256": (
+                report.passage_quality_summary.oversized_passage_rate_256
+            ),
+            "oversized_passage_rate_512": (
+                report.passage_quality_summary.oversized_passage_rate_512
+            ),
+            "included_in_score": False,
+        },
         "content_reuse": (
             None
             if report.content_reuse_summary is None
@@ -208,6 +221,10 @@ class PlainTextAIReadinessReportRenderer:
             f" - Discoverability ({geo.discoverability.weight_percentage}%): {'N/A' if geo.discoverability.dimension_score is None else f'{geo.discoverability.dimension_score:.1f}'}",
             *self._geo_detail_lines(geo.discoverability_detail),
             "",
+            "Passage Extractability — Experimental Diagnostic",
+            "Not included in score",
+            *self._passage_diagnostic_lines(report.passage_quality_summary),
+            "",
             "Structural Summary",
             f"Total Passages: {structural.total_passage_count}",
             f"Total Words: {structural.total_word_count}",
@@ -229,6 +246,19 @@ class PlainTextAIReadinessReportRenderer:
             f"   - {signal.label}: "
             f"{'Not measured' if signal.value is None else f'{signal.value:.1f}'}"
             for signal in detail.signals
+        )
+
+    @staticmethod
+    def _passage_diagnostic_lines(summary) -> tuple:
+        def rate_line(bound, value):
+            rendered = "Not measured" if value is None else f"{value * 100.0:.1f}%"
+            return f" >{bound} words oversized passage rate: {rendered}"
+
+        return (
+            f" Passage count: {summary.passage_count}",
+            rate_line(128, summary.oversized_passage_rate_128),
+            rate_line(256, summary.oversized_passage_rate_256),
+            rate_line(512, summary.oversized_passage_rate_512),
         )
 
     @staticmethod
@@ -369,6 +399,15 @@ class MarkdownAIReadinessReportRenderer:
             f"- **Discoverability ({geo.discoverability.weight_percentage}%)**: {'N/A' if geo.discoverability.dimension_score is None else f'{geo.discoverability.dimension_score:.1f}'}",
             *self._markdown_geo_detail_lines(geo.discoverability_detail),
             "",
+            "## Passage Extractability — Experimental Diagnostic",
+            "",
+            "Not included in score.",
+            "",
+            f"- Passage count: {passage_quality.passage_count}",
+            f"- >128 words oversized passage rate: {self._percentage_or_not_measured(passage_quality.oversized_passage_rate_128)}",
+            f"- >256 words oversized passage rate: {self._percentage_or_not_measured(passage_quality.oversized_passage_rate_256)}",
+            f"- >512 words oversized passage rate: {self._percentage_or_not_measured(passage_quality.oversized_passage_rate_512)}",
+            "",
             "## Structural Summary",
             "",
             f"- Total passages: {structural.total_passage_count}",
@@ -409,3 +448,7 @@ class MarkdownAIReadinessReportRenderer:
             f"{'Not measured' if signal.value is None else f'{signal.value:.1f}'}"
             for signal in detail.signals
         )
+
+    @staticmethod
+    def _percentage_or_not_measured(value) -> str:
+        return "Not measured" if value is None else f"{value * 100.0:.1f}%"

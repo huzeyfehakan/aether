@@ -1,6 +1,6 @@
 import sys
 import unittest
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 
 sys.path.insert(0, "src")
 
@@ -129,6 +129,70 @@ class AIReadinessAssessmentTests(unittest.TestCase):
         with self.assertRaises(FrozenInstanceError):
             first.metadata_completeness = CompletenessClassification.MISSING
         self.assertIsInstance(first, AIReadinessAssessment)
+
+    def test_oversized_passage_diagnostics_do_not_change_any_score(self):
+        report = self.report(
+            metadata_available=(True, True, True, True, True, True, True),
+            coverage_ratio=1.0,
+            covered_paragraphs=2,
+            structural_counts=(2, 600, 2),
+        )
+        profiles = (
+            PassageProfile(
+                passage_id="p1",
+                ordinal_position=0,
+                word_count=100,
+                character_count=500,
+                contains_statistics=True,
+                contains_citation=True,
+            ),
+            PassageProfile(
+                passage_id="p2",
+                ordinal_position=1,
+                word_count=500,
+                character_count=2500,
+                contains_statistics=False,
+                contains_citation=False,
+            ),
+        )
+        base_quality = replace(
+            report.passage_quality_analysis,
+            passage_profiles=profiles,
+            passage_balance_ratio=0.6,
+        )
+        baseline = AssessAIReadiness().execute(
+            replace(report, passage_quality_analysis=base_quality)
+        )
+        instrumented = AssessAIReadiness().execute(
+            replace(
+                report,
+                passage_quality_analysis=replace(
+                    base_quality,
+                    oversized_passage_rate_128=0.5,
+                    oversized_passage_rate_256=0.5,
+                    oversized_passage_rate_512=0.0,
+                ),
+            )
+        )
+
+        self.assertEqual(instrumented.seo_score, baseline.seo_score)
+        self.assertEqual(instrumented.geo_score, baseline.geo_score)
+        self.assertEqual(
+            instrumented.geo_score.semantic_completeness,
+            baseline.geo_score.semantic_completeness,
+        )
+        self.assertEqual(
+            instrumented.geo_score.entity_authority,
+            baseline.geo_score.entity_authority,
+        )
+        self.assertEqual(
+            instrumented.geo_score.structural_richness,
+            baseline.geo_score.structural_richness,
+        )
+        self.assertEqual(
+            instrumented.geo_score.discoverability,
+            baseline.geo_score.discoverability,
+        )
 
     def test_semantic_completeness_renormalizes_unmeasured_optional_signals(self):
         metadata = MetadataAnalysis(

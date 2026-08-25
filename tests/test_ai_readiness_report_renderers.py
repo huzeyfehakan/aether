@@ -1,6 +1,7 @@
 import json
 import sys
 import unittest
+from dataclasses import replace
 
 sys.path.insert(0, "src")
 
@@ -103,6 +104,10 @@ class AIReadinessReportRendererTests(unittest.TestCase):
         self.assertIsNone(structural_signals["Answered question ratio"])
         self.assertNotIn("score", payload)
         self.assertNotIn("recommendations", payload)
+        diagnostic = payload["passage_extractability_diagnostic"]
+        self.assertEqual(diagnostic["passage_count"], 1)
+        self.assertIsNone(diagnostic["oversized_passage_rate_128"])
+        self.assertFalse(diagnostic["included_in_score"])
 
     def test_plain_text_renderer_includes_all_required_summaries(self):
         rendered = PlainTextAIReadinessReportRenderer().render(self.report())
@@ -125,6 +130,29 @@ class AIReadinessReportRendererTests(unittest.TestCase):
         self.assertIn("## Structural Summary", rendered)
         self.assertIn("## Extracted Metadata", rendered)
         self.assertIn("| `p-1` | 1 | 4 | 20 |", rendered)
+        self.assertIn("Passage Extractability — Experimental Diagnostic", rendered)
+        self.assertIn("Not included in score", rendered)
+        self.assertIn(">128 words oversized passage rate: Not measured", rendered)
+
+    def test_renderers_show_measured_diagnostic_rates_without_classification(self):
+        report = self.report()
+        report = replace(
+            report,
+            passage_quality_summary=replace(
+                report.passage_quality_summary,
+                oversized_passage_rate_128=0.25,
+                oversized_passage_rate_256=0.0,
+                oversized_passage_rate_512=0.0,
+            ),
+        )
+
+        plain = PlainTextAIReadinessReportRenderer().render(report)
+        markdown = MarkdownAIReadinessReportRenderer().render(report)
+        for rendered in (plain, markdown):
+            self.assertIn(">128 words oversized passage rate: 25.0%", rendered)
+            self.assertIn(">256 words oversized passage rate: 0.0%", rendered)
+            self.assertNotIn("good", rendered.lower())
+            self.assertNotIn("bad passages", rendered.lower())
 
     def test_renderers_are_deterministic(self):
         report = self.report()

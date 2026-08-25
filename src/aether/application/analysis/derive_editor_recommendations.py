@@ -69,6 +69,7 @@ class RecommendationCode(str, Enum):
     LOW_TRUST_INDEX = "low_trust_index"
     MISSING_SAME_AS_SCHEMA = "missing_same_as_schema"
     INCOMPLETE_BODY_CAPTURE = "incomplete_body_capture"
+    BODY_NOT_SERVER_RENDERED = "body_not_server_rendered"
 
 
 #: Structured data is declared by the page template, so correcting it is a CMS
@@ -111,6 +112,7 @@ _CATEGORIES = {
     RecommendationCode.CONFLICTING_PUBLISHED_DATES: RecommendationCategory.TECHNICAL,
     RecommendationCode.MISSING_SAME_AS_SCHEMA: RecommendationCategory.TECHNICAL,
     RecommendationCode.INCOMPLETE_BODY_CAPTURE: RecommendationCategory.TECHNICAL,
+    RecommendationCode.BODY_NOT_SERVER_RENDERED: RecommendationCategory.TECHNICAL,
 }
 
 _PRIORITIES = {
@@ -126,6 +128,7 @@ _PRIORITIES = {
     RecommendationCode.CONFLICTING_PUBLISHED_DATES: RecommendationPriority.P1_TECHNICAL,
     RecommendationCode.MISSING_SAME_AS_SCHEMA: RecommendationPriority.P1_TECHNICAL,
     RecommendationCode.INCOMPLETE_BODY_CAPTURE: RecommendationPriority.P1_TECHNICAL,
+    RecommendationCode.BODY_NOT_SERVER_RENDERED: RecommendationPriority.P1_TECHNICAL,
 
     # P2: Primary Evidence (GEO Authority)
     RecommendationCode.NO_OUTBOUND_LINKS: RecommendationPriority.P2_PRIMARY_EVIDENCE,
@@ -234,7 +237,11 @@ class DeriveEditorRecommendations:
         if analysis is None:
             return ()
             
-        if analysis.discarded_word_count > analysis.total_word_count:
+        if analysis.empty_body_block_count >= max(1, analysis.total_passage_count):
+            return (EditorRecommendation(code=RecommendationCode.BODY_NOT_SERVER_RENDERED),)
+            
+        uncaptured = analysis.page_visible_word_count - analysis.total_word_count
+        if uncaptured > analysis.total_word_count or analysis.discarded_word_count > analysis.total_word_count:
             return (EditorRecommendation(code=RecommendationCode.INCOMPLETE_BODY_CAPTURE),)
         return ()
 
@@ -243,6 +250,13 @@ class DeriveEditorRecommendations:
         report: ArticleAnalysisReport,
     ) -> Tuple[EditorRecommendation, ...]:
         recommendations = []
+        if not report.body_capture_is_reliable:
+            sd_analysis = report.structured_data_analysis
+            if sd_analysis is not None:
+                has_same_as = "sameas" in [p.lower() for p in sd_analysis.all_declared_properties]
+                if not has_same_as:
+                    recommendations.append(EditorRecommendation(code=RecommendationCode.MISSING_SAME_AS_SCHEMA))
+            return tuple(recommendations)
 
         # GEO Evidence
         if report.passage_quality_analysis and report.passage_quality_analysis.passage_profiles:
@@ -337,6 +351,8 @@ class DeriveEditorRecommendations:
     def _heading_structure(
         report: ArticleAnalysisReport,
     ) -> Tuple[EditorRecommendation, ...]:
+        if not report.body_capture_is_reliable:
+            return ()
         analysis = report.heading_structure_analysis
         if analysis is None:
             return ()
@@ -381,6 +397,10 @@ class DeriveEditorRecommendations:
     def _topic_introduction(
         report: ArticleAnalysisReport,
     ) -> Tuple[EditorRecommendation, ...]:
+        if not report.body_capture_is_reliable:
+            return ()
+        if not report.body_capture_is_reliable:
+            return ()
         analysis = report.topic_introduction_analysis
 
         if analysis is None:

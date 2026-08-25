@@ -53,6 +53,8 @@ class SourceArticleSnapshot:
     meta_published_date: Optional[str] = None
     time_tag_published_date: Optional[str] = None
     discarded_word_count: int = 0
+    page_visible_word_count: int = 0
+    empty_body_block_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -161,6 +163,8 @@ class RegisterSourceSnapshot:
                 meta_published_date=snapshot.meta_published_date,
                 time_tag_published_date=snapshot.time_tag_published_date,
                 discarded_word_count=snapshot.discarded_word_count,
+                page_visible_word_count=snapshot.page_visible_word_count,
+                empty_body_block_count=snapshot.empty_body_block_count,
             )
         )
         return RegistrationResult(

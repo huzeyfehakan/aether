@@ -28,6 +28,8 @@ class ArticleStructuralAnalysis:
     #: the ratio over, and 0.0 read as "every entity is supported".
     unsupported_entity_ratio: Optional[float] = None
     discarded_word_count: int = 0
+    page_visible_word_count: int = 0
+    empty_body_block_count: int = 0
 
 
 class AnalyzeArticleStructure:
@@ -83,6 +85,8 @@ class AnalyzeArticleStructure:
             definitive_stance_ratio=source_data.definitive_stance_ratio,
             unsupported_entity_ratio=unsupported_ratio,
             discarded_word_count=source_data.discarded_word_count,
+            page_visible_word_count=source_data.page_visible_word_count,
+            empty_body_block_count=source_data.empty_body_block_count,
         )
 
     @staticmethod

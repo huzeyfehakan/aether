@@ -14,6 +14,12 @@ in.
 Headings are collected from the same container as the body, by the same rules,
 so a site banner heading is never mistaken for the article's own.
 
+## Reliability Checks
+
+Aether counts the text nodes observed in the page prior to applying sectioning filters (`page_visible_word_count`) and empty block elements inside `<article>`/`<main>` (`empty_body_block_count`). If the extracted text drops the majority of the page's visible words, or if the designated containers are structurally empty but rendered dynamically, Aether flags the body capture as unreliable (`BODY_NOT_SERVER_RENDERED` or `INCOMPLETE_BODY_CAPTURE`).
+
+If body capture is deemed unreliable, Aether suppresses body-dependent GEO and SEO dimension scores (yielding `None`), preventing the silent generation of misleading metrics based on a severely truncated or empty payload.
+
 Some server responses contain no rendered article paragraphs but include a
 server-supplied `application/json` hydration payload. Aether deterministically
 supports this format when a JSON object, in document order:

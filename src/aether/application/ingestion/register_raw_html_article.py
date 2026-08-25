@@ -88,6 +88,8 @@ class NormalizedHtmlArticle:
     meta_published_date: Optional[str] = None
     time_tag_published_date: Optional[str] = None
     discarded_word_count: int = 0
+    page_visible_word_count: int = 0
+    empty_body_block_count: int = 0
 
 
 class _ArticleHtmlCollector(HTMLParser):
@@ -146,6 +148,9 @@ class _ArticleHtmlCollector(HTMLParser):
         self.list_word_count = 0
         self.blockquote_word_count = 0
         self.discarded_word_count = 0
+        self.page_visible_word_count = 0
+        self.empty_body_block_count = 0
+        self._block_has_text_stack: List[bool] = []
         self.links: List[Tuple[str, bool]] = []
 
         self._pending_question_heading = False
@@ -216,6 +221,7 @@ class _ArticleHtmlCollector(HTMLParser):
             self.time_values.append(attributes["datetime"].strip())
         if tag in self._BLOCK_TAGS:
             self._flush_paragraph()
+            self._block_has_text_stack.append(False)
 
         if tag in self._NON_BODY_TAGS:
             self._non_body_depth += 1
@@ -269,6 +275,10 @@ class _ArticleHtmlCollector(HTMLParser):
             self._non_body_depth = max(0, self._non_body_depth - 1)
         if tag in self._BLOCK_TAGS:
             self._flush_paragraph()
+            if self._block_has_text_stack:
+                has_text = self._block_has_text_stack.pop()
+                if not has_text and (self._article_depth > 0 or self._main_depth > 0):
+                    self.empty_body_block_count += 1
         if tag in _HEADING_TAGS and self._heading_parts is not None:
             text = _normalize_text(" ".join(self._heading_parts))
             if text and self._heading_is_body:
@@ -330,6 +340,10 @@ class _ArticleHtmlCollector(HTMLParser):
             self._paragraph_parts.append(data)
 
         words = len(data.split())
+        if not is_metadata_or_heading:
+            self.page_visible_word_count += words
+        for idx in range(len(self._block_has_text_stack)):
+            self._block_has_text_stack[idx] = True
         if self._table_depth > 0:
             self.table_word_count += words
         if self._list_depth > 0:
@@ -556,6 +570,8 @@ class HtmlArticleNormalizer:
             meta_published_date=meta_published_date,
             time_tag_published_date=time_tag_published_date,
             discarded_word_count=discarded_words,
+            page_visible_word_count=collector.page_visible_word_count,
+            empty_body_block_count=collector.empty_body_block_count,
         )
 
     @staticmethod
@@ -1022,5 +1038,8 @@ class RegisterRawHtmlArticle:
                 json_ld_published_date=normalized.json_ld_published_date,
                 meta_published_date=normalized.meta_published_date,
                 time_tag_published_date=normalized.time_tag_published_date,
+                discarded_word_count=normalized.discarded_word_count,
+                page_visible_word_count=normalized.page_visible_word_count,
+                empty_body_block_count=normalized.empty_body_block_count,
             )
         )

@@ -68,6 +68,16 @@ class ArticleAnalysisReport:
     fluency_analysis: Optional[FluencyAnalysis] = None
     claim_evidence_analysis: Optional[ClaimEvidenceAnalysis] = None
 
+    @property
+    def body_capture_is_reliable(self) -> bool:
+        sa = self.structural_analysis
+        if sa.empty_body_block_count >= max(1, sa.total_passage_count):
+            return False
+        uncaptured = sa.page_visible_word_count - sa.total_word_count
+        if uncaptured > sa.total_word_count or sa.discarded_word_count > sa.total_word_count:
+            return False
+        return True
+
     def __post_init__(self) -> None:
         analyses = [
             self.structural_analysis,

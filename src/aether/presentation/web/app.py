@@ -293,6 +293,7 @@ _IMPACT_MAP = {
     RecommendationCode.LOW_TRUST_INDEX: "Entity Authority",
     RecommendationCode.MISSING_SAME_AS_SCHEMA: "Semantic Completeness",
     RecommendationCode.INCOMPLETE_BODY_CAPTURE: "Technical Access",
+    RecommendationCode.BODY_NOT_SERVER_RENDERED: "Technical Access",
 }
 
 
@@ -350,6 +351,11 @@ def _report_view(report: Any) -> Dict[str, Any]:
     structure = report.structural_summary
     assessment = report.assessment_summary
     return {
+        "structure": {
+            "body_capture_is_reliable": structure.body_capture_is_reliable,
+            "page_visible_word_count": structure.page_visible_word_count,
+            "total_word_count": structure.total_word_count,
+        },
         "assessment": {
             "metadata": assessment.metadata_completeness.value,
             "seo_score": {

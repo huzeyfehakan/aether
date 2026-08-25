@@ -188,7 +188,9 @@ class AssessAIReadiness:
 
         semantic_score = None
         dup_analysis = report.content_duplication_analysis
-        if dup_analysis is not None:
+        if not report.body_capture_is_reliable:
+            semantic_score = None
+        elif dup_analysis is not None:
             if dup_analysis.total_passage_count > 0:
                 unique_passages = dup_analysis.total_passage_count - len(dup_analysis.repeated_passages)
                 semantic_score = (max(0, unique_passages) / dup_analysis.total_passage_count) * 100.0
@@ -234,6 +236,13 @@ class AssessAIReadiness:
         # Statistics coverage combined with deterministic fluency measurements.
         passage_quality = report.passage_quality_analysis
         fluency = report.fluency_analysis
+        if not report.body_capture_is_reliable:
+            return GEOScore(
+                semantic_completeness=ScoreDimension(weight_percentage=40, dimension_score=None),
+                entity_authority=ScoreDimension(weight_percentage=30, dimension_score=None),
+                structural_richness=ScoreDimension(weight_percentage=15, dimension_score=None),
+                discoverability=ScoreDimension(weight_percentage=15, dimension_score=None),
+            )
         semantic_comp = None
         if passage_quality and len(passage_quality.passage_profiles) > 0:
             profiles = passage_quality.passage_profiles

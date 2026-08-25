@@ -25,6 +25,8 @@ class ArticleIdentitySummary:
 class StructuralSummary:
     total_passage_count: int
     total_word_count: int
+    body_capture_is_reliable: bool = True
+    page_visible_word_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -189,6 +191,8 @@ class BuildAIReadinessReport:
             structural_summary=StructuralSummary(
                 total_passage_count=structural.total_passage_count,
                 total_word_count=structural.total_word_count,
+            body_capture_is_reliable=report.body_capture_is_reliable,
+            page_visible_word_count=structural.page_visible_word_count,
             ),
             metadata_summary=MetadataSummary(
                 title_length=metadata.title_length,

@@ -144,6 +144,8 @@ class ArticleVersionSourceData:
     meta_published_date: Optional[str] = None
     time_tag_published_date: Optional[str] = None
     discarded_word_count: int = 0
+    page_visible_word_count: int = 0
+    empty_body_block_count: int = 0
 
     def __post_init__(self) -> None:
         if not self.article_version_id or not self.article_version_id.strip():

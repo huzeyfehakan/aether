@@ -311,6 +311,15 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
             "Sayfanın Schema.org JSON-LD bloğunda, yazarın ve kurumun Wikipedia/Wikidata profillerini sameAs özelliğiyle belirtin."
         ),
     ),
+    RecommendationCode.BODY_NOT_SERVER_RENDERED: RecommendationText(
+        headline="Makale Gövdesi Sunucudan Gönderilmiyor",
+        why_it_matters=(
+            "Gövde tarayıcıda JavaScript ile oluşturuluyor. Googlebot dışındaki AI crawler'ların büyük kısmı JavaScript çalıştırmaz; bu sayfa onlara eksik görünecektir."
+        ),
+        what_to_do=(
+            "Makale gövdesini sunucu tarafında render edin. Doğrulama için curl çıktısında gövde paragraflarının göründüğünden emin olun."
+        ),
+    ),
     RecommendationCode.INCOMPLETE_BODY_CAPTURE: RecommendationText(
         headline="Makale Gövdesi Eksik Okundu",
         why_it_matters=(

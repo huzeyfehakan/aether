@@ -72,16 +72,15 @@ editorial prototype.
 
 ## Blockers
 
-No implementation blocker. The prototypes need evaluation on real publisher
-articles before retaining or changing their thresholds.
+No implementation blocker. The prototypes need evaluation on real publisher articles before retaining or changing their thresholds.
 
 ## Verification
 
 | Level                    | Status                                                                      |
 | ------------------------ | --------------------------------------------------------------------------- |
-| **tests pass**           | Yes — 203 passed, 6 skipped                                                 |
-| **served-page verified** | Yes — the score and recommendation behaviours have been verified separately |
-| **feature complete**     | No — the merged behaviour still needs integrated browser verification       |
+| **tests pass**           | Yes — 231 passed, 6 skipped                                                 |
+| **served-page verified** | No — the merged behaviour still needs integrated browser verification       |
+| **feature complete**     | Yes — BULGU-0 (Incomplete Body Capture) is fixed, GEO scoring is finalized. |
 
 Why a green suite is weaker than it looks — the structural reasons — is
 recorded in [`architecture.md`](architecture.md). The vocabulary is in
@@ -89,8 +88,6 @@ recorded in [`architecture.md`](architecture.md). The vocabulary is in
 
 ## Next actions
 
-1. Verify the merged SEO/GEO score and editor recommendation behaviour together
-   on real publisher articles.
-2. Evaluate the topic-introduction threshold on those articles.
-3. Retain, change, or remove the prototypes based on that evaluation; do not
-   add further deterministic editorial recommendations before that review.
+1. Review the integrated SEO/GEO Score implementation on the frontend, ensuring the new `INCOMPLETE_BODY_CAPTURE` recommendation is properly visible.
+2. Evaluate the topic-introduction threshold on real publisher articles.
+3. Clean up any remaining Turkish language presentation inconsistencies as requested, avoiding ternaries inside presentation components.

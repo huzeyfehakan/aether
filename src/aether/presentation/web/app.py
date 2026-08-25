@@ -569,7 +569,7 @@ def create_app(fetcher: Optional[HtmlFetcher] = None) -> FastAPI:
 
     @app.post("/analyze/draft")
     def analyze_draft(
-        content: str = Form(...),
+        content: str = Form(""),
         headline: str = Form(""),
         language: str = Form("tr"),
         publisher: str = Form(""),

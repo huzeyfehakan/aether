@@ -1,5 +1,6 @@
 """Deterministically normalize raw article HTML into existing source snapshots."""
 
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from html import unescape
@@ -86,6 +87,7 @@ class NormalizedHtmlArticle:
     json_ld_published_date: Optional[str] = None
     meta_published_date: Optional[str] = None
     time_tag_published_date: Optional[str] = None
+    discarded_word_count: int = 0
 
 
 class _ArticleHtmlCollector(HTMLParser):
@@ -403,10 +405,21 @@ class HtmlArticleNormalizer:
     _DESCRIPTION_META_KEYS = ("og:description", "description", "twitter:description")
     _KEYWORD_META_KEYS = ("keywords",)
 
+    @classmethod
+    def _discarded_word_count(cls, paragraphs: List[Tuple[int, str]], selected: Optional[int]) -> int:
+        return sum(
+            len(text.split())
+            for priority, text in paragraphs
+            if priority != selected
+        )
+
     def normalize(self, raw_article: RawHtmlArticle) -> NormalizedHtmlArticle:
         collector = _ArticleHtmlCollector()
         collector.feed(raw_article.html)
         collector.close()
+
+        selected_tier = self._selected_tier(collector.paragraphs)
+        discarded_words = self._discarded_word_count(collector.paragraphs, selected_tier)
 
         # og:title outranks a JSON-LD headline deliberately. Both are declared
         # by the publisher, but og:title arrives through the HTML parser with
@@ -415,11 +428,11 @@ class HtmlArticleNormalizer:
         title = self._first_metadata(collector.metadata, self._TITLE_META_KEYS)
         title = title or self._json_ld_text(collector.json_ld_documents, "headline")
         title = title or _normalize_text(" ".join(collector.title_parts))
-        title = title or self._innermost_heading(collector.headings)
+        title = title or self._innermost_heading(collector.headings, selected_tier)
         if not title:
             raise DomainValidationError("raw article html has no title")
 
-        body = self._body_from(collector.paragraphs)
+        body = self._body_from(collector.paragraphs, selected_tier)
         if not body:
             body = self._body_from_application_json(
                 collector.application_json_documents, raw_article.source_url
@@ -494,7 +507,7 @@ class HtmlArticleNormalizer:
             ),
             declared_titles=self._declared_titles(collector),
             declared_descriptions=self._declared_descriptions(collector),
-            declared_headings=self._declared_headings(collector),
+            declared_headings=self._declared_headings(collector, selected_tier),
             internal_links=tuple(internal_links_list),
             outbound_domains=tuple(sorted(outbound_domains_set)),
             outbound_body_domains=tuple(sorted(outbound_body_domains_set)),
@@ -514,11 +527,13 @@ class HtmlArticleNormalizer:
             json_ld_published_date=json_ld_published_date,
             meta_published_date=meta_published_date,
             time_tag_published_date=time_tag_published_date,
+            discarded_word_count=discarded_words,
         )
 
     @staticmethod
     def _declared_headings(
         collector: "_ArticleHtmlCollector",
+        selected_tier: Optional[int],
     ) -> Tuple[DeclaredHeading, ...]:
         """Headings from the article's own container, in document order.
 
@@ -527,7 +542,11 @@ class HtmlArticleNormalizer:
         """
         if not collector.headings:
             return ()
-        top = max(priority for priority, _, _ in collector.headings)
+            
+        top = selected_tier
+        if top is None:
+            top = max(priority for priority, _, _ in collector.headings)
+            
         return tuple(
             DeclaredHeading(level=level, text=text)
             for priority, level, text in collector.headings
@@ -711,7 +730,10 @@ class HtmlArticleNormalizer:
         return urljoin(source_url, canonical_href)
 
     @staticmethod
-    def _innermost_heading(headings: List[Tuple[int, int, str]]) -> str:
+    def _innermost_heading(
+        headings: List[Tuple[int, int, str]],
+        selected_tier: Optional[int]
+    ) -> str:
         """Return the first heading from the most article-specific container.
 
         Headings are ranked exactly like paragraphs: article-contained first,
@@ -723,10 +745,17 @@ class HtmlArticleNormalizer:
         top_level = [item for item in headings if item[1] == 1]
         if not top_level:
             return ""
-        highest_priority = max(priority for priority, _, _ in top_level)
-        return next(
-            text for priority, _, text in top_level if priority == highest_priority
-        )
+            
+        target = selected_tier
+        if target is None:
+            target = max(priority for priority, _, _ in top_level)
+            
+        try:
+            return next(
+                text for priority, _, text in top_level if priority == target
+            )
+        except StopIteration:
+            return ""
 
     @staticmethod
     def _first_metadata(metadata: Dict[str, str], keys: Tuple[str, ...]) -> Optional[str]:
@@ -737,12 +766,43 @@ class HtmlArticleNormalizer:
         return None
 
     @staticmethod
-    def _body_from(paragraphs: List[Tuple[int, str]]) -> str:
-        if not paragraphs:
+    def _paragraph_tiers(
+        paragraphs: List[Tuple[int, str]]
+    ) -> Dict[int, List[str]]:
+        tiers: Dict[int, List[str]] = defaultdict(list)
+        for priority, text in paragraphs:
+            tiers[priority].append(text)
+        return tiers
+
+    @classmethod
+    def _selected_tier(cls, paragraphs: List[Tuple[int, str]]) -> Optional[int]:
+        """Return the containment tier that holds the article body.
+
+        Containment rank alone is not sufficient. A template that wraps only the
+        article header in <article> leaves the prose one tier down, and ranking
+        by containment silently discards it (four paragraphs beat eight hundred
+        words). Prose that is not article text — banners, teaser cards, footers —
+        is already excluded upstream by _NON_BODY_TAGS, so the largest remaining
+        prose region is the article. Word volume decides; containment rank only
+        breaks ties.
+        """
+        tiers = cls._paragraph_tiers(paragraphs)
+        if not tiers:
+            return None
+        return max(
+            tiers,
+            key=lambda priority: (
+                sum(len(text.split()) for text in tiers[priority]),
+                priority,
+            ),
+        )
+
+    @staticmethod
+    def _body_from(paragraphs: List[Tuple[int, str]], selected: Optional[int]) -> str:
+        if selected is None:
             return ""
-        highest_priority = max(priority for priority, _ in paragraphs)
         return "\n\n".join(
-            text for priority, text in paragraphs if priority == highest_priority
+            text for priority, text in paragraphs if priority == selected
         )
 
     @classmethod

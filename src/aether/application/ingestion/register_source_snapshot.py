@@ -52,6 +52,7 @@ class SourceArticleSnapshot:
     json_ld_published_date: Optional[str] = None
     meta_published_date: Optional[str] = None
     time_tag_published_date: Optional[str] = None
+    discarded_word_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -159,6 +160,7 @@ class RegisterSourceSnapshot:
                 json_ld_published_date=snapshot.json_ld_published_date,
                 meta_published_date=snapshot.meta_published_date,
                 time_tag_published_date=snapshot.time_tag_published_date,
+                discarded_word_count=snapshot.discarded_word_count,
             )
         )
         return RegistrationResult(

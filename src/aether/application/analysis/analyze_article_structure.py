@@ -27,6 +27,7 @@ class ArticleStructuralAnalysis:
     #: None when no paragraph names an entity: there is no population to take
     #: the ratio over, and 0.0 read as "every entity is supported".
     unsupported_entity_ratio: Optional[float] = None
+    discarded_word_count: int = 0
 
 
 class AnalyzeArticleStructure:
@@ -81,6 +82,7 @@ class AnalyzeArticleStructure:
             heading_passage_overlap_ratio=source_data.heading_passage_overlap_ratio,
             definitive_stance_ratio=source_data.definitive_stance_ratio,
             unsupported_entity_ratio=unsupported_ratio,
+            discarded_word_count=source_data.discarded_word_count,
         )
 
     @staticmethod

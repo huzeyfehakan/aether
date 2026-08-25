@@ -68,6 +68,7 @@ class RecommendationCode(str, Enum):
     UNSUPPORTED_ENTITIES = "unsupported_entities"
     LOW_TRUST_INDEX = "low_trust_index"
     MISSING_SAME_AS_SCHEMA = "missing_same_as_schema"
+    INCOMPLETE_BODY_CAPTURE = "incomplete_body_capture"
 
 
 #: Structured data is declared by the page template, so correcting it is a CMS
@@ -109,6 +110,7 @@ _CATEGORIES = {
     ),
     RecommendationCode.CONFLICTING_PUBLISHED_DATES: RecommendationCategory.TECHNICAL,
     RecommendationCode.MISSING_SAME_AS_SCHEMA: RecommendationCategory.TECHNICAL,
+    RecommendationCode.INCOMPLETE_BODY_CAPTURE: RecommendationCategory.TECHNICAL,
 }
 
 _PRIORITIES = {
@@ -123,6 +125,7 @@ _PRIORITIES = {
     RecommendationCode.DESCRIPTION_SOURCES_DISAGREE: RecommendationPriority.P1_TECHNICAL,
     RecommendationCode.CONFLICTING_PUBLISHED_DATES: RecommendationPriority.P1_TECHNICAL,
     RecommendationCode.MISSING_SAME_AS_SCHEMA: RecommendationPriority.P1_TECHNICAL,
+    RecommendationCode.INCOMPLETE_BODY_CAPTURE: RecommendationPriority.P1_TECHNICAL,
 
     # P2: Primary Evidence (GEO Authority)
     RecommendationCode.NO_OUTBOUND_LINKS: RecommendationPriority.P2_PRIMARY_EVIDENCE,
@@ -200,7 +203,8 @@ class DeriveEditorRecommendations:
             # can answer are run. Nothing is inferred about what the CMS will
             # publish around it.
             draft_recommendations = list(
-                self._heading_structure(report)
+                self._body_capture(report)
+                + self._heading_structure(report)
                 + self._weak_article_opening(report)
                 + self._repeated_text(report)
                 + self._geo_evidence_and_discoverability(report)
@@ -208,7 +212,8 @@ class DeriveEditorRecommendations:
             draft_recommendations.sort(key=lambda r: r.priority)
             return tuple(draft_recommendations)
         recommendations = list(
-            self._missing_metadata(report)
+            self._body_capture(report)
+            + self._missing_metadata(report)
             + self._heading_structure(report)
             + self._weak_article_opening(report)
             + self._declared_consistency(report)
@@ -220,6 +225,18 @@ class DeriveEditorRecommendations:
         # Sort by priority
         recommendations.sort(key=lambda r: r.priority)
         return tuple(recommendations)
+
+    @staticmethod
+    def _body_capture(
+        report: ArticleAnalysisReport,
+    ) -> Tuple[EditorRecommendation, ...]:
+        analysis = report.structural_analysis
+        if analysis is None:
+            return ()
+            
+        if analysis.discarded_word_count > analysis.total_word_count:
+            return (EditorRecommendation(code=RecommendationCode.INCOMPLETE_BODY_CAPTURE),)
+        return ()
 
     @staticmethod
     def _geo_evidence_and_discoverability(

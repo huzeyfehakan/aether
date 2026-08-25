@@ -292,6 +292,7 @@ _IMPACT_MAP = {
     RecommendationCode.UNSUPPORTED_ENTITIES: "Entity Authority",
     RecommendationCode.LOW_TRUST_INDEX: "Entity Authority",
     RecommendationCode.MISSING_SAME_AS_SCHEMA: "Semantic Completeness",
+    RecommendationCode.INCOMPLETE_BODY_CAPTURE: "Technical Access",
 }
 
 

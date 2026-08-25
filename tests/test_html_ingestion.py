@@ -712,6 +712,46 @@ class RawHtmlIngestionTests(unittest.TestCase):
         self.assertIsNone(result.article.initial_published_at)
         self.assertIsNone(result.article_version.source_published_at)
 
+    def test_body_survives_an_article_element_that_wraps_only_the_header(self):
+        html = """
+        <html lang="tr"><head><title>Title</title></head><body><main>
+          <article><h1>Başlık</h1><p>Kısa özet.</p></article>
+          <p>Birinci uzun paragraf ... Birinci uzun paragraf ... Birinci uzun paragraf ... Birinci uzun paragraf ... Birinci uzun paragraf ... Birinci uzun paragraf ...</p>
+          <p>İkinci uzun paragraf ... İkinci uzun paragraf ... İkinci uzun paragraf ... İkinci uzun paragraf ... İkinci uzun paragraf ... İkinci uzun paragraf ...</p>
+        </main></body></html>
+        """
+        from aether.application.ingestion.register_raw_html_article import HtmlArticleNormalizer
+        normalized = HtmlArticleNormalizer().normalize(self.raw_article(html))
+        self.assertIn("Birinci uzun paragraf", normalized.body)
+        self.assertGreater(len(normalized.body.split()), 20)
+        self.assertGreater(normalized.discarded_word_count, 0)
+        
+    def test_a_full_article_element_still_outranks_sibling_prose(self):
+        """Regresyon: <article> gövdeyi gerçekten sarıyorsa kardeş metin girmez."""
+        html = """
+        <html lang="tr"><head><title>Title</title></head><body><main>
+          <article><h1>Başlık</h1><p>Gerçek gövde... Gerçek gövde... Gerçek gövde...</p></article>
+          <p>Kardeş kısa paragraf.</p>
+        </main></body></html>
+        """
+        from aether.application.ingestion.register_raw_html_article import HtmlArticleNormalizer
+        normalized = HtmlArticleNormalizer().normalize(self.raw_article(html))
+        self.assertIn("Gerçek gövde", normalized.body)
+        self.assertNotIn("Kardeş", normalized.body)
+        self.assertGreater(normalized.discarded_word_count, 0)
+
+    def test_containment_rank_breaks_ties_at_equal_word_volume(self):
+        html = """
+        <html lang="tr"><head><title>Title</title></head><body><main>
+          <article><h1>Başlık</h1><p>Gövde 1234</p></article>
+          <p>Dışarı 1234</p>
+        </main></body></html>
+        """
+        from aether.application.ingestion.register_raw_html_article import HtmlArticleNormalizer
+        normalized = HtmlArticleNormalizer().normalize(self.raw_article(html))
+        self.assertIn("Gövde 1234", normalized.body)
+        self.assertNotIn("Dışarı 1234", normalized.body)
+
 
 if __name__ == "__main__":
     unittest.main()

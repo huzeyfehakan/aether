@@ -311,6 +311,15 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
             "Sayfanın Schema.org JSON-LD bloğunda, yazarın ve kurumun Wikipedia/Wikidata profillerini sameAs özelliğiyle belirtin."
         ),
     ),
+    RecommendationCode.INCOMPLETE_BODY_CAPTURE: RecommendationText(
+        headline="Makale Gövdesi Eksik Okundu",
+        why_it_matters=(
+            "Sayfa şablonunuz (örneğin sadece özet bloğunu <article> içine alarak) gövde metninin büyük kısmını analiz dışında bırakıyor. Okunamayan metin GEO ve SEO skoruna dahil edilemez."
+        ),
+        what_to_do=(
+            "CMS şablonunuzu güncelleyerek tüm makale gövdesinin tek ve doğru bir HTML kapsayıcı (<article> veya <main>) içinde olmasını sağlayın."
+        ),
+    ),
 }
 
 

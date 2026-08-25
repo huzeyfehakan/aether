@@ -32,7 +32,10 @@
       .recommendation { border: 1px solid #e0e8f1; border-left: 3px solid #0768d7; border-radius: 10px; margin-bottom: 12px; padding: 15px 17px; } .recommendation h4 { font-size: 1rem; margin: 0 0 6px; } .recommendation p { color: #4c5b6e; font-size: .9rem; line-height: 1.5; margin: 9px 0 0; } .recommendation strong { color: #24374d; }
       .declared { margin-top: 11px; } .declared td:last-child { text-align: left; color: #24374d; }
       .repeat-count { background: #eef3fa; border-radius: 99px; color: #3f5876; font-size: .8rem; font-weight: 680; padding: 3px 9px; } .recommendation blockquote { border-left: 2px solid #dbe3ec; color: #5d6b7e; font-style: italic; margin: 11px 0 0; padding: 2px 0 2px 12px; }
+      .impact-badge { background: #e3f2fd; color: #0288d1; border: 1px solid #b3e5fc; padding: 2px 6px; font-size: 0.75rem; border-radius: 4px; margin-left: 8px; vertical-align: middle; }
       .technical { margin-top: 28px; } .technical pre { background: #101d2c; border-radius: 10px; color: #dce9f7; margin: 14px 0 0; overflow: auto; padding: 16px; white-space: pre-wrap; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .score-headline { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; } .score-total { font-size: 2.2rem; font-weight: 800; color: #086ad8; line-height: 1; }
+      .score-weight { color: #d63c30; font-weight: 800; font-size: 1.1rem; margin: 0 0 4px; }
       @media (max-width: 640px) { .shell { width: min(100% - 28px, 1120px); padding-top: 30px; } .form-panel, #report-card { padding: 19px; } .tabs { overflow-x: auto; } }
     </style>
   </head>
@@ -105,7 +108,32 @@
 
       <section id="report-card" class="panel hidden" aria-live="polite">
         <div class="report-heading"><div><div class="eyebrow">Analysis complete</div><h2>AI Readiness Report</h2></div><span id="report-state" class="badge partial">Assessment available</span></div>
-        <div id="assessment-grid" class="assessment-grid"></div>
+        
+        <!-- YENİ: AI Readiness Score Bölümü -->
+        <div class="section" id="score-section" style="margin-top: 0;">
+          <div style="display: flex; gap: 32px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 300px;">
+              <h3 style="color: #0768d7; margin-bottom: 12px;">SEO Score</h3>
+              <div class="score-headline">
+                <span id="seo-score-total" class="score-total">0</span>
+                <span style="font-size: 1.1rem; color: #58677b;">/ 100</span>
+              </div>
+              <div id="seo-score-grid" class="metric-grid"></div>
+            </div>
+            <div style="flex: 1; min-width: 300px;">
+              <h3 style="color: #0768d7; margin-bottom: 12px;">GEO Score</h3>
+              <div class="score-headline">
+                <span id="geo-score-total" class="score-total">0</span>
+                <span style="font-size: 1.1rem; color: #58677b;">/ 100</span>
+              </div>
+              <div id="geo-score-grid" class="metric-grid"></div>
+            </div>
+          </div>
+          <p style="margin-top: 16px;">0–100 composite scores based on transparent deterministic measurements.</p>
+        </div>
+        <!-- BİTİŞ: AI Readiness Score Bölümü -->
+
+        <div class="section"><h3>Assessment Summary</h3><div id="assessment-grid" class="assessment-grid"></div></div>
 
         <div class="section"><h3>Article structure</h3><p>How the stored article is organized for deterministic passage analysis.</p><div id="structure-metrics" class="metric-grid"></div></div>
 
@@ -131,7 +159,7 @@
       // them, and only a draft with nothing to report ever rendered.
       const declaredRows = (o) => (o.declared || []).map((d) => `<tr><td>${d.label}</td><td>${d.value}</td></tr>`).join('');
       const occurrence = (o) => `${o.detail ? `<span class="repeat-count">${o.detail}</span>` : ''}${o.declared ? `<table class="metadata-table declared">${declaredRows(o)}</table>` : ''}${o.excerpt ? `<blockquote>${o.excerpt}</blockquote>` : ''}`;
-      const card = (item) => `<div class="recommendation"><h4>${item.headline}</h4>${item.occurrences.map(occurrence).join('')}<p><strong>Why it matters.</strong> ${item.why_it_matters}</p><p><strong>What to do.</strong> ${item.what_to_do}</p></div>`;
+      const card = (item) => `<div class="recommendation"><h4>${item.headline} ${item.impact ? `<span class="badge impact-badge">[Impacts: ${item.impact}]</span>` : ''}</h4>${item.occurrences.map(occurrence).join('')}<p><strong>Why it matters.</strong> ${item.why_it_matters}</p><p><strong>What to do.</strong> ${item.what_to_do}</p></div>`;
 
       document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => {
         document.querySelectorAll('.tab').forEach((item) => item.setAttribute('aria-selected', String(item === tab)));
@@ -177,7 +205,48 @@
 
 
       function renderReport(view, rawReport) {
+        
         const assessment = view.assessment;
+
+        if (assessment.seo_score) {
+            document.querySelector('#seo-score-total').textContent = assessment.seo_score.total;
+            const seoDimensions = [
+                assessment.seo_score.entity_coverage,
+                assessment.seo_score.structured_data,
+                assessment.seo_score.semantic_quality,
+                assessment.seo_score.technical_access
+            ];
+            
+            document.querySelector('#seo-score-grid').innerHTML = seoDimensions.map(d => `
+                <div class="metric-card">
+                    <p class="score-weight">%${d.weight}</p>
+                    <h4 style="margin: 0 0 5px; font-size: 1rem;">${d.label}</h4>
+                    <strong style="color: #45617d;">${d.val !== null ? d.val.toFixed(1) + ' / 100' : 'N/A'}</strong>
+                </div>
+            `).join('');
+            document.querySelector('#score-section').classList.remove('hidden');
+        } else {
+            document.querySelector('#score-section').classList.add('hidden');
+        }
+
+        if (assessment.geo_score) {
+            document.querySelector('#geo-score-total').textContent = assessment.geo_score.total;
+            const geoDimensions = [
+                assessment.geo_score.semantic_completeness,
+                assessment.geo_score.entity_authority,
+                assessment.geo_score.structural_richness,
+                assessment.geo_score.discoverability
+            ];
+            
+            document.querySelector('#geo-score-grid').innerHTML = geoDimensions.map(d => `
+                <div class="metric-card">
+                    <p class="score-weight">%${d.weight}</p>
+                    <h4 style="margin: 0 0 5px; font-size: 1rem;">${d.label}</h4>
+                    <strong style="color: #45617d;">${d.val !== null ? d.val.toFixed(1) + ' / 100' : 'N/A'}</strong>
+                </div>
+            `).join('');
+        }
+
         const cards = [
           ['Metadata', assessment.metadata, 'Fields an AI system needs to identify and attribute this article'],
         ].filter(([, value]) => Boolean(value));
@@ -280,12 +349,22 @@
               outcomeCard.classList.remove('hidden'); outcomeCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
               return;
             }
-            renderReport(data.view, data.report); reportCard.classList.remove('hidden'); reportCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          } catch (error) { status.dataset.error = error.message; }
+
+// YENİ: Backend'den gelen view ve report değişkenlerini gönderiyoruz.
+            renderReport(data.view, data.report); 
+            reportCard.classList.remove('hidden'); 
+            reportCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } catch (error) { 
+            status.dataset.error = error.message; 
+          }
           // Cleared here rather than on each success path: a branch that
           // returned early once left the loading text on screen beneath a
           // rendered result.
-          finally { button.disabled = false; status.textContent = status.dataset.error || ''; refreshPublishers(); }
+          finally { 
+            button.disabled = false; 
+            status.textContent = status.dataset.error || ''; 
+            refreshPublishers(); 
+          }
         });
       });
     </script>

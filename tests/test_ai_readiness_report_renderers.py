@@ -36,6 +36,11 @@ class AIReadinessReportRendererTests(unittest.TestCase):
                 article_version_id="version-1",
                 total_passage_count=1,
                 total_word_count=4,
+                table_word_count=0,
+                list_word_count=0,
+                blockquote_word_count=0,
+                answered_question_heading_count=0,
+                unanswered_question_heading_count=0,
             ),
             metadata_analysis=MetadataAnalysis(
                 article_id="article-1",
@@ -51,12 +56,14 @@ class AIReadinessReportRendererTests(unittest.TestCase):
                 article_version_id="version-1",
                 passage_profiles=(
                     PassageProfile(
-                        passage_id="version-1:p0",
-                        ordinal_position=0,
+                        passage_id="p-1",
+                        ordinal_position=1,
                         word_count=4,
                         character_count=20,
+                        contains_statistics=False,
                     ),
                 ),
+                passage_balance_ratio=1.0,
             ),
         )
         return BuildAIReadinessReport().execute(
@@ -92,7 +99,7 @@ class AIReadinessReportRendererTests(unittest.TestCase):
         self.assertIn("## Article Identity", rendered)
         self.assertIn("## Structural Summary", rendered)
         self.assertIn("## Extracted Metadata", rendered)
-        self.assertIn("| `version-1:p0` | 0 | 4 | 20 |", rendered)
+        self.assertIn("| `p-1` | 1 | 4 | 20 |", rendered)
 
     def test_renderers_are_deterministic(self):
         report = self.report()

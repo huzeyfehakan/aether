@@ -20,7 +20,6 @@ from aether.presentation.editor_recommendation_text import (
 )
 
 
-
 def _codes_in_order(recommendations) -> list:
     """Distinct recommendation codes, keeping first-seen order."""
     seen = []
@@ -30,8 +29,62 @@ def _codes_in_order(recommendations) -> list:
     return seen
 
 
+def _score_mapping(score) -> dict:
+    result = {"total": score.total}
+    if hasattr(score, 'entity_coverage'):
+        result["entity_coverage"] = {
+            "weight_percentage": score.entity_coverage.weight_percentage,
+            "dimension_score": score.entity_coverage.dimension_score,
+            "weighted_contribution": score.entity_coverage.weighted_contribution,
+        }
+    if hasattr(score, 'structured_data'):
+        result["structured_data"] = {
+            "weight_percentage": score.structured_data.weight_percentage,
+            "dimension_score": score.structured_data.dimension_score,
+            "weighted_contribution": score.structured_data.weighted_contribution,
+        }
+    if hasattr(score, 'semantic_quality'):
+        result["semantic_quality"] = {
+            "weight_percentage": score.semantic_quality.weight_percentage,
+            "dimension_score": score.semantic_quality.dimension_score,
+            "weighted_contribution": score.semantic_quality.weighted_contribution,
+        }
+    if hasattr(score, 'technical_access'):
+        result["technical_access"] = {
+            "weight_percentage": score.technical_access.weight_percentage,
+            "dimension_score": score.technical_access.dimension_score,
+            "weighted_contribution": score.technical_access.weighted_contribution,
+        }
+    if hasattr(score, 'semantic_completeness'):
+        result["semantic_completeness"] = {
+            "weight_percentage": score.semantic_completeness.weight_percentage,
+            "dimension_score": score.semantic_completeness.dimension_score,
+            "weighted_contribution": score.semantic_completeness.weighted_contribution,
+        }
+    if hasattr(score, 'entity_authority'):
+        result["entity_authority"] = {
+            "weight_percentage": score.entity_authority.weight_percentage,
+            "dimension_score": score.entity_authority.dimension_score,
+            "weighted_contribution": score.entity_authority.weighted_contribution,
+        }
+    if hasattr(score, 'structural_richness'):
+        result["structural_richness"] = {
+            "weight_percentage": score.structural_richness.weight_percentage,
+            "dimension_score": score.structural_richness.dimension_score,
+            "weighted_contribution": score.structural_richness.weighted_contribution,
+        }
+    if hasattr(score, 'discoverability'):
+        result["discoverability"] = {
+            "weight_percentage": score.discoverability.weight_percentage,
+            "dimension_score": score.discoverability.dimension_score,
+            "weighted_contribution": score.discoverability.weighted_contribution,
+        }
+    return result
+
 def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
     """Map report fields directly without deriving any new business information."""
+    seo_score = report.assessment_summary.seo_score
+    geo_score = report.assessment_summary.geo_score
     return {
         "article_identity": {
             "article_id": report.article_identity.article_id,
@@ -87,9 +140,9 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
             for recommendation in report.editor_recommendations
         ],
         "assessment_summary": {
-            "metadata_completeness": (
-                report.assessment_summary.metadata_completeness.value
-            ),
+            "metadata_completeness": report.assessment_summary.metadata_completeness.value,
+            "seo_score": _score_mapping(seo_score),
+            "geo_score": _score_mapping(geo_score),
         },
     }
 
@@ -107,14 +160,29 @@ class PlainTextAIReadinessReportRenderer:
     def render(self, report: AIReadinessReport) -> str:
         structural = report.structural_summary
         metadata = report.metadata_summary
-        passage_quality = report.passage_quality_summary
         assessment = report.assessment_summary
+        seo = assessment.seo_score
+        geo = assessment.geo_score
         lines = (
             "AI Readiness Report",
             "",
             "Article Identity",
             f"Article ID: {report.article_identity.article_id}",
             f"Article Version ID: {report.article_identity.article_version_id}",
+            "",
+            "SEO Score",
+            f" Total Score: {seo.total}",
+            f" - Entity Coverage ({seo.entity_coverage.weight_percentage}%): {'N/A' if seo.entity_coverage.dimension_score is None else f'{seo.entity_coverage.dimension_score:.1f}'}",
+            f" - Structured Data ({seo.structured_data.weight_percentage}%): {'N/A' if seo.structured_data.dimension_score is None else f'{seo.structured_data.dimension_score:.1f}'}",
+            f" - Semantic Quality ({seo.semantic_quality.weight_percentage}%): {'N/A' if seo.semantic_quality.dimension_score is None else f'{seo.semantic_quality.dimension_score:.1f}'}",
+            f" - Technical Access ({seo.technical_access.weight_percentage}%): {'N/A' if seo.technical_access.dimension_score is None else f'{seo.technical_access.dimension_score:.1f}'}",
+            "",
+            "GEO Score (Generative Engine Optimization)",
+            f" Total Score: {geo.total}",
+            f" - Semantic Completeness ({geo.semantic_completeness.weight_percentage}%): {'N/A' if geo.semantic_completeness.dimension_score is None else f'{geo.semantic_completeness.dimension_score:.1f}'}",
+            f" - Entity Authority ({geo.entity_authority.weight_percentage}%): {'N/A' if geo.entity_authority.dimension_score is None else f'{geo.entity_authority.dimension_score:.1f}'}",
+            f" - Structural Richness ({geo.structural_richness.weight_percentage}%): {'N/A' if geo.structural_richness.dimension_score is None else f'{geo.structural_richness.dimension_score:.1f}'}",
+            f" - Discoverability ({geo.discoverability.weight_percentage}%): {'N/A' if geo.discoverability.dimension_score is None else f'{geo.discoverability.dimension_score:.1f}'}",
             "",
             "Structural Summary",
             f"Total Passages: {structural.total_passage_count}",
@@ -133,13 +201,6 @@ class PlainTextAIReadinessReportRenderer:
 
     @staticmethod
     def _structured_data_lines(report: AIReadinessReport) -> tuple:
-        """Report the Schema.org declaration as a separate question.
-
-        Extracted metadata answers what could be read from the page at all.
-        This answers what the page formally declares to machines. A detail can
-        be readable and undeclared at once, so the two are stated apart rather
-        than left looking like a contradiction.
-        """
         summary = report.structured_data_summary
         if summary is None:
             return ()
@@ -164,9 +225,6 @@ class PlainTextAIReadinessReportRenderer:
     @staticmethod
     def _recommendation_lines(report: AIReadinessReport) -> tuple:
         lines = []
-        # The editor's own work comes first. Platform findings follow, because
-        # they are usually the same on every article and are not the reader's
-        # to fix.
         for category in (
             RecommendationCategory.EDITOR,
             RecommendationCategory.TECHNICAL,
@@ -204,9 +262,6 @@ class PlainTextAIReadinessReportRenderer:
                         "Nothing to change: this article declares itself completely."
                     )
                     continue
-            # Findings of the same kind share one explanation. Repeating the
-            # same two paragraphs of rationale under every occurrence buries
-            # the occurrences themselves.
             for code in _codes_in_order(in_category):
                 occurrences = [r for r in in_category if r.code is code]
                 text = recommendation_text(occurrences[0])
@@ -252,6 +307,8 @@ class MarkdownAIReadinessReportRenderer:
         metadata = report.metadata_summary
         passage_quality = report.passage_quality_summary
         assessment = report.assessment_summary
+        seo = assessment.seo_score
+        geo = assessment.geo_score
         lines = [
             "# AI Readiness Report",
             "",
@@ -259,6 +316,22 @@ class MarkdownAIReadinessReportRenderer:
             "",
             f"- Article ID: `{report.article_identity.article_id}`",
             f"- Article Version ID: `{report.article_identity.article_version_id}`",
+            "",
+            "## SEO Score",
+            f"**Total Score: {seo.total} / 100**",
+            "",
+            f"- **Entity Coverage ({seo.entity_coverage.weight_percentage}%)**: {'N/A' if seo.entity_coverage.dimension_score is None else f'{seo.entity_coverage.dimension_score:.1f}'}",
+            f"- **Structured Data ({seo.structured_data.weight_percentage}%)**: {'N/A' if seo.structured_data.dimension_score is None else f'{seo.structured_data.dimension_score:.1f}'}",
+            f"- **Semantic Quality ({seo.semantic_quality.weight_percentage}%)**: {'N/A' if seo.semantic_quality.dimension_score is None else f'{seo.semantic_quality.dimension_score:.1f}'}",
+            f"- **Technical Access ({seo.technical_access.weight_percentage}%)**: {'N/A' if seo.technical_access.dimension_score is None else f'{seo.technical_access.dimension_score:.1f}'}",
+            "",
+            "## GEO Score (Generative Engine Optimization)",
+            f"**Total Score: {geo.total} / 100**",
+            "",
+            f"- **Semantic Completeness ({geo.semantic_completeness.weight_percentage}%)**: {'N/A' if geo.semantic_completeness.dimension_score is None else f'{geo.semantic_completeness.dimension_score:.1f}'}",
+            f"- **Entity Authority ({geo.entity_authority.weight_percentage}%)**: {'N/A' if geo.entity_authority.dimension_score is None else f'{geo.entity_authority.dimension_score:.1f}'}",
+            f"- **Structural Richness ({geo.structural_richness.weight_percentage}%)**: {'N/A' if geo.structural_richness.dimension_score is None else f'{geo.structural_richness.dimension_score:.1f}'}",
+            f"- **Discoverability ({geo.discoverability.weight_percentage}%)**: {'N/A' if geo.discoverability.dimension_score is None else f'{geo.discoverability.dimension_score:.1f}'}",
             "",
             "## Structural Summary",
             "",

@@ -263,10 +263,12 @@ class BuildAIReadinessReport:
                 1 for profile in profiles if profile.contains_statistics
             )
             statistics_coverage = statistics_count / len(profiles) * 100.0
-            heading_passage_overlap = (
-                structural.heading_passage_overlap_ratio * 100.0
-            )
-            definitive_stance = structural.definitive_stance_ratio * 100.0
+            if structural.heading_passage_overlap_ratio is not None:
+                heading_passage_overlap = (
+                    structural.heading_passage_overlap_ratio * 100.0
+                )
+            if structural.definitive_stance_ratio is not None:
+                definitive_stance = structural.definitive_stance_ratio * 100.0
             passage_balance = (
                 report.passage_quality_analysis.passage_balance_ratio * 100.0
             )

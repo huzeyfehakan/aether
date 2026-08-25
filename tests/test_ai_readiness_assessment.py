@@ -130,6 +130,60 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             first.metadata_completeness = CompletenessClassification.MISSING
         self.assertIsInstance(first, AIReadinessAssessment)
 
+    def test_semantic_completeness_renormalizes_unmeasured_optional_signals(self):
+        metadata = MetadataAnalysis(
+            article_id="article-1",
+            article_version_id="version-1",
+            title_length=10,
+            publication_date_available=True,
+            last_modified_date_available=True,
+            author_available=True,
+            description_available=True,
+        )
+        structural = ArticleStructuralAnalysis(
+            article_id="article-1",
+            article_version_id="version-1",
+            total_passage_count=1,
+            total_word_count=20,
+            table_word_count=0,
+            list_word_count=0,
+            blockquote_word_count=0,
+            answered_question_heading_count=0,
+            unanswered_question_heading_count=0,
+            heading_passage_overlap_ratio=None,
+            definitive_stance_ratio=0.0,
+        )
+        passage_quality = PassageQualityAnalysis(
+            article_id="article-1",
+            article_version_id="version-1",
+            passage_profiles=(
+                PassageProfile(
+                    passage_id="p1",
+                    ordinal_position=0,
+                    word_count=20,
+                    character_count=100,
+                    contains_statistics=True,
+                    contains_citation=False,
+                ),
+            ),
+            passage_balance_ratio=1.0,
+            keyword_stuffing_ratio=0.0,
+        )
+        report = ArticleAnalysisReport(
+            structural_analysis=structural,
+            metadata_analysis=metadata,
+            passage_quality_analysis=passage_quality,
+        )
+
+        assessment = AssessAIReadiness().execute(report)
+
+        # Statistics retains weight 0.4 and measured stance retains 0.3;
+        # missing overlap contributes neither zero points nor its 0.3 weight.
+        self.assertAlmostEqual(
+            assessment.geo_score.semantic_completeness.dimension_score,
+            100.0 * 0.4 / 0.7,
+        )
+
     def test_entity_authority_decreases_when_claim_evidence_coverage_is_low(self):
         metadata = MetadataAnalysis(
             article_id="article-1",

@@ -83,6 +83,86 @@ class RawHtmlIngestionTests(unittest.TestCase):
         self.assertEqual(result.article_version.description, "A source-provided description.")
         self.assertEqual(result.article_version.keywords, "politika, ekonomi,  haber")
 
+    def metric_source_data(self, html):
+        result = self.register.execute(self.raw_article(html))
+        return self.repository.get_source_data(result.article_version.article_version_id)
+
+    def test_heading_waits_for_real_passage_after_date_and_byline(self):
+        source_data = self.metric_source_data("""
+            <html lang="tr"><head><title>Başlık</title></head><body><article>
+              <h1>Çocuk gelişimi</h1>
+              <div itemprop="datePublished"><p>3 Ağustos 2026</p></div>
+              <div itemprop="author"><p>Ayşe Yılmaz</p></div>
+              <p>Çocuk gelişimi aile desteğiyle güçlenir.</p>
+            </article></body></html>
+        """)
+
+        self.assertEqual(source_data.heading_passage_overlap_ratio, 1.0)
+
+    def test_heading_ignores_non_body_recommendation_before_real_passage(self):
+        source_data = self.metric_source_data("""
+            <html lang="tr"><head><title>Başlık</title></head><body><main>
+              <h2>Çocuk gelişimi</h2>
+              <a href="/öneri"><p>İlgili öneri kartı.</p></a>
+              <p>Çocuk gelişimi aile desteğiyle güçlenir.</p>
+            </main></body></html>
+        """)
+
+        self.assertEqual(source_data.heading_passage_overlap_ratio, 1.0)
+
+    def test_overlap_normalizes_unicode_punctuation_case_and_turkish_i(self):
+        examples = (
+            ("Çocuk?", "çocuk gelişir."),
+            ("Gelişim,", "gelişim desteklenir."),
+            ("ÇOCUK", "çocuk gelişir."),
+            ("IŞIK İZİ I İ ı i", "ışık izi ı i."),
+        )
+        for index, (heading, paragraph) in enumerate(examples):
+            with self.subTest(heading=heading, paragraph=paragraph):
+                source_data = self.metric_source_data(f"""
+                    <html lang="tr"><head><title>Başlık {index}</title></head>
+                    <body><main><h2>{heading}</h2><p>{paragraph}</p></main></body></html>
+                """)
+                self.assertEqual(source_data.heading_passage_overlap_ratio, 1.0)
+
+    def test_unmeasured_metrics_are_none_and_measured_zero_is_preserved(self):
+        no_heading = self.metric_source_data("""
+            <html lang="tr"><head><title>Başlık</title></head>
+            <body><main><p>Gerçek içerik.</p></main></body></html>
+        """)
+        self.assertIsNone(no_heading.heading_passage_overlap_ratio)
+        self.assertIsNone(no_heading.definitive_stance_ratio)
+
+        no_overlap = self.metric_source_data("""
+            <html lang="tr"><head><title>Başlık</title></head>
+            <body><main><h2>Çocuk gelişimi</h2><p>Bambaşka sözcükler.</p></main></body></html>
+        """)
+        self.assertEqual(no_overlap.heading_passage_overlap_ratio, 0.0)
+        self.assertIsNone(no_overlap.definitive_stance_ratio)
+
+        question_without_yes_no = self.metric_source_data("""
+            <html lang="tr"><head><title>Başlık</title></head>
+            <body><main><h2>Çocuk gelişir mi?</h2><p>Çocuk zamanla gelişir.</p></main></body></html>
+        """)
+        self.assertEqual(question_without_yes_no.definitive_stance_ratio, 0.0)
+
+    def test_trt_heading_metrics_use_article_passage_instead_of_date(self):
+        html = (FIXTURES / "trt_ebeveyn_akademisi_makale.html").read_text(encoding="utf-8")
+        result = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url="https://ebeveynakademisi.trtcocuk.net.tr/makale/asiri-uyumlu-cocuklar-neyi-saklar-32449390",
+                publisher="TRT Çocuk Ebeveyn Akademisi",
+                article_type="news_report",
+                observed_at=OBSERVED_AT,
+            )
+        )
+        source_data = self.repository.get_source_data(result.article_version.article_version_id)
+
+        # H1 contributes 3/5 and the later informational H5 contributes 0/2.
+        self.assertEqual(source_data.heading_passage_overlap_ratio, 0.3)
+        self.assertEqual(source_data.definitive_stance_ratio, 0.0)
+
     def test_retains_an_inventory_of_declared_structured_data(self):
         """What a page declares to machines survives text normalization."""
         html = """

@@ -22,8 +22,8 @@ class ArticleStructuralAnalysis:
     blockquote_word_count: int
     answered_question_heading_count: int
     unanswered_question_heading_count: int
-    heading_passage_overlap_ratio: float = 0.0
-    definitive_stance_ratio: float = 0.0
+    heading_passage_overlap_ratio: Optional[float] = None
+    definitive_stance_ratio: Optional[float] = None
     #: None when no paragraph names an entity: there is no population to take
     #: the ratio over, and 0.0 read as "every entity is supported".
     unsupported_entity_ratio: Optional[float] = None

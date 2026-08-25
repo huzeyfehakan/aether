@@ -27,7 +27,7 @@ class ArticleStructuralAnalysisTests(unittest.TestCase):
         self.register = RegisterSourceSnapshot(self.repository)
         self.analyze = AnalyzeArticleStructure(self.repository)
 
-    def register_article(self, source_url, body):
+    def register_article(self, source_url, body, **source_metrics):
         return self.register.execute(
             SourceArticleSnapshot(
                 publisher="TRT",
@@ -38,6 +38,7 @@ class ArticleStructuralAnalysisTests(unittest.TestCase):
                 body=body,
                 observed_at=NOW,
                 source_published_at=NOW,
+                **source_metrics,
             )
         )
 
@@ -98,6 +99,21 @@ class ArticleStructuralAnalysisTests(unittest.TestCase):
         )
 
         self.assertEqual(analysis.total_word_count, 4)
+
+    def test_preserves_measured_and_unmeasured_heading_metrics(self):
+        registered = self.register_article(
+            "https://example.org/news/story",
+            "Only body words count.",
+            heading_passage_overlap_ratio=0.0,
+            definitive_stance_ratio=None,
+        )
+
+        analysis = self.analyze.execute(
+            registered.article, registered.article_version.article_version_id
+        )
+
+        self.assertEqual(analysis.heading_passage_overlap_ratio, 0.0)
+        self.assertIsNone(analysis.definitive_stance_ratio)
 
 
 if __name__ == "__main__":

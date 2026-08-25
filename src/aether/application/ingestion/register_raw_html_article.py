@@ -6,6 +6,7 @@ from html import unescape
 from html.parser import HTMLParser
 import json
 import re
+import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse, parse_qs
 
@@ -81,8 +82,8 @@ class NormalizedHtmlArticle:
     blockquote_word_count: int = 0
     answered_question_heading_count: int = 0
     unanswered_question_heading_count: int = 0
-    heading_passage_overlap_ratio: float = 0.0
-    definitive_stance_ratio: float = 0.0
+    heading_passage_overlap_ratio: Optional[float] = None
+    definitive_stance_ratio: Optional[float] = None
     json_ld_published_date: Optional[str] = None
     meta_published_date: Optional[str] = None
     time_tag_published_date: Optional[str] = None
@@ -92,6 +93,10 @@ class _ArticleHtmlCollector(HTMLParser):
     """Collect common publication metadata and visible paragraph text only."""
 
     _SKIPPED_TAGS = {"script", "style", "noscript", "template"}
+    _VOID_TAGS = {
+        "area", "base", "br", "col", "embed", "hr", "img", "input",
+        "link", "meta", "param", "source", "track", "wbr",
+    }
 
     # HTML sectioning and link elements whose paragraphs are, by specification,
     # not article prose: navigation, complementary content, page banners,
@@ -100,6 +105,12 @@ class _ArticleHtmlCollector(HTMLParser):
     # otherwise share the article's container. This is markup semantics only:
     # no class names, publisher names, or URL patterns are consulted.
     _NON_BODY_TAGS = {"a", "aside", "figcaption", "footer", "header", "nav"}
+    _NON_PASSAGE_ITEMPROPS = {
+        "author",
+        "datecreated",
+        "datemodified",
+        "datepublished",
+    }
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -127,6 +138,8 @@ class _ArticleHtmlCollector(HTMLParser):
         self._paragraph_parts: Optional[List[str]] = None
         self._paragraph_priority = 0
         self._paragraph_is_body = True
+        self._non_passage_depth = 0
+        self._non_passage_elements: List[bool] = []
         self._json_ld_parts: Optional[List[str]] = None
         self._application_json_parts: Optional[List[str]] = None
 
@@ -143,10 +156,11 @@ class _ArticleHtmlCollector(HTMLParser):
         self.unanswered_question_heading_count = 0
 
         # GEO N-gram Overlap and Definitive Stance
-        self._last_heading_words: Optional[set] = None
-        self._last_heading_is_question = False
         self.heading_overlaps: List[float] = []
         self.definitive_stances: List[float] = []
+        # Body heading/paragraph events are retained until the complete document
+        # reveals which containment priority supplies the actual article body.
+        self.geo_events: List[Tuple[str, int, str, bool]] = []
 
     def _containment_priority(self) -> int:
         return 3 if self._article_depth else 2 if self._main_depth else 1
@@ -162,6 +176,17 @@ class _ArticleHtmlCollector(HTMLParser):
                 self._application_json_parts = []
             self._skip_depth += 1
             return
+        is_non_passage_container = bool(
+            tag == "address"
+            or set(attributes.get("itemprop", "").lower().split()).intersection(
+                    self._NON_PASSAGE_ITEMPROPS
+                )
+            or "author" in _rel_tokens(attributes.get("rel", ""))
+        )
+        if tag not in self._VOID_TAGS:
+            self._non_passage_elements.append(is_non_passage_container)
+            if is_non_passage_container:
+                self._non_passage_depth += 1
         if tag == "html" and attributes.get("lang"):
             self.html_language = attributes["lang"].strip()
         if tag == "meta":
@@ -235,23 +260,14 @@ class _ArticleHtmlCollector(HTMLParser):
             text = _normalize_text(" ".join(self._paragraph_parts))
             if text and self._paragraph_is_body:
                 self.paragraphs.append((self._paragraph_priority, text))
-
-                # GEO Overlap and Stance
-                if self._last_heading_words is not None:
-                    p_words = set(text.lower().split())
-                    if len(self._last_heading_words) > 0:
-                        overlap = len(p_words.intersection(self._last_heading_words)) / len(self._last_heading_words)
-                        self.heading_overlaps.append(overlap)
-
-                    if self._last_heading_is_question:
-                        # Check definitive stance
-                        first_word = text.lower().split()[0] if text else ""
-                        if first_word in {"evet,", "evet", "hayır,", "hayır", "yes,", "yes", "no,", "no"}:
-                            self.definitive_stances.append(1.0)
-                        else:
-                            self.definitive_stances.append(0.0)
-
-                    self._last_heading_words = None  # Consume it
+                self.geo_events.append(
+                    (
+                        "paragraph",
+                        self._paragraph_priority,
+                        text,
+                        self._non_passage_depth == 0,
+                    )
+                )
 
             self._paragraph_parts = None
             self._paragraph_priority = 0
@@ -262,8 +278,10 @@ class _ArticleHtmlCollector(HTMLParser):
                 self.headings.append(
                     (self._heading_priority, self._heading_level, text)
                 )
-                self._last_heading_words = set(text.lower().split())
-                self._last_heading_is_question = text.strip().endswith("?")
+                is_question = text.strip().endswith("?")
+                self.geo_events.append(
+                    ("heading", self._heading_priority, text, is_question)
+                )
             self._heading_parts = None
             self._heading_priority = 0
             self._heading_level = 0
@@ -287,6 +305,46 @@ class _ArticleHtmlCollector(HTMLParser):
             self._list_depth = max(0, self._list_depth - 1)
         elif tag == "blockquote":
             self._blockquote_depth = max(0, self._blockquote_depth - 1)
+
+        if tag not in self._VOID_TAGS and self._non_passage_elements:
+            was_non_passage_container = self._non_passage_elements.pop()
+            if was_non_passage_container:
+                self._non_passage_depth = max(0, self._non_passage_depth - 1)
+
+    def calculate_geo_metrics(self) -> None:
+        if not self.paragraphs:
+            return
+        body_priority = max(priority for priority, _ in self.paragraphs)
+        pending_heading: Optional[Tuple[set, bool]] = None
+        for kind, priority, text, flag in self.geo_events:
+            if priority != body_priority:
+                continue
+            if kind == "heading":
+                pending_heading = (_normalized_overlap_tokens(text), flag)
+                continue
+            if pending_heading is None or not flag or _looks_like_date_metadata(text):
+                continue
+
+            heading_words, is_question = pending_heading
+            if heading_words:
+                passage_words = _normalized_overlap_tokens(text)
+                self.heading_overlaps.append(
+                    len(passage_words.intersection(heading_words)) / len(heading_words)
+                )
+            if is_question:
+                # Preserve the existing stance semantics; only measurement
+                # availability changes in this task.
+                first_word = text.lower().split()[0] if text else ""
+                self.definitive_stances.append(
+                    1.0
+                    if first_word
+                    in {
+                        "evet,", "evet", "hayır,", "hayır",
+                        "yes,", "yes", "no,", "no",
+                    }
+                    else 0.0
+                )
+            pending_heading = None
 
     def handle_data(self, data: str) -> None:
         if self._skip_depth:
@@ -317,6 +375,42 @@ _HEADING_TAGS = ("h1", "h2", "h3", "h4", "h5", "h6")
 
 def _normalize_text(value: str) -> str:
     return " ".join(value.split())
+
+
+def _normalized_overlap_tokens(value: str) -> set:
+    normalized = unicodedata.normalize("NFC", value).translate(
+        str.maketrans({"I": "ı", "İ": "i"})
+    ).casefold()
+    tokens: List[str] = []
+    current: List[str] = []
+    for character in unicodedata.normalize("NFC", normalized):
+        if unicodedata.category(character)[0] in {"L", "N"}:
+            current.append(character)
+        elif current:
+            tokens.append("".join(current))
+            current = []
+    if current:
+        tokens.append("".join(current))
+    return set(tokens)
+
+
+_MONTH_NAMES = {
+    "january", "february", "march", "april", "may", "june", "july",
+    "august", "september", "october", "november", "december",
+    "ocak", "şubat", "mart", "nisan", "mayıs", "haziran", "temmuz",
+    "ağustos", "eylül", "ekim", "kasım", "aralık",
+}
+
+
+def _looks_like_date_metadata(value: str) -> bool:
+    """Recognize a standalone human-readable calendar date, not prose."""
+    normalized_words = _normalized_overlap_tokens(value)
+    return (
+        len(normalized_words) == 3
+        and bool(normalized_words.intersection(_MONTH_NAMES))
+        and sum(token.isdigit() for token in normalized_words) == 2
+        and any(len(token) == 4 and token.isdigit() for token in normalized_words)
+    )
 
 
 def _normalize_json_ld_text(value: str) -> str:
@@ -407,6 +501,7 @@ class HtmlArticleNormalizer:
         collector = _ArticleHtmlCollector()
         collector.feed(raw_article.html)
         collector.close()
+        collector.calculate_geo_metrics()
 
         # og:title outranks a JSON-LD headline deliberately. Both are declared
         # by the publisher, but og:title arrives through the HTML parser with
@@ -505,11 +600,11 @@ class HtmlArticleNormalizer:
             unanswered_question_heading_count=collector.unanswered_question_heading_count,
             heading_passage_overlap_ratio=(
                 sum(collector.heading_overlaps) / len(collector.heading_overlaps)
-                if collector.heading_overlaps else 0.0
+                if collector.heading_overlaps else None
             ),
             definitive_stance_ratio=(
                 sum(collector.definitive_stances) / len(collector.definitive_stances)
-                if collector.definitive_stances else 0.0
+                if collector.definitive_stances else None
             ),
             json_ld_published_date=json_ld_published_date,
             meta_published_date=meta_published_date,

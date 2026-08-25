@@ -240,11 +240,19 @@ class AssessAIReadiness:
             stats_count = sum(1 for p in profiles if p.contains_statistics)
             stats_score = (stats_count / len(profiles)) * 100.0
 
-            # Add N-gram overlap and definitive stance as positive signals
-            overlap_score = getattr(report.structural_analysis, 'heading_passage_overlap_ratio', 0.0) * 100.0
-            stance_score = getattr(report.structural_analysis, 'definitive_stance_ratio', 0.0) * 100.0
-
-            content_score = (stats_score * 0.4) + (overlap_score * 0.3) + (stance_score * 0.3)
+            # Unmeasured optional signals do not count as zero. Preserve the
+            # established 40/30/30 proportions among measured components.
+            content_components = [(stats_score, 0.4)]
+            overlap_ratio = report.structural_analysis.heading_passage_overlap_ratio
+            stance_ratio = report.structural_analysis.definitive_stance_ratio
+            if overlap_ratio is not None:
+                content_components.append((overlap_ratio * 100.0, 0.3))
+            if stance_ratio is not None:
+                content_components.append((stance_ratio * 100.0, 0.3))
+            measured_weight = sum(weight for _, weight in content_components)
+            content_score = sum(
+                score * weight for score, weight in content_components
+            ) / measured_weight
             if fluency is not None:
                 bounded_structural_variety = min(
                     1.0, fluency.structural_variety_ratio

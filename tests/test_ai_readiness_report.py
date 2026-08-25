@@ -234,6 +234,28 @@ class AIReadinessReportTests(unittest.TestCase):
         self.assertEqual(signals["Sentence balance"], 80.0)
         self.assertEqual(signals["Structural variety"], 100.0)
 
+    def test_semantic_completeness_detail_preserves_unmeasured_optional_signals(self):
+        assessment = self.assessment_with_entity_authority_signals()
+        assessment = replace(
+            assessment,
+            report=replace(
+                assessment.report,
+                structural_analysis=replace(
+                    assessment.report.structural_analysis,
+                    heading_passage_overlap_ratio=None,
+                    definitive_stance_ratio=None,
+                ),
+            ),
+        )
+        report = BuildAIReadinessReport().execute(assessment)
+        signals = {
+            signal.label: signal.value
+            for signal in report.assessment_summary.geo_score.semantic_completeness_detail.signals
+        }
+
+        self.assertIsNone(signals["Heading-passage overlap"])
+        self.assertIsNone(signals["Definitive stance"])
+
     def test_structural_richness_detail_breaks_out_existing_word_components(self):
         report = BuildAIReadinessReport().execute(
             self.assessment_with_entity_authority_signals()

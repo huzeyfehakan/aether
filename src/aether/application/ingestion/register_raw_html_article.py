@@ -220,7 +220,12 @@ class _ArticleHtmlCollector(HTMLParser):
         elif tag == "p":
             self._paragraph_parts = []
             self._paragraph_priority = self._containment_priority()
-            self._paragraph_is_body = self._non_body_depth == 0
+            # Passage extraction and heading pairing share the same strong
+            # semantic definition of article prose. Metadata remains available
+            # through its dedicated meta/time/JSON-LD extraction paths.
+            self._paragraph_is_body = (
+                self._non_body_depth == 0 and self._non_passage_depth == 0
+            )
 
         if self._pending_question_heading:
             if tag in {"p", "ul", "ol"}:

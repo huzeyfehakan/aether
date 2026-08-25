@@ -88,16 +88,69 @@ class RawHtmlIngestionTests(unittest.TestCase):
         return self.repository.get_source_data(result.article_version.article_version_id)
 
     def test_heading_waits_for_real_passage_after_date_and_byline(self):
-        source_data = self.metric_source_data("""
-            <html lang="tr"><head><title>Başlık</title></head><body><article>
+        html = """
+            <html lang="tr"><head><title>Başlık</title>
+              <meta name="author" content="Ayşe Yılmaz" />
+            </head><body><article>
               <h1>Çocuk gelişimi</h1>
-              <div itemprop="datePublished"><p>3 Ağustos 2026</p></div>
+              <div itemprop="datePublished"><p><time datetime="2026-08-03">3 Ağustos 2026</time></p></div>
               <div itemprop="author"><p>Ayşe Yılmaz</p></div>
-              <p>Çocuk gelişimi aile desteğiyle güçlenir.</p>
+              <p>Çocuk gelişimi 3 Ağustos 2026 tarihinde ele alındı.</p>
+              <p>Ayşe Yılmaz araştırmanın sonuçlarını ailelerle paylaştı.</p>
             </article></body></html>
-        """)
+        """
+        result = self.register.execute(self.raw_article(html))
+        source_data = self.repository.get_source_data(
+            result.article_version.article_version_id
+        )
 
         self.assertEqual(source_data.heading_passage_overlap_ratio, 1.0)
+        self.assertEqual(
+            [passage.text for passage in result.passages],
+            [
+                "Çocuk gelişimi 3 Ağustos 2026 tarihinde ele alındı.",
+                "Ayşe Yılmaz araştırmanın sonuçlarını ailelerle paylaştı.",
+            ],
+        )
+        self.assertEqual(result.article_version.author, "Ayşe Yılmaz")
+        self.assertEqual(
+            result.article_version.source_published_at.isoformat(),
+            "2026-08-03T00:00:00+00:00",
+        )
+
+    def test_address_and_rel_author_paragraphs_are_not_article_passages(self):
+        html = """
+            <html lang="tr"><head><title>Başlık</title></head><body><main>
+              <address><p>Adres içindeki yazar</p></address>
+              <div rel="author"><p>İlişkili yazar adı</p></div>
+              <p>Gerçek makale paragrafı.</p>
+            </main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(
+            [passage.text for passage in result.passages],
+            ["Gerçek makale paragrafı."],
+        )
+
+    def test_plain_prose_is_not_removed_for_containing_dates_or_names(self):
+        html = """
+            <html lang="tr"><head><title>Başlık</title></head><body><main>
+              <p>Toplantı 3 Ağustos 2026 tarihinde Ankara'da yapıldı.</p>
+              <p>Ayşe Yılmaz araştırmanın sonuçlarını ayrıntılı biçimde açıkladı.</p>
+            </main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(
+            [passage.text for passage in result.passages],
+            [
+                "Toplantı 3 Ağustos 2026 tarihinde Ankara'da yapıldı.",
+                "Ayşe Yılmaz araştırmanın sonuçlarını ayrıntılı biçimde açıkladı.",
+            ],
+        )
 
     def test_heading_ignores_non_body_recommendation_before_real_passage(self):
         source_data = self.metric_source_data("""

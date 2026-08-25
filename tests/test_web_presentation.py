@@ -664,7 +664,7 @@ class WebPresentationTests(unittest.TestCase):
         html = """
             <html lang="tr"><head><title>Video</title>
               <meta property="og:type" content="website" />
-            </head><body><main><div>Video oynatıcı</div></main></body></html>
+            </head><body><main><aside>Video oynatıcı</aside></main></body></html>
         """
 
         response = self.client.post(
@@ -687,7 +687,7 @@ class WebPresentationTests(unittest.TestCase):
               <script type="application/ld+json">
                 {"@type": "NewsArticle", "headline": "Bir başlık"}
               </script>
-            </head><body><main><div>İçerik tarayıcıda yükleniyor</div></main></body></html>
+            </head><body><main><aside>İçerik tarayıcıda yükleniyor</aside></main></body></html>
         """
 
         response = self.client.post(
@@ -705,10 +705,10 @@ class WebPresentationTests(unittest.TestCase):
     def test_no_outcome_exposes_parser_wording(self):
         """An editor never sees why the parser stopped."""
         for html in (
-            '<html lang="tr"><head><title>V</title></head><body><div>x</div></body></html>',
+            '<html lang="tr"><head><title>V</title></head><body></body></html>',
             '<html lang="tr"><head><title>A</title>'
             '<script type="application/ld+json">{"@type": "Article"}</script>'
-            "</head><body><div>x</div></body></html>",
+            "</head><body></body></html>",
         ):
             response = self.client.post(
                 "/analyze/file",

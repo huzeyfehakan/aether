@@ -101,7 +101,14 @@ class _ArticleHtmlCollector(HTMLParser):
     # recommendation cards and legal boilerplate in these containers, and they
     # otherwise share the article's container. This is markup semantics only:
     # no class names, publisher names, or URL patterns are consulted.
-    _NON_BODY_TAGS = {"a", "aside", "figcaption", "footer", "header", "nav"}
+    _NON_BODY_TAGS = {"a", "aside", "figcaption", "footer", "header", "nav", "head", "title", "button", "label", "figure"}
+    
+    _BLOCK_TAGS = {
+        "address", "article", "aside", "blockquote", "canvas", "dd", "div", "dl", "dt",
+        "fieldset", "figcaption", "figure", "footer", "form", "h1", "h2", "h3", "h4",
+        "h5", "h6", "header", "hr", "li", "main", "nav", "noscript", "ol", "p", "pre",
+        "section", "table", "tfoot", "ul", "video", "br"
+    }
 
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -153,6 +160,33 @@ class _ArticleHtmlCollector(HTMLParser):
     def _containment_priority(self) -> int:
         return 3 if self._article_depth else 2 if self._main_depth else 1
 
+    def _flush_paragraph(self) -> None:
+        if self._paragraph_parts is not None:
+            text = _normalize_text(" ".join(self._paragraph_parts))
+            if text and self._paragraph_is_body:
+                self.paragraphs.append((self._paragraph_priority, text))
+
+                # GEO Overlap and Stance
+                if self._last_heading_words is not None:
+                    p_words = set(text.lower().split())
+                    if len(self._last_heading_words) > 0:
+                        overlap = len(p_words.intersection(self._last_heading_words)) / len(self._last_heading_words)
+                        self.heading_overlaps.append(overlap)
+
+                    if self._last_heading_is_question:
+                        # Check definitive stance
+                        first_word = text.lower().split()[0] if text else ""
+                        if first_word in {"evet,", "evet", "hayır,", "hayır", "yes,", "yes", "no,", "no"}:
+                            self.definitive_stances.append(1.0)
+                        else:
+                            self.definitive_stances.append(0.0)
+
+                    self._last_heading_words = None  # Consume it
+
+            self._paragraph_parts = None
+            self._paragraph_priority = 0
+            self._paragraph_is_body = True
+
     def handle_starttag(self, tag: str, attrs: List[Tuple[str, Optional[str]]]) -> None:
         attributes = {key.lower(): value or "" for key, value in attrs}
         tag = tag.lower()
@@ -179,6 +213,9 @@ class _ArticleHtmlCollector(HTMLParser):
                 self.canonical_source = attributes.get("href", "").strip() or None
         if tag == "time" and attributes.get("datetime"):
             self.time_values.append(attributes["datetime"].strip())
+        if tag in self._BLOCK_TAGS:
+            self._flush_paragraph()
+
         if tag in self._NON_BODY_TAGS:
             self._non_body_depth += 1
         if tag == "article":
@@ -194,10 +231,6 @@ class _ArticleHtmlCollector(HTMLParser):
             self._heading_priority = self._containment_priority()
             self._heading_level = int(tag[1])
             self._heading_is_body = (self._non_body_depth == 0) or (tag == "h1")
-        elif tag == "p":
-            self._paragraph_parts = []
-            self._paragraph_priority = self._containment_priority()
-            self._paragraph_is_body = self._non_body_depth == 0
 
         if self._pending_question_heading:
             if tag in {"p", "ul", "ol"}:
@@ -233,32 +266,9 @@ class _ArticleHtmlCollector(HTMLParser):
             return
         if tag in self._NON_BODY_TAGS:
             self._non_body_depth = max(0, self._non_body_depth - 1)
-        if tag == "p" and self._paragraph_parts is not None:
-            text = _normalize_text(" ".join(self._paragraph_parts))
-            if text and self._paragraph_is_body:
-                self.paragraphs.append((self._paragraph_priority, text))
-
-                # GEO Overlap and Stance
-                if self._last_heading_words is not None:
-                    p_words = set(text.lower().split())
-                    if len(self._last_heading_words) > 0:
-                        overlap = len(p_words.intersection(self._last_heading_words)) / len(self._last_heading_words)
-                        self.heading_overlaps.append(overlap)
-
-                    if self._last_heading_is_question:
-                        # Check definitive stance
-                        first_word = text.lower().split()[0] if text else ""
-                        if first_word in {"evet,", "evet", "hayır,", "hayır", "yes,", "yes", "no,", "no"}:
-                            self.definitive_stances.append(1.0)
-                        else:
-                            self.definitive_stances.append(0.0)
-
-                    self._last_heading_words = None  # Consume it
-
-            self._paragraph_parts = None
-            self._paragraph_priority = 0
-            self._paragraph_is_body = True
-        elif tag in _HEADING_TAGS and self._heading_parts is not None:
+        if tag in self._BLOCK_TAGS:
+            self._flush_paragraph()
+        if tag in _HEADING_TAGS and self._heading_parts is not None:
             text = _normalize_text(" ".join(self._heading_parts))
             if text and self._heading_is_body:
                 self.headings.append(
@@ -297,11 +307,25 @@ class _ArticleHtmlCollector(HTMLParser):
             if self._application_json_parts is not None:
                 self._application_json_parts.append(data)
             return
+        
+        is_metadata_or_heading = False
         if self._in_title:
             self.title_parts.append(data)
+            is_metadata_or_heading = True
+        
         if self._heading_parts is not None:
             self._heading_parts.append(data)
-        if self._paragraph_parts is not None:
+            is_metadata_or_heading = True
+
+        if not data.strip():
+            return
+
+        if not is_metadata_or_heading:
+            if self._paragraph_parts is None:
+                self._paragraph_parts = []
+                self._paragraph_priority = self._containment_priority()
+                self._paragraph_is_body = self._non_body_depth == 0
+
             self._paragraph_parts.append(data)
 
         words = len(data.split())

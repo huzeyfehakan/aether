@@ -33,6 +33,12 @@ class RecommendationCategory(str, Enum):
     TECHNICAL = "technical"
 
 
+class RecommendationPriority(int, Enum):
+    """Triage priority for editor recommendations."""
+    P1_TECHNICAL = 1
+    P2_PRIMARY_EVIDENCE = 2
+    P3_STRUCTURAL_FORMAT = 3
+
 class RecommendationCode(str, Enum):
     """The recommendations this MVP can justify from deterministic facts."""
 
@@ -48,6 +54,17 @@ class RecommendationCode(str, Enum):
     BODY_MOSTLY_REPEATED_TEXT = "body_mostly_repeated_text"
     NO_TOP_LEVEL_HEADING = "no_top_level_heading"
     MULTIPLE_TOP_LEVEL_HEADINGS = "multiple_top_level_headings"
+    WEAK_ARTICLE_OPENING = "weak_article_opening"
+    WEAK_TOPIC_INTRODUCTION = "weak_topic_introduction"
+    # New GEO metric codes
+    NO_OUTBOUND_LINKS = "no_outbound_links"
+    NO_STATISTICS = "no_statistics"
+    NO_INTERNAL_BODY_LINKS = "no_internal_body_links"
+    CONTENT_BLOAT = "content_bloat"
+    SKIPPED_HEADING_LEVEL = "skipped_heading_level"
+    CONFLICTING_PUBLISHED_DATES = "conflicting_published_dates"
+    UNSUPPORTED_ENTITIES = "unsupported_entities"
+    MISSING_SAME_AS_SCHEMA = "missing_same_as_schema"
 
 
 #: Structured data is declared by the page template, so correcting it is a CMS
@@ -69,14 +86,54 @@ _CATEGORIES = {
     # Editors write the headings inside an article.
     RecommendationCode.NO_TOP_LEVEL_HEADING: RecommendationCategory.EDITOR,
     RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS: RecommendationCategory.EDITOR,
+    RecommendationCode.WEAK_ARTICLE_OPENING: RecommendationCategory.EDITOR,
+    RecommendationCode.WEAK_TOPIC_INTRODUCTION: RecommendationCategory.EDITOR,
+    # New GEO codes
+    RecommendationCode.NO_OUTBOUND_LINKS: RecommendationCategory.EDITOR,
+    RecommendationCode.NO_STATISTICS: RecommendationCategory.EDITOR,
+    RecommendationCode.NO_INTERNAL_BODY_LINKS: RecommendationCategory.EDITOR,
+    RecommendationCode.CONTENT_BLOAT: RecommendationCategory.EDITOR,
+    RecommendationCode.SKIPPED_HEADING_LEVEL: RecommendationCategory.EDITOR,
+    RecommendationCode.UNSUPPORTED_ENTITIES: RecommendationCategory.EDITOR,
     # The CMS stamps this on save; an editor has no field for it.
     RecommendationCode.MISSING_LAST_MODIFIED_DATE: RecommendationCategory.TECHNICAL,
     RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: RecommendationCategory.TECHNICAL,
     RecommendationCode.INCOMPLETE_ARTICLE_STRUCTURED_DATA: (
         RecommendationCategory.TECHNICAL
     ),
+    RecommendationCode.CONFLICTING_PUBLISHED_DATES: RecommendationCategory.TECHNICAL,
+    RecommendationCode.MISSING_SAME_AS_SCHEMA: RecommendationCategory.TECHNICAL,
 }
 
+_PRIORITIES = {
+    # P1: Technical and crucial completeness
+    RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: RecommendationPriority.P1_TECHNICAL,
+    RecommendationCode.INCOMPLETE_ARTICLE_STRUCTURED_DATA: RecommendationPriority.P1_TECHNICAL,
+    RecommendationCode.MISSING_LAST_MODIFIED_DATE: RecommendationPriority.P1_TECHNICAL,
+    RecommendationCode.MISSING_PUBLICATION_DATE: RecommendationPriority.P1_TECHNICAL,
+    RecommendationCode.MISSING_AUTHOR: RecommendationPriority.P1_TECHNICAL,
+    RecommendationCode.MISSING_SUMMARY: RecommendationPriority.P1_TECHNICAL,
+    RecommendationCode.TITLE_SOURCES_DISAGREE: RecommendationPriority.P1_TECHNICAL,
+    RecommendationCode.DESCRIPTION_SOURCES_DISAGREE: RecommendationPriority.P1_TECHNICAL,
+    RecommendationCode.CONFLICTING_PUBLISHED_DATES: RecommendationPriority.P1_TECHNICAL,
+    RecommendationCode.MISSING_SAME_AS_SCHEMA: RecommendationPriority.P1_TECHNICAL,
+    
+    # P2: Primary Evidence (GEO Authority)
+    RecommendationCode.NO_OUTBOUND_LINKS: RecommendationPriority.P2_PRIMARY_EVIDENCE,
+    RecommendationCode.NO_STATISTICS: RecommendationPriority.P2_PRIMARY_EVIDENCE,
+    RecommendationCode.NO_INTERNAL_BODY_LINKS: RecommendationPriority.P2_PRIMARY_EVIDENCE,
+    RecommendationCode.UNSUPPORTED_ENTITIES: RecommendationPriority.P2_PRIMARY_EVIDENCE,
+    
+    # P3: Structural Format
+    RecommendationCode.NO_TOP_LEVEL_HEADING: RecommendationPriority.P3_STRUCTURAL_FORMAT,
+    RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS: RecommendationPriority.P3_STRUCTURAL_FORMAT,
+    RecommendationCode.WEAK_ARTICLE_OPENING: RecommendationPriority.P3_STRUCTURAL_FORMAT,
+    RecommendationCode.WEAK_TOPIC_INTRODUCTION: RecommendationPriority.P3_STRUCTURAL_FORMAT,
+    RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY: RecommendationPriority.P3_STRUCTURAL_FORMAT,
+    RecommendationCode.BODY_MOSTLY_REPEATED_TEXT: RecommendationPriority.P3_STRUCTURAL_FORMAT,
+    RecommendationCode.CONTENT_BLOAT: RecommendationPriority.P3_STRUCTURAL_FORMAT,
+    RecommendationCode.SKIPPED_HEADING_LEVEL: RecommendationPriority.P3_STRUCTURAL_FORMAT,
+}
 
 @dataclass(frozen=True)
 class EditorRecommendation:
@@ -95,6 +152,10 @@ class EditorRecommendation:
     @property
     def category(self) -> RecommendationCategory:
         return _CATEGORIES[self.code]
+        
+    @property
+    def priority(self) -> RecommendationPriority:
+        return _PRIORITIES[self.code]
 
 
 #: Schema.org Article properties that restate a field the metadata analysis
@@ -125,13 +186,68 @@ class DeriveEditorRecommendations:
     """Derive editor-facing advice from an existing analysis report."""
 
     def execute(self, report: ArticleAnalysisReport) -> Tuple[EditorRecommendation, ...]:
-        return (
+        if report.is_draft:
+            # A draft has no published page, so only the checks its own text
+            # can answer are run. Nothing is inferred about what the CMS will
+            # publish around it.
+            draft_recommendations = list(
+                self._heading_structure(report)
+                + self._repeated_text(report)
+                + self._geo_evidence_and_discoverability(report)
+            )
+            draft_recommendations.sort(key=lambda r: r.priority)
+            return tuple(draft_recommendations)
+        recommendations = list(
             self._missing_metadata(report)
             + self._heading_structure(report)
             + self._declared_consistency(report)
             + self._repeated_text(report)
             + self._structured_data(report)
+            + self._geo_evidence_and_discoverability(report)
         )
+        # Sort by priority
+        recommendations.sort(key=lambda r: r.priority)
+        return tuple(recommendations)
+        
+    @staticmethod
+    def _geo_evidence_and_discoverability(
+        report: ArticleAnalysisReport,
+    ) -> Tuple[EditorRecommendation, ...]:
+        recommendations = []
+        
+        # GEO Evidence
+        if report.passage_quality_analysis and report.passage_quality_analysis.passage_profiles:
+            profiles = report.passage_quality_analysis.passage_profiles
+            stat_count = sum(1 for p in profiles if p.contains_statistics)
+            
+            if stat_count == 0:
+                recommendations.append(EditorRecommendation(code=RecommendationCode.NO_STATISTICS))
+                
+        # Discoverability & Link Authority
+        links = report.internal_link_analysis
+        if links is not None:
+            if not getattr(links, 'outbound_body_domains', ()):
+                recommendations.append(EditorRecommendation(code=RecommendationCode.NO_OUTBOUND_LINKS))
+            if links.body_link_count == 0:
+                recommendations.append(EditorRecommendation(code=RecommendationCode.NO_INTERNAL_BODY_LINKS))
+                
+        # Structured Data Identity
+        sd_analysis = report.structured_data_analysis
+        if sd_analysis is not None:
+            has_same_as = "sameas" in [p.lower() for p in sd_analysis.all_declared_properties]
+            if not has_same_as:
+                recommendations.append(EditorRecommendation(code=RecommendationCode.MISSING_SAME_AS_SCHEMA))
+                
+        # Content Bloat & Unsupported Entities
+        if report.structural_analysis is not None:
+            if getattr(report.structural_analysis, 'heading_passage_overlap_ratio', 1.0) == 0.0 and getattr(report.structural_analysis, 'definitive_stance_ratio', 1.0) == 0.0:
+                if report.structural_analysis.total_passage_count > 3: # Only for longer articles
+                    recommendations.append(EditorRecommendation(code=RecommendationCode.CONTENT_BLOAT))
+            unsupported = report.structural_analysis.unsupported_entity_ratio
+            if unsupported is not None and unsupported > 0.0:
+                recommendations.append(EditorRecommendation(code=RecommendationCode.UNSUPPORTED_ENTITIES))
+                
+        return tuple(recommendations)
 
     @staticmethod
     def _structured_data(
@@ -180,9 +296,13 @@ class DeriveEditorRecommendations:
                 RecommendationCode.MISSING_LAST_MODIFIED_DATE,
             ),
         )
-        return tuple(
+        recs = [
             EditorRecommendation(code=code) for available, code in missing if not available
-        )
+        ]
+        if getattr(metadata, 'cross_date_conflict', False):
+            recs.append(EditorRecommendation(code=RecommendationCode.CONFLICTING_PUBLISHED_DATES))
+            
+        return tuple(recs)
 
     @staticmethod
     def _heading_structure(
@@ -191,19 +311,30 @@ class DeriveEditorRecommendations:
         analysis = report.heading_structure_analysis
         if analysis is None:
             return ()
-        found = []
+            
+        recommendations = []
         if analysis.top_level_count == 0:
-            found.append(
-                EditorRecommendation(code=RecommendationCode.NO_TOP_LEVEL_HEADING)
+            recommendations.append(
+                EditorRecommendation(
+                    code=RecommendationCode.NO_TOP_LEVEL_HEADING,
+                )
             )
         elif analysis.top_level_count > 1:
-            found.append(
+            recommendations.append(
                 EditorRecommendation(
                     code=RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS,
                     heading_count=analysis.top_level_count,
                 )
             )
-        return tuple(found)
+            
+        if getattr(analysis, 'skipped_heading_levels', False):
+            recommendations.append(
+                EditorRecommendation(
+                    code=RecommendationCode.SKIPPED_HEADING_LEVEL,
+                )
+            )
+            
+        return tuple(recommendations)
 
     @staticmethod
     def _declared_consistency(
@@ -262,3 +393,4 @@ class DeriveEditorRecommendations:
             )
             for repeated in duplication.repeated_passages
         )
+

@@ -32,6 +32,11 @@ class AIReadinessReportTests(unittest.TestCase):
                 article_version_id="version-1",
                 total_passage_count=2,
                 total_word_count=12,
+                table_word_count=0,
+                list_word_count=0,
+                blockquote_word_count=0,
+                answered_question_heading_count=0,
+                unanswered_question_heading_count=0,
             ),
             metadata_analysis=MetadataAnalysis(
                 article_id="article-1",
@@ -51,14 +56,17 @@ class AIReadinessReportTests(unittest.TestCase):
                         ordinal_position=0,
                         word_count=6,
                         character_count=30,
+                        contains_statistics=False,
                     ),
                     PassageProfile(
                         passage_id="version-1:p1",
                         ordinal_position=1,
                         word_count=6,
                         character_count=34,
+                        contains_statistics=False,
                     ),
                 ),
+                passage_balance_ratio=1.0,
             ),
         )
         return AssessAIReadiness().execute(report)

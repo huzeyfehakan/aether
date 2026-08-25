@@ -1,98 +1,115 @@
-# Project handoff
+# Handoff — current state
 
-State at `v2.0.1`. Implementation is complete; further work should be driven by
-feedback from real editors rather than by adding checks.
+Volatile state only: what is being worked on, what is blocking it, what is
+verified right now, and what to do next. Anything that outlives the current
+piece of work belongs elsewhere.
 
-## Architecture
+- **How to work** → [`../AGENTS.md`](../AGENTS.md)
+- **Which file to read when** → [`context.md`](context.md)
+- **Why it works this way** → [`decisions/`](decisions/)
+- **What we do not know yet** → [`product-discovery.md`](product-discovery.md)
+- **How the code is arranged, and its long-lived constraints** →
+  [`architecture.md`](architecture.md)
 
-Ports and adapters, dependencies pointing inward.
+## Read the repository first
 
-```text
-domain/         Immutable records and their invariants. Knows nothing else.
-application/
-  ingestion/    Raw HTML to an immutable article version
-  analysis/     Measurements, and the advice derived from them
-ports/outbound/ Repository contracts
-adapters/       HTTP fetching, in-memory repositories
-presentation/   Renderers, editor-facing wording, FastAPI app
+This file deliberately does **not** record the active branch, commit hashes, or
+the state of anyone's working tree. That information is machine-local, goes
+stale within hours, and git already answers it precisely:
+
+```bash
+git status && git branch --show-current && git log --oneline -10
 ```
 
-Two rules shape the code more than the diagram does:
+Where this file disagrees with the repository, the repository is right.
 
-- **`derive_editor_recommendations.py` is the only place a measurement becomes
-  advice.** It emits a recommendation *code*, a category naming who can act on
-  it, and supporting facts — never a sentence.
-- **Presentation decides how a finding reads, never whether it applies.**
-  Wording lives in `editor_recommendation_text.py` so copy stays out of use
-  cases, and so a Turkish edition is a second table rather than a rewrite.
+---
 
-## Design principles
+## Current task
 
-1. **Deterministic, with no thresholds.** Where a rule needs a comparison it
-   compares two measured quantities, never a chosen constant. A body is
-   "mostly boilerplate" when its shared words outnumber its own — not when it
-   falls under a length.
-2. **No publisher-specific rules.** Nothing keys on a name, host or URL.
-3. **Never predict model behaviour.** The product reports what is on the page
-   and what that costs. It does not say what an AI system will do.
-4. **Every finding is addressed to someone.** Editor or technical. A finding
-   nobody can act on does not belong in the report; several measurements were
-   deleted for failing that test.
-5. **Fail toward silence.** A false positive costs an editor's trust; a missed
-   finding costs less. Rules are built to err that way, and which way each errs
-   is documented.
+Product design only; no code in flight. The context-document restructure this
+section used to describe is finished and published, so it has left this file.
 
-## Intentionally rejected
+A design pass on a criteria-based score ran to a stopping point without touching
+code. The stakeholder input behind it, and the questions it left open, are in
+[`product-discovery.md`](product-discovery.md). **What the pass concluded is not
+recorded anywhere in this repository** — deliberately, because none of it was
+accepted as a decision record. A fresh session will find the inputs and the open
+questions, but not the reasoning between them.
 
-Recorded beside the rules that replaced them, so they are not re-proposed:
+## Released
 
-- **`og:type` for classifying pages.** Wrong in both directions on TRT: a video
-  page declares `article`, a news article declares `website`.
-- **"This article has no subheadings."** Cannot be stated without a length
-  threshold; the boundary is a judgement about writing.
-- **Matching any title fragment against any other.** Two different headlines
-  sharing a site name would agree.
-- **A numeric readiness score.** Deliberate from the outset.
-- **Duplicate titles, image alt-text, FAQ detection.** No evidence of
-  occurrence, or no recommendation produced. TRT alt-text measured 6/6, 11/15,
-  75/78.
-- **`skipped_heading_levels`,** withdrawn after shipping: it found template
-  furniture, not outline faults, on four of six pages.
+Latest release: `v2.0.1`. See [`../README.md`](../README.md) for shipped
+capabilities.
 
-## Known limitations
+## In progress
 
-- Cross-article findings (repeated text, mostly-boilerplate body) hold only for
-  the current process. Persistence behind the repository port is the single
-  change that would most increase how often they fire.
-- Template-level findings are reported per article, so one fix is restated on
-  every article of a property.
-- Title comparison has documented edge cases, chiefly breadcrumb titles.
-- `EditorRecommendation` carries eight optional fields; typed variants per kind
-  would be cleaner.
-- CI does not execute the page script. Two regressions came from that seam.
+**Check a draft before publishing.** Implemented, unreleased. Its usefulness is
+under review rather than settled — the checks are thinner than the reporting
+frame around them. See [`product-discovery.md`](product-discovery.md).
 
-## What to change, and what not to
+**Proportional Dual Scoring (SEO/GEO).** Implemented, unreleased.
+- Dual scores (`seo_score` and `geo_score`) are successfully calculated using rule-based deterministic metrics. Thresholds, arbitrary constants, and speculative regex logic have been completely removed.
+- [Decision 0010](decisions/0010-dual-scoring-supersedes-0003.md) is recorded, documenting the rationale and superseding 0003.
+- Ingestion layer, analysis modules, presentation renderers, and `index.html` template have been updated to present both scores gracefully, supporting unmeasured `null` dimensions (`Optional[float]`).
+- All unit and acceptance tests have been updated and are green.
 
-**Do not change:** the determinism contract; the refusal to predict model
-behaviour; the audience split; the separation of recommendation codes from
-wording; the `v1.0.0` tag.
+**Turkish interface edition.** Uncommitted, and not ready to land.
 
-**Worth changing when reopened:** `_report_view` in `web/app.py` — a single
-large dict literal, and the site of both frontend/backend regressions.
-Persistence behind `ContentRepository`. Property-level reporting for template
-findings. A CI smoke test that runs the page script.
+- Working: negotiation is `X-Aether-Language` → `Accept-Language` → Turkish;
+  every user-facing surface has Turkish wording; the manual TR/EN switcher
+  persists to `localStorage` and beats the browser preference.
+- Not yet consistent: about half the translations are second lookup tables as
+  designed. The rest are inline `if language is TURKISH else` ternaries and
+  dicts rebuilt inside function bodies — roughly twenty in the plain-text
+  renderer, four in `_report_view`, two helpers in
+  `editor_recommendation_text.py`. The four in `_report_view` violate
+  [decision 0007](decisions/0007-separate-finding-codes-from-wording.md) and are
+  the reason this has not landed.
+- The interface language module is not yet part of the committed tree.
 
-## First questions when editor feedback arrives
+## Blockers
 
-1. Which recommendations did editors act on, and which did they scroll past?
-   Anything consistently ignored should be removed, not reworded.
-2. Was anything dismissed as "not my job"? That means the audience split is
-   wrong for that finding, not that the finding is wrong.
-3. Did any finding turn out to be false? Trace it to the rule and check which
-   direction that rule was built to err in.
-4. What did an editor want to know that the report does not say? That is the
-   only sound source of a new capability.
-5. **Do TRT editors control per-article structured data in the CMS, or only
-   engineering?** This was flagged early and never confirmed. If editors do
-   control it, several findings currently filed under technical belong to
-   them, and the split needs revisiting.
+| Blocker | Blocks | Needs |
+|---|---|---|
+| No answer on what "duplicate" means | Any duplicate-detection work | Q1 and Q6 in [`product-discovery.md`](product-discovery.md) |
+| No real TRT Dinle page captured | Any non-article content model | A sample export or public URLs (Q11–Q12) |
+| Corpus is in-memory and process-scoped | Every cross-item finding | Persistence behind `ContentRepository` — see [`architecture.md`](architecture.md) |
+| Browser verification is manual | Regressions in the page script | See **Verification** |
+
+Product direction is blocked on discovery, not on code. Nothing above blocks
+ordinary bug-fixing.
+
+## Verification
+
+| Level | Status |
+|---|---|
+| **tests pass** | Yes — 205 tests |
+| **served-page verified** | **No** — the app has not been exercised in a browser against the in-progress work |
+| **feature complete** | **No** — the Turkish edition has not landed |
+
+Why a green suite is weaker than it looks — the structural reasons — is recorded
+in [`architecture.md`](architecture.md). The vocabulary is in
+[`../AGENTS.md`](../AGENTS.md) §3.
+
+## Next actions
+
+In order.
+
+1. **Re-add `<p id="outcome-happened"></p>` to the outcome card** in
+   `index.html` before the Turkish edition lands. The i18n pass removed it while
+   the page script still assigns to it, so the outcome explanation cannot
+   render. Verify by starting the app and analysing a non-article URL, not by
+   reading the template.
+2. **Teach the page-script harness to fail on this class of bug**: return `null`
+   for selectors the template does not declare, and make `querySelectorAll`
+   match. Own branch, own commit. This converts a whole regression class from
+   invisible into a test failure.
+3. **Reconcile the language defaults.** `language.py` documents Turkish as the
+   default and fallback, but 21 Python signatures default to `Language.ENGLISH`.
+   No current caller reaches them, because the HTTP boundary always passes a
+   resolved value; the first one that does will get the wrong language silently.
+4. **Then** the inline-ternary cleanup in `_report_view` and the plain-text
+   renderer, which is what decision 0007 requires before this lands.
+
+Do not merge and do not tag any of this without being asked.

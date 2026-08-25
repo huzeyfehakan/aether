@@ -1,3 +1,4 @@
+import json
 import re
 import sys
 import unittest
@@ -9,6 +10,8 @@ sys.path.insert(0, "src")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from aether.presentation.web.app import create_app  # noqa: E402
+
+from tests.page_script import run_page_script  # noqa: E402
 
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "trt_world_erdogan_kazakhstan.html"
@@ -30,15 +33,189 @@ class WebPresentationTests(unittest.TestCase):
         self.fetcher = StubHtmlFetcher(self.html)
         self.client = TestClient(create_app(self.fetcher))
 
-    def test_index_displays_url_and_html_file_submission_forms(self):
+    def test_index_offers_a_published_article_and_a_draft_flow(self):
         response = self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('data-endpoint="/analyze/url"', response.text)
-        self.assertIn('data-endpoint="/analyze/file"', response.text)
-        self.assertIn("Advanced source details", response.text)
+        self.assertIn('data-endpoint="/analyze/draft"', response.text)
+        self.assertIn("Check a draft", response.text)
         self.assertIn('id="assessment-grid"', response.text)
         self.assertIn('id="report"', response.text)
+
+    def test_the_editor_ui_no_longer_asks_for_a_saved_html_file(self):
+        """Nobody in an editorial workflow has one; the endpoint stays for tests."""
+        response = self.client.get("/")
+
+        self.assertNotIn('data-endpoint="/analyze/file"', response.text)
+        self.assertNotIn("Upload HTML", response.text)
+
+    def test_the_editor_ui_no_longer_shows_controls_that_do_nothing(self):
+        """Content type never reached an analysis; publisher is derived."""
+        response = self.client.get("/")
+
+        self.assertNotIn("article_type_override", response.text)
+        self.assertNotIn("Content type", response.text)
+        self.assertNotIn("Publisher override", response.text)
+
+    def test_recovery_fields_use_human_controls_not_iso_timestamps(self):
+        response = self.client.get("/")
+
+        self.assertNotIn("2026-05-14T14:00:00+03:00", response.text)
+        self.assertIn('name="fallback_published_at" type="date"', response.text)
+        self.assertIn('<select name="fallback_language">', response.text)
+
+    def _draft(self, content, headline="", publisher="TRT Çocuk"):
+        return self.client.post(
+            "/analyze/draft",
+            data={"content": content, "headline": headline,
+                  "language": "tr", "publisher": publisher},
+        )
+
+    def test_a_draft_never_reports_published_page_fields(self):
+        """A draft has no metadata, identity or structured data to be missing."""
+        response = self._draft("<h1>Başlık</h1><p>Bir paragraf.</p>")
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(list(body), ["draft"])
+        draft = body["draft"]
+        # Naming a check as unavailable is correct; reporting a page field as
+        # missing, or carrying page-level structure at all, is not.
+        self.assertNotIn("metadata", json.dumps(draft["recommendations"]).lower())
+        for absent in ("article_id", "identity", "assessment", "metadata_completeness"):
+            self.assertNotIn(absent, json.dumps(draft).lower())
+        self.assertNotIn("missing", " ".join(draft["checks_unavailable"]).lower())
+
+    def test_a_draft_uses_the_heading_from_the_pasted_markup(self):
+        response = self._draft("<h1>Ekran süresi</h1><p>Bir paragraf.</p>")
+
+        self.assertEqual(response.json()["draft"]["headline"], "Ekran süresi")
+
+    def test_a_draft_without_a_heading_asks_for_the_headline(self):
+        """Never invented, and never taken from the first paragraph."""
+        response = self._draft("<p>Bu ilk paragraftır.</p><p>İkinci.</p>")
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("enter the headline", response.json()["detail"])
+
+    def test_a_supplied_headline_is_used_when_the_paste_has_no_heading(self):
+        response = self._draft("<p>Bir paragraf.</p>", headline="Editörün başlığı")
+
+        self.assertEqual(response.json()["draft"]["headline"], "Editörün başlığı")
+
+    def test_a_draft_with_its_own_heading_is_not_given_a_second_one(self):
+        """Injecting one made every such draft look like it had two."""
+        response = self._draft("<h1>Başlık</h1><p>Bir paragraf.</p>", headline="Başka")
+        findings = " ".join(
+            r["headline"] for r in response.json()["draft"]["recommendations"]
+        )
+
+        self.assertNotIn("more than one main heading", findings)
+
+    def test_a_draft_with_several_top_level_headings_is_reported(self):
+        response = self._draft("<h1>Bir</h1><p>M.</p><h1>İki</h1><p>N.</p>")
+        draft = response.json()["draft"]
+        findings = " ".join(r["headline"] for r in draft["recommendations"])
+        details = json.dumps(draft["recommendations"], ensure_ascii=False)
+
+        self.assertIn("more than one main heading", findings)
+        self.assertIn("claim to be the main heading", details)
+        self.assertNotIn("other article", details)
+
+    def test_a_plain_text_draft_says_headings_could_not_be_checked(self):
+        response = self._draft(
+            "Bir paragraf.\n\nİkinci paragraf.", headline="Editörün başlığı"
+        )
+        draft = response.json()["draft"]
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("Heading structure", draft["checks_performed"])
+        self.assertTrue(
+            any("carried no formatting" in c for c in draft["checks_unavailable"])
+        )
+
+    def test_an_empty_draft_is_refused_with_an_editor_facing_message(self):
+        response = self._draft("", headline="Bir başlık")
+
+        self.assertEqual(response.status_code, 422)
+        detail = response.json()["detail"].lower()
+        for jargon in ("paragraph tag", "raw article", "parser", "none"):
+            self.assertNotIn(jargon, detail)
+
+    def test_a_draft_lists_what_needs_the_published_page(self):
+        draft = self._draft("<h1>Başlık</h1><p>Bir paragraf.</p>").json()["draft"]
+        unavailable = " ".join(draft["checks_unavailable"]).lower()
+
+        self.assertIn("publication date", unavailable)
+        self.assertIn("schema.org", unavailable)
+        self.assertNotIn("missing", unavailable)
+
+    def test_a_draft_is_never_compared_against_another_draft(self):
+        """An unpublished draft is not part of what a publisher has published."""
+        first = self._draft("<h1>Bir</h1><p>Paylaşılan bir paragraf.</p>", publisher="TRT")
+        second = self._draft("<h1>İki</h1><p>Paylaşılan bir paragraf.</p>", publisher="TRT")
+
+        self.assertEqual(second.json()["draft"]["compared_article_count"], 0)
+        findings = " ".join(
+            r["headline"] for r in second.json()["draft"]["recommendations"]
+        )
+        self.assertNotIn("appears in your other articles", findings)
+
+    def test_the_draft_template_reads_only_fields_the_draft_response_sends(self):
+        """The seam where the last two regressions lived."""
+        template = self._template()
+        draft = self._draft("<h1>Başlık</h1><p>Bir paragraf.</p>").json()["draft"]
+        referenced = set(re.findall(r"\bdraft\.([a-z_]+)", template))
+
+        missing = sorted(referenced - set(draft))
+        self.assertEqual(missing, [], f"template reads {missing} which the draft omits")
+
+    def _submit_handler(self):
+        template = self._template()
+        begin = template.index("form.addEventListener('submit'")
+        return template[begin : template.index("\n        });", begin)]
+
+    def test_the_loading_state_is_cleared_in_finally(self):
+        """A draft rendered its result beneath a stale "Analyzing article…".
+
+        The clear sat on one success path and the draft branch returned before
+        reaching it. Asserted structurally, so a branch added later cannot
+        skip it: the loading text is cleared where the button is re-enabled.
+        """
+        handler = self._submit_handler()
+
+        finally_block = handler[handler.index("finally {") :]
+        self.assertIn("status.textContent", finally_block)
+        self.assertIn("button.disabled = false", finally_block)
+
+    def test_the_loading_state_is_not_cleared_on_a_single_success_path(self):
+        """Clearing it inline is how the draft branch came to bypass it."""
+        handler = self._submit_handler()
+
+        self.assertNotIn("status.textContent = '';", handler)
+
+    def test_a_successful_draft_leaves_no_loading_message(self):
+        """The draft branch returns early, so the clear must survive a return."""
+        response = self._draft("<h1>Başlık</h1><p>Bir paragraf.</p>")
+        self.assertEqual(response.status_code, 200)
+
+        handler = self._submit_handler()
+        draft_branch = handler[handler.index("if (data.draft) {") : handler.index("if (data.outcome)")]
+
+        self.assertIn("return;", draft_branch)
+        self.assertNotIn("status.textContent", draft_branch)
+
+    def test_drafts_are_not_offered_as_something_to_compare_against(self):
+        self.client.post(
+            "/analyze/draft",
+            data={"content": "<p>Bir paragraf.</p>", "headline": "Başlık",
+                  "language": "tr", "publisher": "Taslaklar"},
+        )
+
+        names = self.client.get("/publishers").json()["publishers"]
+
+        self.assertNotIn("Taslaklar", names)
 
     def test_url_submission_fetches_html_and_returns_existing_plain_text_report(self):
         response = self.client.post(
@@ -216,6 +393,264 @@ class WebPresentationTests(unittest.TestCase):
             "Bu icerik bilgilendirme", recommendation["occurrences"][0]["excerpt"]
         )
 
+    def _publish(self, slug, paragraph, publisher="ebeveynakademisi.trtcocuk.net.tr"):
+        """Put one article into the corpus a draft can be compared against."""
+        html = (
+            f'<html lang="tr"><head><title>{slug}</title></head><body><main>'
+            f"<p>{paragraph}</p></main></body></html>"
+        )
+        response = self.client.post(
+            "/analyze/file",
+            data={"source_url": f"https://{publisher}/makale/{slug}"},
+            files={"file": ("a.html", html, "text/html")},
+        )
+        self.assertEqual(response.status_code, 200)
+        return response
+
+    def test_the_draft_review_names_checks_as_codes_not_sentences(self):
+        """Application decides whether a check applies; presentation words it.
+
+        These were English sentences built inside the use case, which fixed the
+        report to one language and put copy in application logic.
+        """
+        from aether.application.analysis.build_draft_review import (
+            DraftCheck,
+            UnavailableCheck,
+        )
+
+        review = self.client.app.state.pipeline.analyze_draft(
+            "<h1>Başlık</h1><p>Bir paragraf.</p>", "", "tr", ""
+        )
+
+        for check in review.checks_performed:
+            self.assertIsInstance(check, DraftCheck)
+        for check in review.checks_unavailable:
+            self.assertIsInstance(check, UnavailableCheck)
+
+    def test_every_draft_check_code_has_wording(self):
+        """A code with no entry would reach an editor as an enum name."""
+        from aether.application.analysis.build_draft_review import (
+            DraftCheck,
+            UnavailableCheck,
+        )
+        from aether.presentation.draft_check_text import (
+            performed_check_text,
+            unavailable_check_text,
+        )
+
+        for check in DraftCheck:
+            self.assertTrue(performed_check_text(check))
+        for check in UnavailableCheck:
+            self.assertTrue(unavailable_check_text(check))
+
+    def test_not_choosing_a_publisher_is_offered_and_never_chosen_for_you(self):
+        """Being first in the list is not a choice the editor made."""
+        dom = run_page_script(
+            "await refreshPublishers();",
+            publishers=["trthaber.com", "trtworld.com"],
+        )
+        select = dom["#draft-publisher"]["html"]
+
+        self.assertIn('<option value="">', select)
+        self.assertIn("Don", select)
+        self.assertLess(select.index('value=""'), select.index("trthaber.com"))
+
+    def test_the_editor_is_told_what_comparing_will_do(self):
+        chosen = run_page_script(
+            "await refreshPublishers();"
+            "document.querySelector('#draft-publisher').value = 'trthaber.com';"
+            "describeComparison();",
+            publishers=["trthaber.com"],
+        )
+        self.assertIn(
+            "trthaber.com", chosen["#draft-compare-state"]["text"]
+        )
+
+        not_chosen = run_page_script(
+            "await refreshPublishers();", publishers=["trthaber.com"]
+        )
+        self.assertIn(
+            "checked on its own", not_chosen["#draft-compare-state"]["text"]
+        )
+
+        nothing_yet = run_page_script("await refreshPublishers();", publishers=[])
+        self.assertIn(
+            "No articles have been checked yet",
+            nothing_yet["#draft-compare-state"]["text"],
+        )
+
+    def test_the_chosen_publisher_survives_a_submission(self):
+        """The list is rebuilt after every submit, which discarded the choice."""
+        dom = run_page_script(
+            "await refreshPublishers();"
+            "document.querySelector('#draft-publisher').value = 'trtworld.com';"
+            "await refreshPublishers();",
+            publishers=["trthaber.com", "trtworld.com"],
+        )
+
+        self.assertIn("trtworld.com", dom["#draft-compare-state"]["text"])
+
+    def test_a_draft_with_no_publisher_says_repetition_was_not_checked(self):
+        draft = self._draft("<h1>Başlık</h1><p>Bir paragraf.</p>", publisher="").json()[
+            "draft"
+        ]
+        unavailable = " ".join(draft["checks_unavailable"])
+
+        self.assertIn("no publisher was chosen", unavailable)
+        self.assertNotIn(
+            "Text repeated in your other articles", draft["checks_performed"]
+        )
+
+    def test_a_publisher_with_nothing_checked_yet_says_so_differently(self):
+        """Not the same as declining to compare, and not stated the same way."""
+        draft = self._draft(
+            "<h1>Başlık</h1><p>Bir paragraf.</p>", publisher="trthaber.com"
+        ).json()["draft"]
+        unavailable = " ".join(draft["checks_unavailable"])
+
+        self.assertIn("have been checked yet", unavailable)
+        self.assertNotIn("no publisher was chosen", unavailable)
+
+    def test_no_publisher_display_name_is_invented_from_a_hostname(self):
+        dom = run_page_script(
+            "await refreshPublishers();",
+            publishers=["ebeveynakademisi.trtcocuk.net.tr"],
+        )
+        select = dom["#draft-publisher"]["html"]
+
+        self.assertIn("ebeveynakademisi.trtcocuk.net.tr", select)
+        self.assertNotIn("Ebeveynakademisi<", select)
+
+    def test_choosing_a_publisher_after_a_first_check_takes_effect(self):
+        """A draft was identified by its text alone, so it kept the publisher
+        it was first checked against. Checking it again after choosing one
+        compared it against the earlier choice, silently and permanently.
+        """
+        publisher = "ebeveynakademisi.trtcocuk.net.tr"
+        shared = "Bu icerik bilgilendirme amacli hazirlanmistir."
+        self._publish("birinci", shared, publisher=publisher)
+        draft = f"<h1>Yeni makale</h1><p>{shared}</p><p>Ozgun paragraf.</p>"
+
+        without = self._draft(draft, publisher="").json()["draft"]
+        without_findings = " ".join(r["headline"] for r in without["recommendations"])
+        self.assertNotIn("also appears in your other articles", without_findings)
+
+        with_publisher = self._draft(draft, publisher=publisher).json()["draft"]
+        findings = " ".join(r["headline"] for r in with_publisher["recommendations"])
+        self.assertIn("also appears in your other articles", findings)
+
+    def test_the_same_draft_and_publisher_stay_one_draft(self):
+        publisher = "ebeveynakademisi.trtcocuk.net.tr"
+        self._publish("birinci", "Birinci metin.", publisher=publisher)
+        draft = "<h1>Taslak</h1><p>Ozgun bir paragraf.</p>"
+
+        self._draft(draft, publisher=publisher)
+        self._draft(draft, publisher=publisher)
+
+        repository = self.client.app.state.pipeline.repository
+        drafts = [a for a in repository.all_articles() if a.article_type == "draft"]
+        self.assertEqual(len(drafts), 1)
+
+    def test_the_same_draft_checked_against_two_publishers_is_two_drafts(self):
+        draft = "<h1>Taslak</h1><p>Ozgun bir paragraf.</p>"
+
+        self._draft(draft, publisher="TRT Haber")
+        self._draft(draft, publisher="TRT World")
+
+        repository = self.client.app.state.pipeline.repository
+        publishers = {
+            a.publisher for a in repository.all_articles() if a.article_type == "draft"
+        }
+        self.assertEqual(publishers, {"TRT Haber", "TRT World"})
+
+    def test_a_draft_counts_every_published_article_it_was_compared_with(self):
+        """One published article is one article compared against, not none.
+
+        The count subtracted the article being analysed, which is right for a
+        published article because it is in the corpus. A draft never is, so the
+        subtraction removed a real article instead.
+        """
+        publisher = "ebeveynakademisi.trtcocuk.net.tr"
+        for index, (slug, paragraph) in enumerate(
+            (("birinci", "Birinci metin."), ("ikinci", "Ikinci metin.")), start=1
+        ):
+            self._publish(slug, paragraph, publisher=publisher)
+            draft = self._draft(
+                f"<h1>Taslak {index}</h1><p>Tamamen ozgun bir paragraf {index}.</p>",
+                publisher=publisher,
+            ).json()["draft"]
+
+            self.assertEqual(draft["compared_article_count"], index)
+            self.assertIn(
+                "Text repeated in your other articles", draft["checks_performed"]
+            )
+
+    def test_drafts_are_never_counted_as_articles_to_compare_against(self):
+        publisher = "ebeveynakademisi.trtcocuk.net.tr"
+        self._publish("birinci", "Birinci metin.", publisher=publisher)
+        for index in range(3):
+            draft = self._draft(
+                f"<h1>Taslak {index}</h1><p>Ozgun paragraf {index}.</p>",
+                publisher=publisher,
+            ).json()["draft"]
+
+        self.assertEqual(draft["compared_article_count"], 1)
+
+    def test_a_published_article_still_excludes_itself_from_the_comparison(self):
+        """The published path must be unchanged; it was already correct."""
+        publisher = "ebeveynakademisi.trtcocuk.net.tr"
+        first = self._publish("birinci", "Birinci metin.", publisher=publisher)
+        self.assertEqual(
+            first.json()["view"]["editor"]["compared_articles"],
+            "No previously analyzed articles from this publisher, so repeated "
+            "text could not be checked.",
+        )
+
+        second = self._publish("ikinci", "Ikinci metin.", publisher=publisher)
+        self.assertEqual(
+            second.json()["view"]["editor"]["compared_articles"],
+            "Compared against previously analyzed articles from this publisher "
+            "(1 article).",
+        )
+
+    def test_a_draft_finding_reaches_the_page_instead_of_throwing(self):
+        """The whole seam: a real repeated paragraph, rendered by the real page.
+
+        renderDraft called a card() that only existed inside renderReport, so a
+        draft with anything to report threw a ReferenceError and showed nothing.
+        A draft with no findings took the other branch and rendered, which is
+        why every earlier check of this flow looked correct.
+
+        Asserted by running the page, because the two static template checks
+        above both passed while this was broken.
+        """
+        shared = "Bu icerik bilgilendirme amacli hazirlanmistir."
+        self._publish("birinci", shared)
+        draft = self._draft(
+            f"<h1>Yeni makale</h1><p>{shared}</p><p>Bu paragraf ozgundur.</p>",
+            publisher="ebeveynakademisi.trtcocuk.net.tr",
+        ).json()["draft"]
+
+        self.assertTrue(
+            draft["recommendations"], "the draft must have a finding to render"
+        )
+
+        dom = run_page_script(f"renderDraft({json.dumps(draft)});")
+        findings = dom["#draft-findings"]["html"]
+
+        self.assertIn("This paragraph also appears in your other articles", findings)
+        self.assertIn(shared, findings)
+        self.assertIn("What to do.", findings)
+        self.assertNotIn("Nothing to change", findings)
+
+    def test_a_draft_with_nothing_to_report_still_says_so(self):
+        """The branch that did work must keep working."""
+        draft = self._draft("<h1>Başlık</h1><p>Bir paragraf.</p>").json()["draft"]
+
+        dom = run_page_script(f"renderDraft({json.dumps(draft)});")
+
+        self.assertIn("Nothing to change", dom["#draft-findings"]["html"])
+
     def test_index_shows_both_audience_sections(self):
         response = self.client.get("/")
 
@@ -340,7 +775,7 @@ class WebPresentationTests(unittest.TestCase):
         self.assertIn("Publication Date Available: False", report)
         # With the always-true fields gone, a page carrying none of the four
         # fields that can vary is correctly "missing" rather than "partial".
-        self.assertIn("Metadata Completeness: missing", report)
+        self.assertIn("Metadata Completeness: partial", report)
         self.assertIn("This article does not say when it was published", report)
 
 

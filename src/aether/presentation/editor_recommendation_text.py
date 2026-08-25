@@ -211,6 +211,84 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
             "site to publish it outside the article body."
         ),
     ),
+    RecommendationCode.NO_OUTBOUND_LINKS: RecommendationText(
+        headline="Dış Atıf Bulunmuyor",
+        why_it_matters=(
+            "Yapay zeka motorları, makalenin dış kaynaklara referans verip vermediğini kontrol ederek Varlık Otoritesini (Entity Authority) ölçer. "
+            "Dışarıya bağlantı vermek, derin araştırmayı ve güvenilirliği gösterir."
+        ),
+        what_to_do=(
+            "İddialarınızı desteklemek için makale gövdesinden güvenilir ve otoriter dış kaynaklara bağlantılar ekleyin."
+        ),
+    ),
+    RecommendationCode.NO_STATISTICS: RecommendationText(
+        headline="İstatistik veya Veri Noktası Yok",
+        why_it_matters=(
+            "Sayısal veriler, bir makalenin Anlamsal Bütünlüğünü (Semantic Completeness) büyük ölçüde artırır. "
+            "Yapay zeka motorları iddialarını somut rakamlarla destekleyen içerikleri tercih eder."
+        ),
+        what_to_do=(
+            "Argümanlarınızı güçlendirmek için metin içine istatistik, yüzdelik oran ve net sayısal veriler ekleyin."
+        ),
+    ),
+    RecommendationCode.NO_INTERNAL_BODY_LINKS: RecommendationText(
+        headline="Gövde İçinde İç Bağlantı Yok",
+        why_it_matters=(
+            "Site içindeki diğer içeriklere bağlantı vermeyen makaleler, okuyucular ve yapay zeka tarayıcıları için çıkmaz sokak (dead end) oluşturur. "
+            "İç linkleme otoriteyi dağıtır ve bağlam sağlar."
+        ),
+        what_to_do=(
+            "Sitenizdeki diğer ilgili makalelere ana metin gövdesi içinden bağlantılar verin."
+        ),
+    ),
+    RecommendationCode.CONTENT_BLOAT: RecommendationText(
+        headline="İzole ve Şişirme İçeriği Sadeleştirin",
+        why_it_matters=(
+            "Yapay zeka motorları 'içerik şişirmesini' cezalandırır. "
+            "Başlığıyla aynı kelime dağarcığını paylaşmayan ve kesin bir duruş sergilemeyen paragraflar Anlamsal Bütünlüğünüzü zayıflatır."
+        ),
+        what_to_do=(
+            "Ana başlıkla zayıf bağları olan doldurma paragrafları kaldırın veya onları ana temayla ilişkilendirin."
+        ),
+    ),
+    RecommendationCode.SKIPPED_HEADING_LEVEL: RecommendationText(
+        headline="Anlamsal Kopukluk: Başlık Hiyerarşisi Atlanmış",
+        why_it_matters=(
+            "Yapay zeka tarayıcıları başlık yapılarını (H1, H2, H3, H4) mantıksal bir taslak olarak okur. "
+            "Başlık seviyelerini atlamak (örneğin H2'den doğrudan H4'e atlamak) belgenin anlamsal yapısını bozar."
+        ),
+        what_to_do=(
+            "Başlık hiyerarşinizi, sayılar arasında atlama yapmadan doğrusal olarak aşağı inecek şekilde düzeltin."
+        ),
+    ),
+    RecommendationCode.CONFLICTING_PUBLISHED_DATES: RecommendationText(
+        headline="Çelişkili Tarih Verileri (Sanity Check Başarısız)",
+        why_it_matters=(
+            "Yapay zeka arama motorları, tazeliği doğrulamak için Meta, JSON-LD ve <time> etiketlerindeki tarihleri çapraz kontrol eder. "
+            "Eğer bu tarihler uyuşmuyorsa kaynağın güvenilirliği sarsılır."
+        ),
+        what_to_do=(
+            "CMS'nizin JSON-LD, meta property='article:published_time' ve HTML <time> etiketlerine aynı (veya uyumlu) tarih damgasını bastığından emin olun."
+        ),
+    ),
+    RecommendationCode.UNSUPPORTED_ENTITIES: RecommendationText(
+        headline="Kanıtsız Varlıkları (Kurum/Ürün) Destekleyin",
+        why_it_matters=(
+            "Özel isimlerin, kurum veya spesifik ürünlerin geçtiği paragraflarda birincil kanıt eksikliği bulunuyor."
+        ),
+        what_to_do=(
+            "Yapay zeka motorlarının bu varlıkları güvenilir bir kaynak olarak referans alabilmesi için, ilgili paragraflara iddialarınızı kanıtlayan istatistiksel veriler veya bağımsız dış atıflar ekleyin."
+        ),
+    ),
+    RecommendationCode.MISSING_SAME_AS_SCHEMA: RecommendationText(
+        headline="Yapısal Veri (sameAs) Kullanımı Eksik",
+        why_it_matters=(
+            "Yapay zeka motorlarının varlıkları Knowledge Graph ile eşleştirebilmesi için sameAs özelliğine ihtiyacı vardır."
+        ),
+        what_to_do=(
+            "Sayfanın Schema.org JSON-LD bloğunda, yazarın ve kurumun Wikipedia/Wikidata profillerini sameAs özelliğiyle belirtin."
+        ),
+    ),
 }
 
 

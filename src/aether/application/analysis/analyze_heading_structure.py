@@ -54,6 +54,7 @@ class HeadingStructureAnalysis:
     article_version_id: str
     headings: Tuple[DeclaredHeading, ...]
     top_level_count: int
+    skipped_heading_levels: bool = False
 
     @property
     def has_headings(self) -> bool:
@@ -77,10 +78,21 @@ class AnalyzeHeadingStructure:
         source_data = self._content_repository.get_source_data(article_version_id)
         headings = source_data.declared_headings if source_data is not None else ()
 
+        skipped = False
+        if headings:
+            if headings[0].level > 2:
+                skipped = True
+            else:
+                for i in range(1, len(headings)):
+                    if headings[i].level - headings[i-1].level > 1:
+                        skipped = True
+                        break
+
         return HeadingStructureAnalysis(
             article_id=article.article_id,
             article_version_id=article_version.article_version_id,
             headings=headings,
             top_level_count=sum(1 for heading in headings if heading.level == 1),
+            skipped_heading_levels=skipped,
         )
 

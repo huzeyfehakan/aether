@@ -30,6 +30,7 @@ class MetadataAnalysis:
     last_modified_date_available: bool
     author_available: bool
     description_available: bool
+    cross_date_conflict: bool = False
 
 
 class AnalyzeArticleMetadata:
@@ -43,6 +44,19 @@ class AnalyzeArticleMetadata:
         self._validate_article_version(article, article_version)
 
         title = article_version.title.strip()
+        
+        # Cross Date Check
+        cross_date_conflict = False
+        source_data = self._content_repository.get_source_data(article_version_id)
+        if source_data:
+            dates = []
+            for d in [source_data.json_ld_published_date, source_data.meta_published_date, source_data.time_tag_published_date]:
+                if d:
+                    # Very simple heuristic: just check if the first 10 characters (YYYY-MM-DD) mismatch
+                    dates.append(d[:10])
+            if len(set(dates)) > 1:
+                cross_date_conflict = True
+        
         return MetadataAnalysis(
             article_id=article.article_id,
             article_version_id=article_version.article_version_id,
@@ -53,6 +67,7 @@ class AnalyzeArticleMetadata:
             description_available=bool(
                 article_version.description and article_version.description.strip()
             ),
+            cross_date_conflict=cross_date_conflict,
         )
 
     @staticmethod

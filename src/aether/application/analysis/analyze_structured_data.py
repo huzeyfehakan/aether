@@ -44,6 +44,7 @@ class StructuredDataAnalysis:
     article_node_present: bool
     declared_node_types: Tuple[str, ...]
     declared_article_properties: Tuple[str, ...]
+    all_declared_properties: Tuple[str, ...]
     missing_article_properties: Tuple[str, ...]
 
 
@@ -71,12 +72,17 @@ class AnalyzeStructuredData:
         for node in article_nodes:
             declared.update(node.property_names)
 
+        all_props: set = set()
+        for node in nodes:
+            all_props.update(node.property_names)
+
         return StructuredDataAnalysis(
             article_id=article.article_id,
             article_version_id=article_version.article_version_id,
             article_node_present=bool(article_nodes),
             declared_node_types=tuple(sorted({node.node_type for node in nodes})),
             declared_article_properties=tuple(sorted(declared)),
+            all_declared_properties=tuple(sorted(all_props)),
             missing_article_properties=(
                 tuple(
                     name

@@ -14,12 +14,23 @@ from aether.application.analysis.analyze_article_metadata import AnalyzeArticleM
 from aether.application.analysis.analyze_article_structure import AnalyzeArticleStructure
 from aether.application.analysis.analyze_content_duplication import AnalyzeContentDuplication
 from aether.application.analysis.analyze_passage_quality import AnalyzePassageQuality
+from aether.application.analysis.analyze_internal_links import AnalyzeInternalLinks
 from aether.application.analysis.analyze_heading_structure import AnalyzeHeadingStructure
 from aether.application.analysis.analyze_structured_data import AnalyzeStructuredData
 from aether.application.analysis.analyze_declared_consistency import AnalyzeDeclaredConsistency
 from aether.application.analysis.assess_ai_readiness import AssessAIReadiness
 from aether.application.analysis.build_ai_readiness_report import BuildAIReadinessReport
 from aether.application.analysis.build_article_analysis_report import BuildArticleAnalysisReport
+from aether.application.analysis.build_draft_review import BuildDraftReview
+from aether.application.analysis.derive_editor_recommendations import (
+    DeriveEditorRecommendations,
+    RecommendationCode,
+)
+from aether.application.ingestion.prepare_draft import (
+    DraftContentRequired,
+    DraftHeadlineRequired,
+    prepare_draft,
+)
 from aether.application.ingestion.assess_page_content import (
     AssessPageContent,
     PageAssessment,
@@ -30,6 +41,10 @@ from aether.application.ingestion.register_raw_html_article import (
     canonical_url_from_html,
 )
 from aether.domain.common import DomainValidationError
+from aether.presentation.draft_check_text import (
+    performed_check_text,
+    unavailable_check_text,
+)
 from aether.presentation.page_outcome_text import outcome_view
 from aether.presentation.ai_readiness_report_renderers import (
     PlainTextAIReadinessReportRenderer,
@@ -37,16 +52,21 @@ from aether.presentation.ai_readiness_report_renderers import (
 from aether.application.analysis.derive_editor_recommendations import (
     RecommendationCategory,
 )
+from aether.presentation.draft_check_text import (
+    performed_check_text,
+    unavailable_check_text,
+)
 from aether.presentation.editor_recommendation_text import (
     category_subtitle,
-    heading_count_phrase,
-    shared_words_phrase,
-    title_source_label,
     compared_articles_phrase,
+    heading_count_phrase,
     missing_properties_phrase,
     recommendation_text,
     repeated_in_phrase,
+    shared_words_phrase,
+    title_source_label,
 )
+from aether.presentation.score_dimension_text import seo_dimension_text, geo_dimension_text
 
 
 class HtmlFetcher(Protocol):
@@ -61,6 +81,7 @@ class AIReadinessPipeline:
 
     def __init__(self) -> None:
         repository = InMemoryContentRepository()
+        self.repository = repository
         self._register_article = RegisterRawHtmlArticle(repository)
         self._build_analysis_report = BuildArticleAnalysisReport(
             AnalyzeArticleStructure(repository),
@@ -73,7 +94,18 @@ class AIReadinessPipeline:
             AnalyzeStructuredData(repository),
             AnalyzeDeclaredConsistency(repository),
             AnalyzeHeadingStructure(repository),
+            AnalyzeInternalLinks(repository),
         )
+        # A draft composes only the analyses its own text can answer.
+        self._build_draft_report = BuildArticleAnalysisReport(
+            AnalyzeArticleStructure(repository),
+            AnalyzeArticleMetadata(repository),
+            AnalyzePassageQuality(repository),
+            AnalyzeContentDuplication(repository),
+            heading_structure_analysis=AnalyzeHeadingStructure(repository),
+            is_draft=True,
+        )
+        self._build_draft_review = BuildDraftReview()
         self._assess_page = AssessPageContent()
         self._assess_readiness = AssessAIReadiness()
         self._build_readiness_report = BuildAIReadinessReport()
@@ -112,6 +144,42 @@ class AIReadinessPipeline:
         )
         assessment = self._assess_readiness.execute(analysis_report)
         return self._build_readiness_report.execute(assessment)
+
+    def analyze_draft(
+        self,
+        content: str,
+        headline: str,
+        language: str,
+        publisher: str,
+    ) -> Any:
+        """Analyse an unpublished draft, running only the checks it supports.
+
+        An empty ``publisher`` is an editor who chose not to compare, not a
+        publisher named nothing. The draft is still stored, under a name of its
+        own, and the review says the comparison was not run.
+        """
+        comparison_requested = bool(publisher.strip())
+        publisher = publisher.strip() or _DRAFTS_WITHOUT_A_PUBLISHER
+        prepared = prepare_draft(content, headline, language, publisher)
+        registration = self._register_article.execute(
+            RawHtmlArticle(
+                html=prepared.html,
+                source_url=prepared.source_url,
+                publisher=publisher,
+                article_type="draft",
+                observed_at=datetime.now(timezone.utc),
+                fallback_language=language,
+            )
+        )
+        analysis_report = self._build_draft_report.execute(
+            registration.article, registration.article_version.article_version_id
+        )
+        return self._build_draft_review.execute(
+            analysis_report,
+            prepared.headline,
+            prepared.heading_check_available,
+            comparison_requested,
+        )
 
     def analyze(
         self,
@@ -154,6 +222,11 @@ class AIReadinessPipeline:
 
 _TEMPLATE_PATH = Path(__file__).parent / "templates" / "index.html"
 
+#: Where a draft is kept when the editor chose not to compare it. The domain
+#: requires a publisher, and this is not one: no draft filed here is ever
+#: compared against anything, because drafts are excluded from every corpus.
+_DRAFTS_WITHOUT_A_PUBLISHER = "Unpublished drafts"
+
 
 def _canonical_url_from_html(html: str) -> Optional[str]:
     """Reuse the ingestion canonical contract to derive a usable source URL.
@@ -181,6 +254,32 @@ def _publisher_from(source_url: str, publisher: Optional[str]) -> str:
     return hostname.removeprefix("www.")
 
 
+_IMPACT_MAP = {
+    RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: "Structured Data",
+    RecommendationCode.INCOMPLETE_ARTICLE_STRUCTURED_DATA: "Structured Data",
+    RecommendationCode.MISSING_LAST_MODIFIED_DATE: "Metadata",
+    RecommendationCode.MISSING_PUBLICATION_DATE: "Metadata",
+    RecommendationCode.MISSING_AUTHOR: "Metadata",
+    RecommendationCode.MISSING_SUMMARY: "Metadata",
+    RecommendationCode.TITLE_SOURCES_DISAGREE: "Semantic Quality",
+    RecommendationCode.DESCRIPTION_SOURCES_DISAGREE: "Semantic Quality",
+    RecommendationCode.NO_OUTBOUND_LINKS: "Entity Authority",
+    RecommendationCode.NO_STATISTICS: "Semantic Completeness",
+    RecommendationCode.NO_INTERNAL_BODY_LINKS: "Discoverability",
+    RecommendationCode.NO_TOP_LEVEL_HEADING: "Structural Richness",
+    RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS: "Structural Richness",
+    RecommendationCode.WEAK_ARTICLE_OPENING: "Semantic Completeness",
+    RecommendationCode.WEAK_TOPIC_INTRODUCTION: "Semantic Completeness",
+    RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY: "Semantic Quality",
+    RecommendationCode.BODY_MOSTLY_REPEATED_TEXT: "Semantic Quality",
+    RecommendationCode.CONTENT_BLOAT: "Semantic Completeness",
+    RecommendationCode.SKIPPED_HEADING_LEVEL: "Structural Richness",
+    RecommendationCode.CONFLICTING_PUBLISHED_DATES: "Metadata",
+    RecommendationCode.UNSUPPORTED_ENTITIES: "Entity Authority",
+    RecommendationCode.MISSING_SAME_AS_SCHEMA: "Semantic Completeness",
+}
+
+
 def _recommendation_views(report: Any, category) -> list:
     """Shape one category of recommendations for display.
 
@@ -198,6 +297,7 @@ def _recommendation_views(report: Any, category) -> list:
                 "headline": text.headline,
                 "why_it_matters": text.why_it_matters,
                 "what_to_do": text.what_to_do,
+                "impact": _IMPACT_MAP.get(recommendation.code, ""),
                 "occurrences": [],
             },
         )
@@ -236,6 +336,20 @@ def _report_view(report: Any) -> Dict[str, Any]:
     return {
         "assessment": {
             "metadata": assessment.metadata_completeness.value,
+            "seo_score": {
+                "total": report.assessment_summary.seo_score.total,
+                "entity_coverage": {"val": report.assessment_summary.seo_score.entity_coverage.dimension_score, "label": seo_dimension_text("entity_coverage")["label"], "weight": report.assessment_summary.seo_score.entity_coverage.weight_percentage},
+                "structured_data": {"val": report.assessment_summary.seo_score.structured_data.dimension_score, "label": seo_dimension_text("structured_data")["label"], "weight": report.assessment_summary.seo_score.structured_data.weight_percentage},
+                "semantic_quality": {"val": report.assessment_summary.seo_score.semantic_quality.dimension_score, "label": seo_dimension_text("semantic_quality")["label"], "weight": report.assessment_summary.seo_score.semantic_quality.weight_percentage},
+                "technical_access": {"val": report.assessment_summary.seo_score.technical_access.dimension_score, "label": seo_dimension_text("technical_access")["label"], "weight": report.assessment_summary.seo_score.technical_access.weight_percentage},
+            } if hasattr(report, 'assessment_summary') and hasattr(report.assessment_summary, 'seo_score') else None,
+            "geo_score": {
+                "total": report.assessment_summary.geo_score.total,
+                "semantic_completeness": {"val": report.assessment_summary.geo_score.semantic_completeness.dimension_score, "label": geo_dimension_text("semantic_completeness")["label"], "weight": report.assessment_summary.geo_score.semantic_completeness.weight_percentage},
+                "entity_authority": {"val": report.assessment_summary.geo_score.entity_authority.dimension_score, "label": geo_dimension_text("entity_authority")["label"], "weight": report.assessment_summary.geo_score.entity_authority.weight_percentage},
+                "structural_richness": {"val": report.assessment_summary.geo_score.structural_richness.dimension_score, "label": geo_dimension_text("structural_richness")["label"], "weight": report.assessment_summary.geo_score.structural_richness.weight_percentage},
+                "discoverability": {"val": report.assessment_summary.geo_score.discoverability.dimension_score, "label": geo_dimension_text("discoverability")["label"], "weight": report.assessment_summary.geo_score.discoverability.weight_percentage},
+            } if hasattr(report, 'assessment_summary') and hasattr(report.assessment_summary, 'geo_score') else None,
         },
         "metadata": (
             {"label": "Publication date", "available": metadata.publication_date_available},
@@ -279,6 +393,50 @@ def _report_view(report: Any) -> Dict[str, Any]:
             "article_version_id": report.article_identity.article_version_id,
         },
     }
+
+
+def _draft_view(review: Any) -> Dict[str, Any]:
+    """Shape a draft review for display.
+
+    Nothing here mentions metadata, structured data or article identity: a
+    draft has none, and the review type does not carry them.
+    """
+    return {
+        "headline": review.headline,
+        "paragraph_count": review.paragraph_count,
+        "word_count": review.word_count,
+        "compared_article_count": review.compared_article_count,
+        "checks_performed": [
+            performed_check_text(check) for check in review.checks_performed
+        ],
+        "checks_unavailable": [
+            unavailable_check_text(check) for check in review.checks_unavailable
+        ],
+        "recommendations": [
+            {
+                "headline": recommendation_text(r).headline,
+                "why_it_matters": recommendation_text(r).why_it_matters,
+                "what_to_do": recommendation_text(r).what_to_do,
+                "occurrences": [_occurrence_view(r)],
+            }
+            for r in review.recommendations
+        ],
+    }
+
+
+def _occurrence_view(recommendation: Any) -> Dict[str, Any]:
+    occurrence: Dict[str, Any] = {}
+    if recommendation.excerpt:
+        occurrence["excerpt"] = recommendation.excerpt
+    if recommendation.other_article_count:
+        occurrence["detail"] = repeated_in_phrase(recommendation.other_article_count)
+    if recommendation.heading_count:
+        occurrence["detail"] = heading_count_phrase(recommendation.heading_count)
+    if recommendation.total_word_count:
+        occurrence["detail"] = shared_words_phrase(
+            recommendation.repeated_word_count, recommendation.total_word_count
+        )
+    return occurrence
 
 
 def _analysis_response(result: Any) -> Dict[str, Any]:
@@ -344,6 +502,36 @@ def create_app(fetcher: Optional[HtmlFetcher] = None) -> FastAPI:
         except (HtmlFetchError, DomainValidationError) as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
+    @app.get("/publishers")
+    def publishers() -> Dict[str, Any]:
+        """Publishers already analysed, so a draft can be compared with them."""
+        repository = app.state.pipeline.repository
+        names = sorted(
+            {
+                article.publisher
+                for article in repository.all_articles()
+                if article.article_type != "draft"
+            }
+        )
+        return {"publishers": names}
+
+    @app.post("/analyze/draft")
+    def analyze_draft(
+        content: str = Form(...),
+        headline: str = Form(""),
+        language: str = Form("tr"),
+        publisher: str = Form(""),
+    ) -> Dict[str, Any]:
+        try:
+            review = app.state.pipeline.analyze_draft(
+                content, headline, language, publisher
+            )
+        except (DraftContentRequired, DraftHeadlineRequired) as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        except DomainValidationError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        return {"draft": _draft_view(review)}
+
     @app.post("/analyze/file")
     async def analyze_file(
         file: UploadFile = File(...),
@@ -381,3 +569,4 @@ def create_app(fetcher: Optional[HtmlFetcher] = None) -> FastAPI:
 
 
 app = create_app()
+

@@ -44,11 +44,18 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             article_version_id="version-1",
             total_passage_count=structural_counts[0],
             total_word_count=structural_counts[1],
+            table_word_count=0,
+            list_word_count=0,
+            blockquote_word_count=0,
+            answered_question_heading_count=0,
+            unanswered_question_heading_count=0,
+            unsupported_entity_ratio=0.0,
         )
         passage_quality = PassageQualityAnalysis(
             article_id="article-1",
             article_version_id="version-1",
             passage_profiles=(),
+            passage_balance_ratio=1.0,
         )
         return ArticleAnalysisReport(
             structural_analysis=structural,
@@ -71,7 +78,8 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             assessment.metadata_completeness, CompletenessClassification.COMPLETE
         )
         self.assertTrue(assessment.observations.author_available)
-        self.assertFalse(hasattr(assessment, "score"))
+        self.assertTrue(hasattr(assessment, "seo_score"))
+        self.assertTrue(hasattr(assessment, "geo_score"))
 
     def test_classifies_partial_report_from_existing_raw_observations(self):
         report = self.report(
@@ -117,6 +125,92 @@ class AIReadinessAssessmentTests(unittest.TestCase):
             first.metadata_completeness = CompletenessClassification.MISSING
         self.assertIsInstance(first, AIReadinessAssessment)
 
+    def entity_authority_report(self):
+        from aether.application.analysis.analyze_internal_links import InternalLinkAnalysisResult
+        from aether.application.analysis.analyze_structured_data import StructuredDataAnalysis
+        from dataclasses import replace
+        
+        report = self.report(
+            metadata_available=(True, True, True, True, True, True, True),
+            coverage_ratio=1.0,
+            covered_paragraphs=2,
+            structural_counts=(2, 10, 2),
+        )
+        
+        # Override with our specific test data
+        return replace(report,
+            structured_data_analysis=StructuredDataAnalysis(
+                article_id="article-1",
+                article_version_id="version-1",
+                article_node_present=True,
+                declared_node_types=("Article", "Person", "Organization"),
+                declared_article_properties=("author", "publisher"),
+                all_declared_properties=("author", "publisher"),
+                missing_article_properties=("datePublished",)
+            ),
+            internal_link_analysis=InternalLinkAnalysisResult(
+                article_id="article-1",
+                article_version_id="version-1",
+                outgoing_link_count=5,
+                unique_target_count=5,
+                body_link_count=0,
+                incoming_link_count=1,
+                potential_orphan=False,
+                outbound_body_domains=(),
+                third_party_ratio=None,
+                trust_index=None,
+            )
+        )
+
+    def test_geo_entity_authority_scores_correctly_with_body_vs_non_body_links(self):
+        report = self.entity_authority_report()
+        assessment = AssessAIReadiness().execute(report)
+        
+        # Yazar beyan edilmis (100), govde hicbir yere atif yapmiyor (0),
+        # varliklar kanitlanmis (100). trust_index ve third_party_ratio bos
+        # kume uzerinde oran oldugu icin ortalamaya hic girmiyor.
+        self.assertAlmostEqual(
+            assessment.geo_score.entity_authority.dimension_score, 200 / 3, places=6
+        )
+
+    def test_body_citations_raise_entity_authority_above_an_article_with_none(self):
+        from dataclasses import replace
+        """Ayni makale, tek fark govdedeki dis atiflar."""
+        cited = replace(
+            self.entity_authority_report(),
+            internal_link_analysis=replace(
+                self.entity_authority_report().internal_link_analysis,
+                outbound_body_domains=("wikipedia.org", "reuters.com"),
+                trust_index=(3 + 2) / (2 * 3),
+                third_party_ratio=1.0,
+            ),
+        )
+
+        scored = AssessAIReadiness().execute(cited)
+
+        # (100 yazar + 100 atif var + 83.33 guven + 100 bagimsizlik + 100 kanit) / 5
+        self.assertAlmostEqual(
+            scored.geo_score.entity_authority.dimension_score, 483.3333333 / 5.0, places=4
+        )
+
+    def test_an_unmeasurable_entity_authority_leaves_its_weight_out_of_the_total(self):
+        from dataclasses import replace
+        """Taslak: yapisal veri ve link analizi hic komposize edilmemis."""
+        report = replace(
+            self.entity_authority_report(),
+            structured_data_analysis=None,
+            internal_link_analysis=None,
+            structural_analysis=replace(
+                self.entity_authority_report().structural_analysis,
+                unsupported_entity_ratio=None
+            )
+        )
+
+        geo = AssessAIReadiness().execute(report).geo_score
+
+        self.assertIsNone(geo.entity_authority.dimension_score)
+        # 30 puanlik agirlik toplamdan dusuyor, sifir olarak sayilmiyor.
+        self.assertEqual(geo.entity_authority.weighted_contribution, 0.0)
 
 if __name__ == "__main__":
     unittest.main()

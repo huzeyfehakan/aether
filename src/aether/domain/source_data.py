@@ -15,9 +15,10 @@ needs. Retaining the raw document would store unbounded publisher data in an
 immutable record and invite analyses that are no longer deterministic.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
-from typing import Tuple
+from typing import Tuple, Optional
 
 from .common import DomainValidationError
 
@@ -107,6 +108,18 @@ class StructuredDataNode:
 
 
 @dataclass(frozen=True)
+class InternalLink:
+    """An internal link declared in the article."""
+    
+    target_url: str
+    is_in_body: bool
+
+    def __post_init__(self) -> None:
+        if not self.target_url or not self.target_url.strip():
+            raise DomainValidationError("internal link target_url is required")
+
+
+@dataclass(frozen=True)
 class ArticleVersionSourceData:
     """Everything one article version declared to machines, as an inventory."""
 
@@ -115,6 +128,21 @@ class ArticleVersionSourceData:
     declared_titles: Tuple[DeclaredTitle, ...] = ()
     declared_descriptions: Tuple[DeclaredDescription, ...] = ()
     declared_headings: Tuple[DeclaredHeading, ...] = ()
+    internal_links: Tuple[InternalLink, ...] = ()
+    outbound_domains: Tuple[str, ...] = ()
+    outbound_body_domains: Tuple[str, ...] = ()
+    table_word_count: int = 0
+    list_word_count: int = 0
+    blockquote_word_count: int = 0
+    answered_question_heading_count: int = 0
+    unanswered_question_heading_count: int = 0
+    heading_passage_overlap_ratio: float = 0.0
+    definitive_stance_ratio: float = 0.0
+    
+    # Layered Dates for Sanity Check
+    json_ld_published_date: Optional[str] = None
+    meta_published_date: Optional[str] = None
+    time_tag_published_date: Optional[str] = None
 
     def __post_init__(self) -> None:
         if not self.article_version_id or not self.article_version_id.strip():
@@ -123,3 +151,13 @@ class ArticleVersionSourceData:
             sources = [item.source for item in declared]
             if len(set(sources)) != len(sources):
                 raise DomainValidationError("each source may be declared once")
+        if self.table_word_count < 0:
+            raise DomainValidationError("table_word_count cannot be negative")
+        if self.list_word_count < 0:
+            raise DomainValidationError("list_word_count cannot be negative")
+        if self.blockquote_word_count < 0:
+            raise DomainValidationError("blockquote_word_count cannot be negative")
+        if self.answered_question_heading_count < 0:
+            raise DomainValidationError("answered_question_heading_count cannot be negative")
+        if self.unanswered_question_heading_count < 0:
+            raise DomainValidationError("unanswered_question_heading_count cannot be negative")

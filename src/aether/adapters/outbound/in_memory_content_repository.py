@@ -44,11 +44,30 @@ class InMemoryContentRepository(ContentRepository):
             )
         )
 
-    def count_article_versions_for_publisher(self, publisher: str) -> int:
+    def all_articles(self) -> Tuple[Article, ...]:
+        """Every stored article. Used to offer an editor what to compare against."""
+        return tuple(self._articles_by_id.values())
+
+    #: Drafts are stored so they can be compared against published work, but
+    #: they are never something to compare against: an unpublished draft is not
+    #: part of what a publisher has published, and two drafts sharing text says
+    #: nothing about either.
+    _DRAFT_ARTICLE_TYPE = "draft"
+
+    def count_article_versions_for_publisher(
+        self, publisher: str, excluding: Optional[str] = None
+    ) -> int:
         return sum(
             1
-            for version in self._versions.values()
-            if self._publisher_of(version) == publisher
+            for version_id, version in self._versions.items()
+            if version_id != excluding and self._is_published_by(version, publisher)
+        )
+
+    def list_articles_by_publisher(self, publisher: str) -> Tuple[Article, ...]:
+        return tuple(
+            article
+            for article in self._articles_by_id.values()
+            if article.publisher == publisher
         )
 
     def find_passage_fingerprint_occurrences(
@@ -58,7 +77,7 @@ class InMemoryContentRepository(ContentRepository):
         publisher_version_ids = {
             version_id
             for version_id, version in self._versions.items()
-            if self._publisher_of(version) == publisher
+            if self._is_published_by(version, publisher)
         }
         occurrences: Dict[str, set] = {fingerprint: set() for fingerprint in wanted}
         for passage in self._passages.values():
@@ -83,9 +102,13 @@ class InMemoryContentRepository(ContentRepository):
     ) -> Optional[ArticleVersionSourceData]:
         return self._source_data.get(article_version_id)
 
-    def _publisher_of(self, article_version: ArticleVersion) -> Optional[str]:
+    def _is_published_by(self, article_version: ArticleVersion, publisher: str) -> bool:
         article = self._articles_by_id.get(article_version.article_id)
-        return article.publisher if article is not None else None
+        return (
+            article is not None
+            and article.publisher == publisher
+            and article.article_type != self._DRAFT_ARTICLE_TYPE
+        )
 
     def save_article(self, article: Article) -> None:
         existing = self._articles_by_id.get(article.article_id)

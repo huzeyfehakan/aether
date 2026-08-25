@@ -13,6 +13,7 @@ from aether.domain.source_data import (
     DeclaredHeading,
     DeclaredTitle,
     StructuredDataNode,
+    InternalLink,
 )
 from aether.ports.outbound.content_repository import ContentRepository
 
@@ -38,6 +39,19 @@ class SourceArticleSnapshot:
     declared_titles: Tuple[DeclaredTitle, ...] = ()
     declared_descriptions: Tuple[DeclaredDescription, ...] = ()
     declared_headings: Tuple[DeclaredHeading, ...] = ()
+    internal_links: Tuple[InternalLink, ...] = ()
+    outbound_domains: Tuple[str, ...] = ()
+    outbound_body_domains: Tuple[str, ...] = ()
+    table_word_count: int = 0
+    list_word_count: int = 0
+    blockquote_word_count: int = 0
+    answered_question_heading_count: int = 0
+    unanswered_question_heading_count: int = 0
+    heading_passage_overlap_ratio: float = 0.0
+    definitive_stance_ratio: float = 0.0
+    json_ld_published_date: Optional[str] = None
+    meta_published_date: Optional[str] = None
+    time_tag_published_date: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -132,6 +146,19 @@ class RegisterSourceSnapshot:
                 declared_titles=snapshot.declared_titles,
                 declared_descriptions=snapshot.declared_descriptions,
                 declared_headings=snapshot.declared_headings,
+                internal_links=snapshot.internal_links,
+                outbound_domains=snapshot.outbound_domains,
+                outbound_body_domains=snapshot.outbound_body_domains,
+                table_word_count=snapshot.table_word_count,
+                list_word_count=snapshot.list_word_count,
+                blockquote_word_count=snapshot.blockquote_word_count,
+                answered_question_heading_count=snapshot.answered_question_heading_count,
+                unanswered_question_heading_count=snapshot.unanswered_question_heading_count,
+                heading_passage_overlap_ratio=snapshot.heading_passage_overlap_ratio,
+                definitive_stance_ratio=snapshot.definitive_stance_ratio,
+                json_ld_published_date=snapshot.json_ld_published_date,
+                meta_published_date=snapshot.meta_published_date,
+                time_tag_published_date=snapshot.time_tag_published_date,
             )
         )
         return RegistrationResult(

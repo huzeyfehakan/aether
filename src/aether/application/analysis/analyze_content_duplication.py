@@ -105,13 +105,21 @@ class AnalyzeContentDuplication:
                     )
                 )
 
-        stored_versions = self._content_repository.count_article_versions_for_publisher(
-            article.publisher
+        # Name the version to leave out rather than subtracting one from the
+        # total. A draft is already absent from the corpus it is compared
+        # against, so subtracting it again discounted a real article: with one
+        # published article a draft reported nothing to compare against, and
+        # the review then listed repeated text as a check it had not run,
+        # while the comparison had in fact run and found matches.
+        compared_article_count = (
+            self._content_repository.count_article_versions_for_publisher(
+                article.publisher, excluding=article_version_id
+            )
         )
         return ContentDuplicationAnalysis(
             article_id=article.article_id,
             article_version_id=article_version.article_version_id,
-            compared_article_count=max(0, stored_versions - 1),
+            compared_article_count=compared_article_count,
             total_passage_count=len(passages),
             # Most-repeated first, then document order, so the ordering is
             # stable and the clearest boilerplate surfaces first.

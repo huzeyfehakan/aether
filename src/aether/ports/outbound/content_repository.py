@@ -21,11 +21,18 @@ class ContentRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def count_article_versions_for_publisher(self, publisher: str) -> int:
-        """Number of stored article versions belonging to one publisher.
+    def count_article_versions_for_publisher(
+        self, publisher: str, excluding: Optional[str] = None
+    ) -> int:
+        """Number of stored article versions one publisher can be compared with.
 
         Comparisons across articles are only as trustworthy as the number of
         articles available, so callers report this alongside any finding.
+
+        ``excluding`` names the version being analysed, which is never part of
+        what it is compared against. Callers state it rather than subtracting
+        one from the total: a version the corpus already excludes, such as a
+        draft, must not be subtracted a second time.
         """
         raise NotImplementedError
 
@@ -38,6 +45,10 @@ class ContentRepository(ABC):
         Every requested fingerprint appears in the result. Version ids are
         sorted so that callers observe a stable order.
         """
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_articles_by_publisher(self, publisher: str) -> Tuple[Article, ...]:
         raise NotImplementedError
 
     @abstractmethod

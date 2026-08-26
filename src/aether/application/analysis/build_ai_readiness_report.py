@@ -659,47 +659,36 @@ class BuildAIReadinessReport:
         links = report.internal_link_analysis
         structural = report.structural_analysis
         
-        outgoing_links = None
-        body_links = None
-        body_link_density = None
-        unique_targets = None
+        body_link_saturation = None
+        unique_target_ratio = None
+        
         if links is not None:
-            outgoing_links = float(links.outgoing_link_count)
-            body_links = float(links.body_link_count)
-            unique_targets = float(links.unique_target_count)
             if structural and structural.total_passage_count > 0:
-                body_link_density = links.body_link_count / structural.total_passage_count
+                density = links.body_link_count / structural.total_passage_count
+                body_link_saturation = (density / (1 + density)) * 100.0
             else:
-                body_link_density = 0.0
+                body_link_saturation = 0.0
+                
+            if links.body_link_count > 0:
+                unique_target_ratio = (links.unique_target_count / links.body_link_count) * 100.0
+            else:
+                unique_target_ratio = 0.0
 
         return ScoreDimensionDetail(
             label="Discoverability",
             dimension_score=dimension_score,
             signals=(
                 ScoreSignalDetail(
-                    label="Body links",
-                    value=body_links,
-                    explanation="Count of outgoing links retained in the article body",
-                    kind=SignalKind.COUNT,
+                    label="Body link saturation",
+                    value=body_link_saturation,
+                    explanation="Score contribution based on body link density",
+                    kind=SignalKind.RATIO,
                 ),
                 ScoreSignalDetail(
-                    label="Outgoing links",
-                    value=outgoing_links,
-                    explanation="Count of all outgoing links",
-                    kind=SignalKind.COUNT,
-                    is_context=True,
-                ),
-                ScoreSignalDetail(
-                    label="Body link density",
-                    value=body_link_density,
-                    explanation="Body links per passage",
-                    kind=SignalKind.MEASUREMENT,
-                ),
-                ScoreSignalDetail(
-                    label="Unique targets",
-                    value=unique_targets,
-                    explanation="Count of unique outgoing link targets",
-                    kind=SignalKind.COUNT,
+                    label="Unique target ratio",
+                    value=unique_target_ratio,
+                    explanation="Ratio of unique link targets to total body links",
+                    kind=SignalKind.RATIO,
                     is_context=True,
                 ),
             ),

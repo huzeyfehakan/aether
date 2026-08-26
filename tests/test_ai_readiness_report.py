@@ -428,7 +428,7 @@ class AIReadinessReportTests(unittest.TestCase):
         self.assertAlmostEqual(signals["Structured content ratio"], 20 / 120 * 100.0)
         self.assertEqual(signals["Answered question ratio"], 75.0)
 
-    def test_discoverability_detail_exposes_link_counts_and_used_ratio(self):
+    def test_discoverability_detail_exposes_saturation_ratios(self):
         report = BuildAIReadinessReport().execute(
             self.assessment_with_entity_authority_signals()
         )
@@ -437,10 +437,8 @@ class AIReadinessReportTests(unittest.TestCase):
             for signal in report.assessment_summary.geo_score.discoverability_detail.signals
         }
 
-        self.assertEqual(signals["Body links"], 2.0)
-        self.assertEqual(signals["Outgoing links"], 2.0)
-        self.assertEqual(signals["Body link density"], 1.0) # 2 links / 2 passages
-        self.assertEqual(signals["Unique targets"], 2.0)
+        self.assertEqual(signals["Body link saturation"], 50.0) # 1.0 / 2.0 * 100
+        self.assertEqual(signals["Unique target ratio"], 100.0) # 2 targets / 2 body links
 
 
 if __name__ == "__main__":n+    unittest.main()

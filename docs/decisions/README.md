@@ -34,6 +34,8 @@ decision without a stated reopening condition becomes dogma.
 | [0009](0009-anchor-title-comparison-on-whole-values.md) | Anchor title comparison on whole declared values |
 | [0010](0010-thresholded-article-opening-prototype.md) | Thresholded article-opening prototype |
 | [0011](0011-dual-scoring-supersedes-0003.md) | Dual Scoring System (SEO and GEO) |
+| [0012](0012-breakdown-items-formatting.md) | Breakdown items are typed as scores, ratios, or counts |
+| [0013](0013-discoverability-uses-paragraph-density.md) | Discoverability score uses paragraph-based density saturation |
 
 ## Rejected ideas, and where they live
 

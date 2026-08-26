@@ -409,7 +409,7 @@ class WebPresentationTests(unittest.TestCase):
                 signal["label"]
                 for signal in geo_score["discoverability"]["detail"]["signals"]
             ],
-            ["Outgoing links", "Body links", "Body link ratio", "Unique targets"],
+            ["Body links", "Outgoing links", "Body link density", "Unique targets"],
         )
 
     def test_all_score_cards_have_accessible_toggles_and_detail_rows(self):

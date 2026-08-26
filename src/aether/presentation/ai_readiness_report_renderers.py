@@ -276,14 +276,28 @@ class PlainTextAIReadinessReportRenderer:
     def _score_detail_lines(detail) -> tuple:
         return tuple(
             f"   - {signal.label}: "
-            f"{PlainTextAIReadinessReportRenderer._detail_value(signal.value)}"
+            f"{PlainTextAIReadinessReportRenderer._detail_value(signal)}"
             for signal in detail.signals
         )
 
     @staticmethod
-    def _detail_value(value) -> str:
+    def _detail_value(signal) -> str:
+        value = signal.value
         if value is None:
             return "Not measured"
+            
+        from aether.application.analysis.build_ai_readiness_report import SignalKind
+        if signal.kind == SignalKind.SCORE:
+            return f"{value:.1f} / 100"
+        elif signal.kind == SignalKind.RATIO:
+            return f"%{value:.1f}"
+        elif signal.kind == SignalKind.COUNT:
+            if isinstance(value, float) or isinstance(value, int):
+                return f"{int(value):,}".replace(",", ".")
+            return str(value)
+        elif signal.kind == SignalKind.MEASUREMENT:
+            return f"{value:.1f}" if isinstance(value, float) else str(value)
+            
         return f"{value:.1f}" if isinstance(value, (int, float)) else str(value)
 
     @staticmethod
@@ -507,16 +521,32 @@ class MarkdownAIReadinessReportRenderer:
 
     @staticmethod
     def _markdown_score_detail_lines(detail) -> tuple:
-        return tuple(
-            f"  - {signal.label}: "
-            f"{MarkdownAIReadinessReportRenderer._detail_value(signal.value)}"
-            for signal in detail.signals
-        )
+        def format_signal(signal):
+            val_str = MarkdownAIReadinessReportRenderer._detail_value(signal)
+            if signal.is_context:
+                return f"  - *{signal.label}*: {val_str}"
+            return f"  - **{signal.label}**: {val_str}"
+            
+        return tuple(format_signal(signal) for signal in detail.signals)
 
     @staticmethod
-    def _detail_value(value) -> str:
+    def _detail_value(signal) -> str:
+        value = signal.value
         if value is None:
             return "Not measured"
+            
+        from aether.application.analysis.build_ai_readiness_report import SignalKind
+        if signal.kind == SignalKind.SCORE:
+            return f"{value:.1f} / 100"
+        elif signal.kind == SignalKind.RATIO:
+            return f"%{value:.1f}"
+        elif signal.kind == SignalKind.COUNT:
+            if isinstance(value, float) or isinstance(value, int):
+                return f"{int(value):,}".replace(",", ".")
+            return str(value)
+        elif signal.kind == SignalKind.MEASUREMENT:
+            return f"{value:.1f}" if isinstance(value, float) else str(value)
+            
         return f"{value:.1f}" if isinstance(value, (int, float)) else str(value)
 
     @staticmethod

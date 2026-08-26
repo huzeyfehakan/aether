@@ -437,9 +437,9 @@ class AIReadinessReportTests(unittest.TestCase):
             for signal in report.assessment_summary.geo_score.discoverability_detail.signals
         }
 
-        self.assertEqual(signals["Outgoing links"], 2.0)
         self.assertEqual(signals["Body links"], 2.0)
-        self.assertEqual(signals["Body link ratio"], 100.0)
+        self.assertEqual(signals["Outgoing links"], 2.0)
+        self.assertEqual(signals["Body link density"], 1.0) # 2 links / 2 passages
         self.assertEqual(signals["Unique targets"], 2.0)
 
 

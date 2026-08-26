@@ -3,6 +3,14 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple, Union
 
+from enum import Enum
+
+class SignalKind(Enum):
+    SCORE = "SCORE"
+    RATIO = "RATIO"
+    COUNT = "COUNT"
+    MEASUREMENT = "MEASUREMENT"
+
 from aether.application.analysis.analyze_content_duplication import RepeatedPassage
 from aether.application.analysis.analyze_passage_quality import PassageProfile
 from aether.application.analysis.assess_ai_readiness import (
@@ -76,6 +84,8 @@ class ScoreSignalDetail:
     label: str
     value: Optional[Union[float, str]]
     explanation: str
+    kind: Optional[SignalKind] = None
+    is_context: bool = False
 
 
 @dataclass(frozen=True)
@@ -647,43 +657,50 @@ class BuildAIReadinessReport:
         report, dimension_score: Optional[float]
     ) -> ScoreDimensionDetail:
         links = report.internal_link_analysis
+        structural = report.structural_analysis
+        
         outgoing_links = None
         body_links = None
-        body_link_ratio = None
+        body_link_density = None
         unique_targets = None
         if links is not None:
             outgoing_links = float(links.outgoing_link_count)
             body_links = float(links.body_link_count)
             unique_targets = float(links.unique_target_count)
-            body_link_ratio = (
-                links.body_link_count / links.outgoing_link_count * 100.0
-                if links.outgoing_link_count > 0
-                else 0.0
-            )
+            if structural and structural.total_passage_count > 0:
+                body_link_density = links.body_link_count / structural.total_passage_count
+            else:
+                body_link_density = 0.0
 
         return ScoreDimensionDetail(
             label="Discoverability",
             dimension_score=dimension_score,
             signals=(
                 ScoreSignalDetail(
-                    label="Outgoing links",
-                    value=outgoing_links,
-                    explanation="Count of outgoing links",
-                ),
-                ScoreSignalDetail(
                     label="Body links",
                     value=body_links,
                     explanation="Count of outgoing links retained in the article body",
+                    kind=SignalKind.COUNT,
                 ),
                 ScoreSignalDetail(
-                    label="Body link ratio",
-                    value=body_link_ratio,
-                    explanation="Body links divided by outgoing links",
+                    label="Outgoing links",
+                    value=outgoing_links,
+                    explanation="Count of all outgoing links",
+                    kind=SignalKind.COUNT,
+                    is_context=True,
+                ),
+                ScoreSignalDetail(
+                    label="Body link density",
+                    value=body_link_density,
+                    explanation="Body links per passage",
+                    kind=SignalKind.MEASUREMENT,
                 ),
                 ScoreSignalDetail(
                     label="Unique targets",
                     value=unique_targets,
                     explanation="Count of unique outgoing link targets",
+                    kind=SignalKind.COUNT,
+                    is_context=True,
                 ),
             ),
         )

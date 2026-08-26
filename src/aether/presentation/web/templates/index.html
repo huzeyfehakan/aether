@@ -49,6 +49,7 @@
       .geo-signal-row strong { flex: 0 1 55%; font-size: .86rem; min-width: 0; overflow-wrap: normal; text-align: right; white-space: normal; word-break: normal; }
       .geo-signal-row-stacked { align-items: flex-start; flex-direction: column; }
       .geo-signal-row-stacked strong { flex: none; max-width: 100%; text-align: left; }
+      .geo-signal-context { opacity: 0.6; }
       @media (max-width: 640px) { .shell { width: min(100% - 28px, 1120px); padding-top: 30px; } .form-panel, #report-card { padding: 19px; } .tabs { overflow-x: auto; } .geo-signal-row { align-items: flex-start; flex-direction: column; } .geo-signal-row strong { flex: none; max-width: 100%; text-align: left; } }
     </style>
   </head>
@@ -183,14 +184,24 @@
       const statusBadge = (value) => `<span class="badge ${value}">${titleCase(value)}</span>`;
       const metric = (label, value) => `<div class="metric-card"><p>${label}</p><strong>${value}</strong></div>`;
       const scoreValue = (value) => value !== null ? `${value.toFixed(1)} / 100` : 'Not measured';
-      const signalValue = (value) => value === null
-        ? 'Not measured'
-        : (typeof value === 'number' ? value.toFixed(1) : value);
-      const signalRowClass = (value) => {
+      const signalValue = (signal) => {
+        if (signal.value === null) return 'Not measured';
+        const kind = signal.kind ? signal.kind.split('.').pop() : null; // Handle Enum string
+        if (kind === 'SCORE') return `${signal.value.toFixed(1)} / 100`;
+        if (kind === 'RATIO') return `%${signal.value.toFixed(1)}`;
+        if (kind === 'COUNT') return Math.round(signal.value).toLocaleString('en-US'); // Fall back to simple JS locale
+        return typeof signal.value === 'number' ? signal.value.toFixed(1) : signal.value;
+      };
+      const signalRowClass = (signal) => {
+        const value = signal.value;
         const textual = typeof value === 'string' ? value : '';
-        return textual.includes(',') || textual.length > 40
+        let cls = textual.includes(',') || textual.length > 40
           ? 'geo-signal-row geo-signal-row-stacked'
           : 'geo-signal-row';
+        if (signal.is_context) {
+          cls += ' geo-signal-context';
+        }
+        return cls;
       };
       const scoreDimensionCard = (dimension, scoreType) => {
         if (!dimension.detail) {
@@ -198,8 +209,8 @@
         }
         const detailId = `${scoreType}-${dimension.key.replaceAll('_', '-')}-detail`;
         const rows = dimension.detail.signals.map((signal) => `
-          <li class="${signalRowClass(signal.value)}" title="${signal.explanation}">
-            <span>&bull; ${signal.label}</span><strong>${signalValue(signal.value)}</strong>
+          <li class="${signalRowClass(signal)}" title="${signal.explanation}">
+            <span>&bull; ${signal.label}</span><strong>${signalValue(signal)}</strong>
           </li>
         `).join('');
         return `<div class="metric-card">

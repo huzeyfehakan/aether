@@ -80,6 +80,10 @@ def _score_mapping(score) -> dict:
             "weighted_contribution": score.discoverability.weighted_contribution,
         }
     for dimension_name in (
+        "entity_coverage",
+        "structured_data",
+        "semantic_quality",
+        "technical_access",
         "semantic_completeness",
         "entity_authority",
         "structural_richness",
@@ -145,6 +149,16 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
             ),
             "included_in_score": False,
         },
+        "passage_balance_diagnostic": {
+            "ratio": report.passage_balance_diagnostic.ratio,
+            "included_in_score": report.passage_balance_diagnostic.included_in_score,
+        },
+        "direct_answer_coverage_diagnostic": {
+            "ratio": report.direct_answer_coverage_diagnostic.ratio,
+            "included_in_score": (
+                report.direct_answer_coverage_diagnostic.included_in_score
+            ),
+        },
         "content_reuse": (
             None
             if report.content_reuse_summary is None
@@ -206,24 +220,42 @@ class PlainTextAIReadinessReportRenderer:
             "SEO Score",
             f" Total Score: {seo.total}",
             f" - Entity Coverage ({seo.entity_coverage.weight_percentage}%): {'N/A' if seo.entity_coverage.dimension_score is None else f'{seo.entity_coverage.dimension_score:.1f}'}",
+            *self._score_detail_lines(seo.entity_coverage_detail),
             f" - Structured Data ({seo.structured_data.weight_percentage}%): {'N/A' if seo.structured_data.dimension_score is None else f'{seo.structured_data.dimension_score:.1f}'}",
+            *self._score_detail_lines(seo.structured_data_detail),
             f" - Semantic Quality ({seo.semantic_quality.weight_percentage}%): {'N/A' if seo.semantic_quality.dimension_score is None else f'{seo.semantic_quality.dimension_score:.1f}'}",
+            *self._score_detail_lines(seo.semantic_quality_detail),
             f" - Technical Access ({seo.technical_access.weight_percentage}%): {'N/A' if seo.technical_access.dimension_score is None else f'{seo.technical_access.dimension_score:.1f}'}",
+            *self._score_detail_lines(seo.technical_access_detail),
             "",
             "GEO Score (Generative Engine Optimization)",
             f" Total Score: {geo.total}",
             f" - Semantic Completeness ({geo.semantic_completeness.weight_percentage}%): {'N/A' if geo.semantic_completeness.dimension_score is None else f'{geo.semantic_completeness.dimension_score:.1f}'}",
-            *self._geo_detail_lines(geo.semantic_completeness_detail),
+            *self._score_detail_lines(geo.semantic_completeness_detail),
             f" - Entity Authority ({geo.entity_authority.weight_percentage}%): {'N/A' if geo.entity_authority.dimension_score is None else f'{geo.entity_authority.dimension_score:.1f}'}",
-            *self._geo_detail_lines(geo.entity_authority_detail),
+            *self._score_detail_lines(geo.entity_authority_detail),
             f" - Structural Richness ({geo.structural_richness.weight_percentage}%): {'N/A' if geo.structural_richness.dimension_score is None else f'{geo.structural_richness.dimension_score:.1f}'}",
-            *self._geo_detail_lines(geo.structural_richness_detail),
+            *self._score_detail_lines(geo.structural_richness_detail),
             f" - Discoverability ({geo.discoverability.weight_percentage}%): {'N/A' if geo.discoverability.dimension_score is None else f'{geo.discoverability.dimension_score:.1f}'}",
-            *self._geo_detail_lines(geo.discoverability_detail),
+            *self._score_detail_lines(geo.discoverability_detail),
             "",
             "Passage Extractability — Experimental Diagnostic",
             "Not included in score",
             *self._passage_diagnostic_lines(report.passage_quality_summary),
+            "",
+            "Passage Balance — Experimental Diagnostic",
+            "Not included in score",
+            " Value: "
+            + self._percentage_or_not_measured(
+                report.passage_balance_diagnostic.ratio
+            ),
+            "",
+            "Direct Answer Coverage — Experimental Diagnostic",
+            "Not included in score",
+            " Value: "
+            + self._percentage_or_not_measured(
+                report.direct_answer_coverage_diagnostic.ratio
+            ),
             "",
             "Structural Summary",
             f"Total Passages: {structural.total_passage_count}",
@@ -241,12 +273,18 @@ class PlainTextAIReadinessReportRenderer:
         return "\n".join(list(lines) + list(self._recommendation_lines(report)))
 
     @staticmethod
-    def _geo_detail_lines(detail) -> tuple:
+    def _score_detail_lines(detail) -> tuple:
         return tuple(
             f"   - {signal.label}: "
-            f"{'Not measured' if signal.value is None else f'{signal.value:.1f}'}"
+            f"{PlainTextAIReadinessReportRenderer._detail_value(signal.value)}"
             for signal in detail.signals
         )
+
+    @staticmethod
+    def _detail_value(value) -> str:
+        if value is None:
+            return "Not measured"
+        return f"{value:.1f}" if isinstance(value, (int, float)) else str(value)
 
     @staticmethod
     def _passage_diagnostic_lines(summary) -> tuple:
@@ -260,6 +298,10 @@ class PlainTextAIReadinessReportRenderer:
             rate_line(256, summary.oversized_passage_rate_256),
             rate_line(512, summary.oversized_passage_rate_512),
         )
+
+    @staticmethod
+    def _percentage_or_not_measured(value) -> str:
+        return "Not measured" if value is None else f"{value * 100.0:.1f}%"
 
     @staticmethod
     def _structured_data_lines(report: AIReadinessReport) -> tuple:
@@ -383,21 +425,25 @@ class MarkdownAIReadinessReportRenderer:
             f"**Total Score: {seo.total} / 100**",
             "",
             f"- **Entity Coverage ({seo.entity_coverage.weight_percentage}%)**: {'N/A' if seo.entity_coverage.dimension_score is None else f'{seo.entity_coverage.dimension_score:.1f}'}",
+            *self._markdown_score_detail_lines(seo.entity_coverage_detail),
             f"- **Structured Data ({seo.structured_data.weight_percentage}%)**: {'N/A' if seo.structured_data.dimension_score is None else f'{seo.structured_data.dimension_score:.1f}'}",
+            *self._markdown_score_detail_lines(seo.structured_data_detail),
             f"- **Semantic Quality ({seo.semantic_quality.weight_percentage}%)**: {'N/A' if seo.semantic_quality.dimension_score is None else f'{seo.semantic_quality.dimension_score:.1f}'}",
+            *self._markdown_score_detail_lines(seo.semantic_quality_detail),
             f"- **Technical Access ({seo.technical_access.weight_percentage}%)**: {'N/A' if seo.technical_access.dimension_score is None else f'{seo.technical_access.dimension_score:.1f}'}",
+            *self._markdown_score_detail_lines(seo.technical_access_detail),
             "",
             "## GEO Score (Generative Engine Optimization)",
             f"**Total Score: {geo.total} / 100**",
             "",
             f"- **Semantic Completeness ({geo.semantic_completeness.weight_percentage}%)**: {'N/A' if geo.semantic_completeness.dimension_score is None else f'{geo.semantic_completeness.dimension_score:.1f}'}",
-            *self._markdown_geo_detail_lines(geo.semantic_completeness_detail),
+            *self._markdown_score_detail_lines(geo.semantic_completeness_detail),
             f"- **Entity Authority ({geo.entity_authority.weight_percentage}%)**: {'N/A' if geo.entity_authority.dimension_score is None else f'{geo.entity_authority.dimension_score:.1f}'}",
-            *self._markdown_geo_detail_lines(geo.entity_authority_detail),
+            *self._markdown_score_detail_lines(geo.entity_authority_detail),
             f"- **Structural Richness ({geo.structural_richness.weight_percentage}%)**: {'N/A' if geo.structural_richness.dimension_score is None else f'{geo.structural_richness.dimension_score:.1f}'}",
-            *self._markdown_geo_detail_lines(geo.structural_richness_detail),
+            *self._markdown_score_detail_lines(geo.structural_richness_detail),
             f"- **Discoverability ({geo.discoverability.weight_percentage}%)**: {'N/A' if geo.discoverability.dimension_score is None else f'{geo.discoverability.dimension_score:.1f}'}",
-            *self._markdown_geo_detail_lines(geo.discoverability_detail),
+            *self._markdown_score_detail_lines(geo.discoverability_detail),
             "",
             "## Passage Extractability — Experimental Diagnostic",
             "",
@@ -407,6 +453,24 @@ class MarkdownAIReadinessReportRenderer:
             f"- >128 words oversized passage rate: {self._percentage_or_not_measured(passage_quality.oversized_passage_rate_128)}",
             f"- >256 words oversized passage rate: {self._percentage_or_not_measured(passage_quality.oversized_passage_rate_256)}",
             f"- >512 words oversized passage rate: {self._percentage_or_not_measured(passage_quality.oversized_passage_rate_512)}",
+            "",
+            "## Passage Balance — Experimental Diagnostic",
+            "",
+            "Not included in score.",
+            "",
+            "- Value: "
+            + self._percentage_or_not_measured(
+                report.passage_balance_diagnostic.ratio
+            ),
+            "",
+            "## Direct Answer Coverage — Experimental Diagnostic",
+            "",
+            "Not included in score.",
+            "",
+            "- Value: "
+            + self._percentage_or_not_measured(
+                report.direct_answer_coverage_diagnostic.ratio
+            ),
             "",
             "## Structural Summary",
             "",
@@ -442,12 +506,18 @@ class MarkdownAIReadinessReportRenderer:
         return "\n".join(lines)
 
     @staticmethod
-    def _markdown_geo_detail_lines(detail) -> tuple:
+    def _markdown_score_detail_lines(detail) -> tuple:
         return tuple(
             f"  - {signal.label}: "
-            f"{'Not measured' if signal.value is None else f'{signal.value:.1f}'}"
+            f"{MarkdownAIReadinessReportRenderer._detail_value(signal.value)}"
             for signal in detail.signals
         )
+
+    @staticmethod
+    def _detail_value(value) -> str:
+        if value is None:
+            return "Not measured"
+        return f"{value:.1f}" if isinstance(value, (int, float)) else str(value)
 
     @staticmethod
     def _percentage_or_not_measured(value) -> str:

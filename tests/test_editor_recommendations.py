@@ -16,6 +16,9 @@ from aether.application.analysis.analyze_article_structure import (  # noqa: E40
 from aether.application.analysis.analyze_content_duplication import (  # noqa: E402
     AnalyzeContentDuplication,
 )
+from aether.application.analysis.analyze_declared_consistency import (  # noqa: E402
+    AnalyzeDeclaredConsistency,
+)
 from aether.application.analysis.analyze_passage_quality import (  # noqa: E402
     AnalyzePassageQuality,
 )
@@ -114,6 +117,46 @@ class EditorRecommendationTests(unittest.TestCase):
             report, RecommendationCode.MISSING_LAST_MODIFIED_DATE
         )[0]
         self.assertEqual(recommendation.category, RecommendationCategory.TECHNICAL)
+
+    def test_consistency_disagreement_aligns_technical_score_and_recommendation(self):
+        registration = self.register.execute(
+            RawHtmlArticle(
+                html="""
+                    <html lang="tr"><head>
+                      <title>Birinci başlık</title>
+                      <meta property="og:title" content="Tamamen farklı başlık">
+                      <meta name="description" content="Birinci açıklama">
+                      <meta property="og:description" content="Tamamen farklı açıklama">
+                    </head><body><main><p>Özgün paragraf.</p></main></body></html>
+                """,
+                source_url="https://example.com/tutarsiz",
+                publisher="Example",
+                article_type="news_report",
+                observed_at=OBSERVED_AT,
+            )
+        )
+        analysis = BuildArticleAnalysisReport(
+            AnalyzeArticleStructure(self.repository),
+            AnalyzeArticleMetadata(self.repository),
+            AnalyzePassageQuality(self.repository),
+            declared_consistency_analysis=AnalyzeDeclaredConsistency(
+                self.repository
+            ),
+        ).execute(
+            registration.article,
+            registration.article_version.article_version_id,
+        )
+        report = BuildAIReadinessReport().execute(
+            AssessAIReadiness().execute(analysis)
+        )
+        codes = {item.code for item in report.editor_recommendations}
+
+        self.assertEqual(
+            report.assessment_summary.seo_score.technical_access.dimension_score,
+            0.0,
+        )
+        self.assertIn(RecommendationCode.TITLE_SOURCES_DISAGREE, codes)
+        self.assertIn(RecommendationCode.DESCRIPTION_SOURCES_DISAGREE, codes)
 
     def test_every_metadata_recommendation_names_a_concrete_action(self):
         """Naming the gap is not advice; the editor must know what to do."""
@@ -294,6 +337,36 @@ class EditorRecommendationTests(unittest.TestCase):
             self.assertNotIn(claim, wording)
         for jargon in ("passage", "corpus", "fingerprint"):
             self.assertNotIn(jargon, wording)
+
+    def test_content_bloat_no_longer_depends_on_direct_answer_coverage(self):
+        html = """
+            <html lang="tr"><head><title>Doğrudan cevap</title></head><body><main>
+              <h2>Bu yöntem güvenli mi?</h2>
+              <p>Evet.</p>
+              <p>İkinci uzunluk paragrafı.</p>
+              <p>Üçüncü uzunluk paragrafı.</p>
+              <p>Dördüncü uzunluk paragrafı.</p>
+            </main></body></html>
+        """
+        article = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url="https://example.org/direct-answer-gap",
+                publisher="Example",
+                article_type="news_report",
+                observed_at=OBSERVED_AT,
+            )
+        )
+
+        report = self.report_for(article)
+        recommendation = self.of_code(
+            report, RecommendationCode.CONTENT_BLOAT
+        )[0]
+        wording = recommendation_text(recommendation).why_it_matters.lower()
+
+        self.assertIn("share vocabulary", wording)
+        self.assertNotIn("directly answer", wording)
+        self.assertNotIn("definitive stance", wording)
 
 
 if __name__ == "__main__":

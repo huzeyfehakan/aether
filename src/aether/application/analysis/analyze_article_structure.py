@@ -23,7 +23,7 @@ class ArticleStructuralAnalysis:
     answered_question_heading_count: int
     unanswered_question_heading_count: int
     heading_passage_overlap_ratio: Optional[float] = None
-    definitive_stance_ratio: Optional[float] = None
+    direct_answer_coverage_ratio: Optional[float] = None
     #: None when no paragraph names an entity: there is no population to take
     #: the ratio over, and 0.0 read as "every entity is supported".
     unsupported_entity_ratio: Optional[float] = None
@@ -79,7 +79,7 @@ class AnalyzeArticleStructure:
             answered_question_heading_count=source_data.answered_question_heading_count,
             unanswered_question_heading_count=source_data.unanswered_question_heading_count,
             heading_passage_overlap_ratio=source_data.heading_passage_overlap_ratio,
-            definitive_stance_ratio=source_data.definitive_stance_ratio,
+            direct_answer_coverage_ratio=source_data.direct_answer_coverage_ratio,
             unsupported_entity_ratio=unsupported_ratio,
         )
 

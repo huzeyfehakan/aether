@@ -252,9 +252,13 @@ class DeriveEditorRecommendations:
 
         # Content Bloat & Unsupported Entities
         if report.structural_analysis is not None:
-            if report.structural_analysis.heading_passage_overlap_ratio == 0.0 and report.structural_analysis.definitive_stance_ratio == 0.0:
-                if report.structural_analysis.total_passage_count > 3: # Only for longer articles
-                    recommendations.append(EditorRecommendation(code=RecommendationCode.CONTENT_BLOAT))
+            if (
+                report.structural_analysis.heading_passage_overlap_ratio == 0.0
+                and report.structural_analysis.total_passage_count > 3
+            ):
+                recommendations.append(
+                    EditorRecommendation(code=RecommendationCode.CONTENT_BLOAT)
+                )
             unsupported = report.structural_analysis.unsupported_entity_ratio
             if unsupported is not None and unsupported > 0.0:
                 recommendations.append(EditorRecommendation(code=RecommendationCode.UNSUPPORTED_ENTITIES))

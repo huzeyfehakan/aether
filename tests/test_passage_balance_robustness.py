@@ -1,15 +1,16 @@
 """Diagnostic characterization of Passage Balance sensitivity.
 
-These tests intentionally preserve the current formula and scoring behavior.
-They do not define an editorially correct balance; they measure how HTML
-paragraph boundaries and non-article paragraphs affect the existing result.
+These tests do not define an editorially correct balance. They characterize
+how HTML paragraph boundaries affect the diagnostic itself and distinguish
+remaining score sensitivity from the diagnostic's now-removed score path.
 """
 
 import sys
 import unittest
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from statistics import fmean, median, pstdev
+from unittest.mock import patch
 
 sys.path.insert(0, "src")
 
@@ -20,7 +21,7 @@ from aether.presentation.web.app import AIReadinessPipeline  # noqa: E402
 
 
 TRT_FIXTURE = (
-    Path(__file__).parent / "fixtures" / "trt_ebeveyn_akademisi_makale.html"
+    Path(__file__).parent / "fixtures" / "trt_ebeveyn_belgeseller_nuxt.html"
 )
 
 
@@ -31,6 +32,7 @@ class BenchmarkResult:
     passage_balance_ratio: float
     semantic_completeness: float
     geo_score: int
+    oversized_rates: tuple
 
 
 @dataclass(frozen=True)
@@ -188,9 +190,11 @@ LONG_OUTLIER_HTML = _article_html(
 
 
 class PassageBalanceRobustnessBenchmarkTests(unittest.TestCase):
-    def measure(self, name: str, html: str) -> BenchmarkResult:
+    def measure(
+        self, name: str, html: str, source_url: str | None = None
+    ) -> BenchmarkResult:
         pipeline = AIReadinessPipeline()
-        source_url = f"https://benchmark.example/{name}"
+        source_url = source_url or f"https://benchmark.example/{name}"
         report = pipeline.analyze_report(
             html=html,
             source_url=source_url,
@@ -216,6 +220,11 @@ class PassageBalanceRobustnessBenchmarkTests(unittest.TestCase):
                 report.assessment_summary.geo_score.semantic_completeness.dimension_score
             ),
             geo_score=report.assessment_summary.geo_score.total,
+            oversized_rates=(
+                passage_quality.oversized_passage_rate_128,
+                passage_quality.oversized_passage_rate_256,
+                passage_quality.oversized_passage_rate_512,
+            ),
         )
 
     def benchmark_results(self):
@@ -243,7 +252,7 @@ class PassageBalanceRobustnessBenchmarkTests(unittest.TestCase):
             for name, result in results.items()
         }
 
-    def test_same_prose_changes_scores_when_only_paragraph_boundaries_change(self):
+    def test_same_prose_changes_balance_and_exposes_other_segmentation_sensitivity(self):
         results = self.benchmark_results()
         natural = results["natural"]
         single = results["single_paragraph"]
@@ -257,6 +266,8 @@ class PassageBalanceRobustnessBenchmarkTests(unittest.TestCase):
             over_segmented.passage_balance_ratio,
             natural.passage_balance_ratio,
         )
+        # Remaining score differences are retained rather than hidden: sentence
+        # segmentation still changes the separately scored Fluency signal.
         self.assertNotEqual(single.semantic_completeness, natural.semantic_completeness)
         self.assertNotEqual(single.geo_score, natural.geo_score)
 
@@ -273,19 +284,40 @@ class PassageBalanceRobustnessBenchmarkTests(unittest.TestCase):
             (3, 1, 8, 6, 3),
         )
 
-    def test_trt_fixture_characterizes_passage_balance_population(self):
-        result = self.measure("trt-ebeveyn", TRT_FIXTURE.read_text(encoding="utf-8"))
+    def test_passage_balance_alone_cannot_change_semantic_or_geo_score(self):
+        original_execute = AnalyzePassageQuality.execute
+        scores = []
+        for ratio in (0.0, 0.25, 0.5, 0.75, 1.0):
+            def execute_with_ratio(analyzer, article, version_id, value=ratio):
+                return replace(
+                    original_execute(analyzer, article, version_id),
+                    passage_balance_ratio=value,
+                )
 
-        self.assertEqual(
-            result.passage_texts,
-            (
-                "3 Ağustos 2026",
-                "Aşırı uyumlu çocuklar çoğu zaman çevre tarafından kolay çocuk olarak tanımlanır.",
-                "Bu uyumun ardında çoğu zaman fark edilmeyen bir kaygı yatar.",
-                "Prof. Dr. Funda Gümüştaş",
-                "Bu içerik bilgilendirme amaçlı hazırlanmıştır.",
+            with self.subTest(passage_balance_ratio=ratio), patch.object(
+                AnalyzePassageQuality,
+                "execute",
+                execute_with_ratio,
+            ):
+                result = self.measure(f"balance-{ratio}", NATURAL_HTML)
+                scores.append((result.semantic_completeness, result.geo_score))
+
+        self.assertEqual(len(set(scores)), 1)
+
+    def test_trt_fixture_characterizes_passage_balance_population(self):
+        result = self.measure(
+            "trt-ebeveyn",
+            TRT_FIXTURE.read_text(encoding="utf-8"),
+            source_url=(
+                "https://ebeveynakademisi.trtcocuk.net.tr/makale/"
+                "cocuk-icin-belgeseller-ve-sinema-filmleri-29038861"
             ),
         )
+
+        self.assertEqual(len(result.passage_texts), 11)
+        self.assertEqual(sum(result.word_counts), 343)
+        self.assertAlmostEqual(result.passage_balance_ratio, 0.32822966507177037)
+        self.assertEqual(result.oversized_rates, (0.0, 0.0, 0.0))
 
     def test_candidate_metrics_characterize_shared_html_variants(self):
         results = self.benchmark_results()

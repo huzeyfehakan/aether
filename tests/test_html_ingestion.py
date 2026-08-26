@@ -184,20 +184,105 @@ class RawHtmlIngestionTests(unittest.TestCase):
             <body><main><p>Gerçek içerik.</p></main></body></html>
         """)
         self.assertIsNone(no_heading.heading_passage_overlap_ratio)
-        self.assertIsNone(no_heading.definitive_stance_ratio)
+        self.assertIsNone(no_heading.direct_answer_coverage_ratio)
 
         no_overlap = self.metric_source_data("""
             <html lang="tr"><head><title>Başlık</title></head>
             <body><main><h2>Çocuk gelişimi</h2><p>Bambaşka sözcükler.</p></main></body></html>
         """)
         self.assertEqual(no_overlap.heading_passage_overlap_ratio, 0.0)
-        self.assertIsNone(no_overlap.definitive_stance_ratio)
+        self.assertIsNone(no_overlap.direct_answer_coverage_ratio)
 
         question_without_yes_no = self.metric_source_data("""
             <html lang="tr"><head><title>Başlık</title></head>
             <body><main><h2>Çocuk gelişir mi?</h2><p>Çocuk zamanla gelişir.</p></main></body></html>
         """)
-        self.assertEqual(question_without_yes_no.definitive_stance_ratio, 0.0)
+        self.assertEqual(question_without_yes_no.direct_answer_coverage_ratio, 0.0)
+
+    def test_direct_answer_coverage_supports_bounded_question_types(self):
+        examples = (
+            (
+                "Ayılar neden saldırıyor?",
+                "Ayılar kendilerini tehdit altında hissettikleri için değil, açlık nedeniyle saldırabilir.",
+                1.0,
+            ),
+            (
+                "Ayılar neden saldırıyor?",
+                "Ayılar dünyanın birçok bölgesinde yaşayan büyük memelilerdir.",
+                0.0,
+            ),
+            (
+                "Ayılar neden saldırıyor?",
+                "Çünkü hava bugün çok sıcak.",
+                0.0,
+            ),
+            (
+                "Algoritma nedir?",
+                "Algoritma, bir problemi çözmek için izlenen adımları ifade eder.",
+                1.0,
+            ),
+            ("Algoritma nedir?", "Bahçede bugün birçok çiçek açtı.", 0.0),
+            (
+                "Belgesel nasıl seçilir?",
+                "Belgesel seçilirken önce yaş uygunluğu kontrol edilmelidir.",
+                1.0,
+            ),
+            (
+                "Nelere dikkat edilmeli?",
+                "Dikkat edilmesi gerekenler şunlardır: yaş, süre ve kaynak güvenilirliği.",
+                1.0,
+            ),
+            ("Bu yöntem güvenli mi?", "Evet.", 1.0),
+            ("Bu yöntem güvenli mi?", "Hayır,", 1.0),
+            (
+                "AYILAR NEDEN SALDIRIYOR?",
+                "ÇÜNKÜ ayılar yavrularını korumaya çalışabilir.",
+                1.0,
+            ),
+            (
+                "Why do bears attack?",
+                "Bears may attack because bears perceive a threat.",
+                1.0,
+            ),
+            (
+                "What is an algorithm?",
+                "An algorithm is a defined sequence of instructions.",
+                1.0,
+            ),
+        )
+        for index, (heading, paragraph, expected) in enumerate(examples):
+            with self.subTest(heading=heading):
+                source_data = self.metric_source_data(f"""
+                    <html lang="tr"><head><title>Örnek {index}</title></head>
+                    <body><main><h2>{heading}</h2><p>{paragraph}</p></main></body></html>
+                """)
+                self.assertEqual(
+                    source_data.direct_answer_coverage_ratio, expected
+                )
+
+    def test_direct_answer_coverage_is_half_when_one_of_two_questions_is_answered(self):
+        source_data = self.metric_source_data("""
+            <html lang="tr"><head><title>İki soru</title></head><body><main>
+              <h2>Ayılar neden saldırıyor?</h2>
+              <p>Ayılar açlık nedeniyle saldırgan davranabilir.</p>
+              <h2>Algoritma nedir?</h2>
+              <p>Bahçede bugün birçok çiçek açtı.</p>
+            </main></body></html>
+        """)
+
+        self.assertEqual(source_data.direct_answer_coverage_ratio, 0.5)
+
+    def test_direct_answer_uses_first_eligible_passage_after_metadata(self):
+        source_data = self.metric_source_data("""
+            <html lang="tr"><head><title>Metadata pairing</title></head><body><main>
+              <h2>Ayılar neden saldırıyor?</h2>
+              <div itemprop="datePublished"><p>25 Ağustos 2026</p></div>
+              <div itemprop="author"><p>AA Muhabiri</p></div>
+              <p>Ayılar açlık nedeniyle saldırgan davranabilir.</p>
+            </main></body></html>
+        """)
+
+        self.assertEqual(source_data.direct_answer_coverage_ratio, 1.0)
 
     def test_trt_heading_metrics_use_article_passage_instead_of_date(self):
         html = (FIXTURES / "trt_ebeveyn_akademisi_makale.html").read_text(encoding="utf-8")
@@ -214,7 +299,7 @@ class RawHtmlIngestionTests(unittest.TestCase):
 
         # H1 contributes 3/5 and the later informational H5 contributes 0/2.
         self.assertEqual(source_data.heading_passage_overlap_ratio, 0.3)
-        self.assertEqual(source_data.definitive_stance_ratio, 0.0)
+        self.assertIsNone(source_data.direct_answer_coverage_ratio)
 
     def test_retains_an_inventory_of_declared_structured_data(self):
         """What a page declares to machines survives text normalization."""
@@ -295,7 +380,7 @@ class RawHtmlIngestionTests(unittest.TestCase):
             "2026-08-03T00:00:00+00:00",
         )
 
-    def test_normalizes_timezone_naive_json_ld_date_published_to_utc(self):
+    def test_treats_timezone_naive_json_ld_date_published_as_unavailable(self):
         html = """
             <html lang="en"><head><title>Naive datetime</title>
               <script type="application/ld+json">
@@ -306,10 +391,7 @@ class RawHtmlIngestionTests(unittest.TestCase):
 
         result = self.register.execute(self.raw_article(html))
 
-        self.assertEqual(
-            result.article_version.source_published_at.isoformat(),
-            "2026-08-03T10:00:00+00:00",
-        )
+        self.assertIsNone(result.article_version.source_published_at)
 
     def test_rejects_a_malformed_date_only_value(self):
         html = """
@@ -730,7 +812,7 @@ class RawHtmlIngestionTests(unittest.TestCase):
             "2026-07-22T09:00:00+00:00",
         )
 
-    def test_normalizes_naive_selected_json_ld_date_without_falling_back(self):
+    def test_naive_selected_json_ld_date_does_not_activate_lower_priority_fallback(self):
         html = """
             <html lang="en"><head>
               <meta property="article:published_time" content="2026-07-22T08:00:00+00:00" />
@@ -744,10 +826,107 @@ class RawHtmlIngestionTests(unittest.TestCase):
 
         result = self.register.execute(self.raw_article(html))
 
+        self.assertIsNone(result.article_version.source_published_at)
+
+    def test_timezone_aware_json_ld_date_published_preserves_its_offset(self):
+        html = """
+            <html lang="en"><head><title>Aware published date</title>
+              <script type="application/ld+json">
+                {"@type": "Article", "datePublished": "2026-08-25T10:30:00+03:00"}
+              </script>
+            </head><body><main><p>Visible article paragraph.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
         self.assertEqual(
             result.article_version.source_published_at.isoformat(),
-            "2026-07-22T10:00:00+00:00",
+            "2026-08-25T10:30:00+03:00",
         )
+
+    def test_timezone_naive_json_ld_date_modified_is_unavailable(self):
+        html = """
+            <html lang="en"><head><title>Naive modified date</title>
+              <script type="application/ld+json">
+                {"@type": "NewsArticle", "datePublished": "2026-08-25T07:30:00Z",
+                 "dateModified": "2026-08-25T10:30:00"}
+              </script>
+            </head><body><main><p>Visible article paragraph.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertEqual(
+            result.article_version.source_published_at.isoformat(),
+            "2026-08-25T07:30:00+00:00",
+        )
+        self.assertIsNone(result.article_version.source_updated_at)
+
+    def test_aa_style_question_gets_direct_answer_without_trusting_naive_modified_date(self):
+        html = (FIXTURES / "aa_naive_date_modified.html").read_text(
+            encoding="utf-8"
+        )
+
+        result = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url="https://www.aa.com.tr/tr/yasam/ayilar-neden-saldiriyor/414651",
+                publisher="AA",
+                article_type="news_report",
+                observed_at=OBSERVED_AT,
+            )
+        )
+        source_data = self.repository.get_source_data(
+            result.article_version.article_version_id
+        )
+
+        self.assertEqual(source_data.direct_answer_coverage_ratio, 1.0)
+        self.assertIsNone(result.article_version.source_updated_at)
+
+    def test_naive_json_ld_date_modified_does_not_activate_meta_fallback(self):
+        html = """
+            <html lang="en"><head><title>Modified precedence</title>
+              <meta property="article:modified_time" content="2026-08-25T12:00:00+03:00" />
+              <script type="application/ld+json">
+                {"@type": "Article", "dateModified": "2026-08-25T10:30:00"}
+              </script>
+            </head><body><main><p>Visible article paragraph.</p></main></body></html>
+        """
+
+        result = self.register.execute(self.raw_article(html))
+
+        self.assertIsNone(result.article_version.source_updated_at)
+
+    def test_rejects_malformed_selected_json_ld_datetime(self):
+        html = """
+            <html lang="en"><head><title>Malformed datetime</title>
+              <script type="application/ld+json">
+                {"@type": "Article", "dateModified": "not-a-date"}
+              </script>
+            </head><body><main><p>Visible article paragraph.</p></main></body></html>
+        """
+
+        with self.assertRaisesRegex(
+            DomainValidationError, "JSON-LD Article dateModified must be ISO-8601"
+        ):
+            self.register.execute(self.raw_article(html))
+
+    def test_rejects_aware_date_modified_before_aware_date_published(self):
+        html = """
+            <html lang="en"><head><title>Invalid date ordering</title>
+              <script type="application/ld+json">
+                {"@type": "Article",
+                 "datePublished": "2026-08-25T10:30:00+03:00",
+                 "dateModified": "2026-08-25T09:30:00+03:00"}
+              </script>
+            </head><body><main><p>Visible article paragraph.</p></main></body></html>
+        """
+
+        with self.assertRaisesRegex(
+            DomainValidationError,
+            "source_updated_at cannot precede source_published_at",
+        ):
+            self.register.execute(self.raw_article(html))
 
     def test_ingests_paragraphs_from_a_matching_server_supplied_json_payload(self):
         html = """
@@ -783,6 +962,178 @@ class RawHtmlIngestionTests(unittest.TestCase):
             [passage.text for passage in result.passages],
             ["İlk paragraf.", "İkinci paragraf."],
         )
+
+    def test_recovers_trt_article_body_from_captured_nuxt_hydration(self):
+        html = (FIXTURES / "trt_ebeveyn_belgeseller_nuxt.html").read_text(
+            encoding="utf-8"
+        )
+        result = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url=(
+                    "https://ebeveynakademisi.trtcocuk.net.tr/makale/"
+                    "cocuk-icin-belgeseller-ve-sinema-filmleri-29038861"
+                ),
+                publisher="TRT Çocuk Ebeveyn Akademisi",
+                article_type="article",
+                observed_at=OBSERVED_AT,
+            )
+        )
+        source_data = self.repository.get_source_data(
+            result.article_version.article_version_id
+        )
+
+        self.assertEqual(len(result.passages), 11)
+        self.assertEqual(sum(len(item.text.split()) for item in result.passages), 343)
+        self.assertEqual(
+            [heading.text for heading in source_data.declared_headings],
+            [
+                "Our Planet -Gezegenimiz",
+                "Inside the Mind of a Cat - Kedilerin Aklından Neler Geçiyor?",
+                "March of The Penguins - İmparatorun Yolculuğu",
+                "Abstract: The Arts Of Design - Soyut Düşünce: Tasarım Sanatı",
+                "Inside Out - Ters Yüz",
+                "Inside Out 2 - Ters Yüz 2",
+            ],
+        )
+        body = result.article_version.body
+        for excluded in (
+            "24 Aralık 2025",
+            "TRT Çocuk\n\n",
+            "Önemli Hatırlatma",
+            "Bu içerik ilgili uzman danışman",
+            "Hazırlayan:",
+            "AİLECE İZLENECEK",
+            "EN ÇOK İZLENEN",
+            "Linked recommendation card",
+            "Çocukların hayatı daha iyi anlamalarını sağlayan",
+        ):
+            self.assertNotIn(excluded, body)
+
+    def test_nuxt_hydration_requires_matching_article_identity(self):
+        html = (FIXTURES / "trt_ebeveyn_belgeseller_nuxt.html").read_text(
+            encoding="utf-8"
+        )
+        result = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url="https://example.org/article/a-different-identity",
+                publisher="Example",
+                article_type="article",
+                observed_at=OBSERVED_AT,
+            )
+        )
+
+        self.assertEqual(len(result.passages), 4)
+        self.assertEqual(result.passages[0].text, "24 Aralık 2025")
+
+    def test_malformed_nuxt_state_is_ignored_without_executing_javascript(self):
+        html = """
+            <html lang="en"><head><title>Safe fallback</title></head><body>
+              <article><p>Visible safe body.</p></article>
+              <script>
+                window.__NUXT__=(function(a){
+                  throw new Error("must never execute");
+                  return {data:[{type:a,path:"/safe",body:[
+                    {type:"text",value:"<p>Unsafe body.</p>"}
+                  ]}]};
+                }("article")); trailing_malformed_input(
+              </script>
+            </body></html>
+        """
+
+        result = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url="https://example.org/safe",
+                publisher="Example",
+                article_type="article",
+                observed_at=OBSERVED_AT,
+            )
+        )
+
+        self.assertEqual([item.text for item in result.passages], ["Visible safe body."])
+
+    def test_dom_body_wins_when_matching_hydration_does_not_dominate_it(self):
+        html = """
+            <html lang="en"><head><title>DOM article</title></head><body>
+              <article><h2>DOM heading</h2><p>First DOM paragraph.</p>
+                <p>Second DOM paragraph is retained.</p></article>
+              <script>window.__NUXT__=(function(a,b){return {data:[{content:{
+                type:a,path:"/neutral-story",body:[
+                  {type:b,value:"<h2>Payload heading</h2>"},
+                  {type:b,value:"<p>Short payload.</p>"}
+                ]}}]}}("article","text"));</script>
+            </body></html>
+        """
+
+        result = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url="https://example.org/neutral-story",
+                publisher="Example",
+                article_type="article",
+                observed_at=OBSERVED_AT,
+            )
+        )
+
+        self.assertEqual(
+            [item.text for item in result.passages],
+            ["First DOM paragraph.", "Second DOM paragraph is retained."],
+        )
+
+    def test_duplicate_dom_and_nuxt_body_is_not_duplicated(self):
+        html = """
+            <html lang="en"><head><title>Duplicate sources</title></head><body>
+              <article><h2>DOM heading</h2><p>Same first paragraph.</p>
+                <p>Same second paragraph.</p></article>
+              <script>window.__NUXT__=(function(a,b){return {data:[{content:{
+                type:a,path:"/duplicate",body:[
+                  {type:b,value:"<h2>Structured heading</h2>"},
+                  {type:b,value:"<p>Same first paragraph.</p>"},
+                  {type:b,value:"<p>Same second paragraph.</p>"}
+                ]}}]}}("article","text"));</script>
+            </body></html>
+        """
+
+        result = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url="https://example.org/duplicate",
+                publisher="Example",
+                article_type="article",
+                observed_at=OBSERVED_AT,
+            )
+        )
+
+        self.assertEqual(len(result.passages), 2)
+        self.assertEqual(
+            [item.text for item in result.passages],
+            ["Same first paragraph.", "Same second paragraph."],
+        )
+
+    def test_nuxt_payload_with_unsupported_blocks_is_rejected(self):
+        html = """
+            <html lang="en"><head><title>Unsupported blocks</title></head><body>
+              <article><p>Visible fallback.</p></article>
+              <script>window.__NUXT__=(function(a){return {data:[{content:{
+                type:a,path:"/unsupported",body:[
+                  {type:"component",value:"<p>Untrusted component.</p>"}
+                ]}}]}}("article"));</script>
+            </body></html>
+        """
+
+        result = self.register.execute(
+            RawHtmlArticle(
+                html=html,
+                source_url="https://example.org/unsupported",
+                publisher="Example",
+                article_type="article",
+                observed_at=OBSERVED_AT,
+            )
+        )
+
+        self.assertEqual([item.text for item in result.passages], ["Visible fallback."])
 
     def test_does_not_use_an_unrelated_json_article_payload(self):
         html = """

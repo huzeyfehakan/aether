@@ -137,7 +137,7 @@ class ArticleVersionSourceData:
     answered_question_heading_count: int = 0
     unanswered_question_heading_count: int = 0
     heading_passage_overlap_ratio: Optional[float] = None
-    definitive_stance_ratio: Optional[float] = None
+    direct_answer_coverage_ratio: Optional[float] = None
 
     # Layered Dates for Sanity Check
     json_ld_published_date: Optional[str] = None

@@ -342,11 +342,13 @@ def _recommendation_views(report: Any, category) -> list:
     return list(grouped.values())
 
 
-def _geo_dimension_view(name: str, dimension: Any, detail: Any) -> Dict[str, Any]:
+def _score_dimension_view(
+    name: str, dimension: Any, detail: Any, label: str
+) -> Dict[str, Any]:
     return {
         "key": name,
         "val": dimension.dimension_score,
-        "label": geo_dimension_text(name)["label"],
+        "label": label,
         "weight": dimension.weight_percentage,
         "detail": {
             "label": detail.label,
@@ -374,32 +376,52 @@ def _report_view(report: Any) -> Dict[str, Any]:
             "metadata": assessment.metadata_completeness.value,
             "seo_score": {
                 "total": report.assessment_summary.seo_score.total,
-                "entity_coverage": {"val": report.assessment_summary.seo_score.entity_coverage.dimension_score, "label": seo_dimension_text("entity_coverage")["label"], "weight": report.assessment_summary.seo_score.entity_coverage.weight_percentage},
-                "structured_data": {"val": report.assessment_summary.seo_score.structured_data.dimension_score, "label": seo_dimension_text("structured_data")["label"], "weight": report.assessment_summary.seo_score.structured_data.weight_percentage},
-                "semantic_quality": {"val": report.assessment_summary.seo_score.semantic_quality.dimension_score, "label": seo_dimension_text("semantic_quality")["label"], "weight": report.assessment_summary.seo_score.semantic_quality.weight_percentage},
-                "technical_access": {"val": report.assessment_summary.seo_score.technical_access.dimension_score, "label": seo_dimension_text("technical_access")["label"], "weight": report.assessment_summary.seo_score.technical_access.weight_percentage},
+                "entity_coverage": _score_dimension_view(
+                    "entity_coverage", report.assessment_summary.seo_score.entity_coverage,
+                    report.assessment_summary.seo_score.entity_coverage_detail,
+                    seo_dimension_text("entity_coverage")["label"],
+                ),
+                "structured_data": _score_dimension_view(
+                    "structured_data", report.assessment_summary.seo_score.structured_data,
+                    report.assessment_summary.seo_score.structured_data_detail,
+                    seo_dimension_text("structured_data")["label"],
+                ),
+                "semantic_quality": _score_dimension_view(
+                    "semantic_quality", report.assessment_summary.seo_score.semantic_quality,
+                    report.assessment_summary.seo_score.semantic_quality_detail,
+                    seo_dimension_text("semantic_quality")["label"],
+                ),
+                "technical_access": _score_dimension_view(
+                    "technical_access", report.assessment_summary.seo_score.technical_access,
+                    report.assessment_summary.seo_score.technical_access_detail,
+                    seo_dimension_text("technical_access")["label"],
+                ),
             } if hasattr(report, 'assessment_summary') and hasattr(report.assessment_summary, 'seo_score') else None,
             "geo_score": {
                 "total": report.assessment_summary.geo_score.total,
-                "semantic_completeness": _geo_dimension_view(
+                "semantic_completeness": _score_dimension_view(
                     "semantic_completeness",
                     report.assessment_summary.geo_score.semantic_completeness,
                     report.assessment_summary.geo_score.semantic_completeness_detail,
+                    geo_dimension_text("semantic_completeness")["label"],
                 ),
-                "entity_authority": _geo_dimension_view(
+                "entity_authority": _score_dimension_view(
                     "entity_authority",
                     report.assessment_summary.geo_score.entity_authority,
                     report.assessment_summary.geo_score.entity_authority_detail,
+                    geo_dimension_text("entity_authority")["label"],
                 ),
-                "structural_richness": _geo_dimension_view(
+                "structural_richness": _score_dimension_view(
                     "structural_richness",
                     report.assessment_summary.geo_score.structural_richness,
                     report.assessment_summary.geo_score.structural_richness_detail,
+                    geo_dimension_text("structural_richness")["label"],
                 ),
-                "discoverability": _geo_dimension_view(
+                "discoverability": _score_dimension_view(
                     "discoverability",
                     report.assessment_summary.geo_score.discoverability,
                     report.assessment_summary.geo_score.discoverability_detail,
+                    geo_dimension_text("discoverability")["label"],
                 ),
             } if hasattr(report, 'assessment_summary') and hasattr(report.assessment_summary, 'geo_score') else None,
         },
@@ -430,6 +452,16 @@ def _report_view(report: Any) -> Dict[str, Any]:
                 },
             ),
             "included_in_score": False,
+        },
+        "passage_balance": {
+            "ratio": report.passage_balance_diagnostic.ratio,
+            "included_in_score": report.passage_balance_diagnostic.included_in_score,
+        },
+        "direct_answer_coverage": {
+            "ratio": report.direct_answer_coverage_diagnostic.ratio,
+            "included_in_score": (
+                report.direct_answer_coverage_diagnostic.included_in_score
+            ),
         },
         "editor": (
             None

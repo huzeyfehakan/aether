@@ -105,7 +105,7 @@ class ArticleStructuralAnalysisTests(unittest.TestCase):
             "https://example.org/news/story",
             "Only body words count.",
             heading_passage_overlap_ratio=0.0,
-            definitive_stance_ratio=None,
+            direct_answer_coverage_ratio=None,
         )
 
         analysis = self.analyze.execute(
@@ -113,7 +113,7 @@ class ArticleStructuralAnalysisTests(unittest.TestCase):
         )
 
         self.assertEqual(analysis.heading_passage_overlap_ratio, 0.0)
-        self.assertIsNone(analysis.definitive_stance_ratio)
+        self.assertIsNone(analysis.direct_answer_coverage_ratio)
 
 
 if __name__ == "__main__":

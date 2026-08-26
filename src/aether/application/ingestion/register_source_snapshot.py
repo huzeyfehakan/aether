@@ -48,7 +48,7 @@ class SourceArticleSnapshot:
     answered_question_heading_count: int = 0
     unanswered_question_heading_count: int = 0
     heading_passage_overlap_ratio: Optional[float] = None
-    definitive_stance_ratio: Optional[float] = None
+    direct_answer_coverage_ratio: Optional[float] = None
     json_ld_published_date: Optional[str] = None
     meta_published_date: Optional[str] = None
     time_tag_published_date: Optional[str] = None
@@ -155,7 +155,7 @@ class RegisterSourceSnapshot:
                 answered_question_heading_count=snapshot.answered_question_heading_count,
                 unanswered_question_heading_count=snapshot.unanswered_question_heading_count,
                 heading_passage_overlap_ratio=snapshot.heading_passage_overlap_ratio,
-                definitive_stance_ratio=snapshot.definitive_stance_ratio,
+                direct_answer_coverage_ratio=snapshot.direct_answer_coverage_ratio,
                 json_ld_published_date=snapshot.json_ld_published_date,
                 meta_published_date=snapshot.meta_published_date,
                 time_tag_published_date=snapshot.time_tag_published_date,

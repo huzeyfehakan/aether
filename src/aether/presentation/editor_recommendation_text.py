@@ -266,8 +266,8 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
     RecommendationCode.CONTENT_BLOAT: RecommendationText(
         headline="İzole ve Şişirme İçeriği Sadeleştirin",
         why_it_matters=(
-            "AI engines penalize 'content bloat'. Paragraphs that don't share vocabulary "
-            "with their heading and lack a definitive stance dilute your Semantic Completeness."
+            "Paragraphs that do not share vocabulary with their heading can make "
+            "the article's organization less explicit."
         ),
         what_to_do=(
             "Remove filler paragraphs that have weak ties to the main heading or associate them with the main theme."

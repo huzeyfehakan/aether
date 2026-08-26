@@ -108,6 +108,27 @@ class AIReadinessReportRendererTests(unittest.TestCase):
         self.assertEqual(diagnostic["passage_count"], 1)
         self.assertIsNone(diagnostic["oversized_passage_rate_128"])
         self.assertFalse(diagnostic["included_in_score"])
+        passage_balance = payload["passage_balance_diagnostic"]
+        self.assertEqual(passage_balance["ratio"], 1.0)
+        self.assertFalse(passage_balance["included_in_score"])
+        direct_answer = payload["direct_answer_coverage_diagnostic"]
+        self.assertIsNone(direct_answer["ratio"])
+        self.assertFalse(direct_answer["included_in_score"])
+
+        seo_score = payload["assessment_summary"]["seo_score"]
+        for dimension in (
+            "entity_coverage",
+            "structured_data",
+            "semantic_quality",
+            "technical_access",
+        ):
+            self.assertIn("detail", seo_score[dimension])
+        entity_signals = {
+            signal["label"]: signal["value"]
+            for signal in seo_score["entity_coverage"]["detail"]["signals"]
+        }
+        self.assertEqual(entity_signals["Publication date"], "Available")
+        self.assertEqual(entity_signals["Last modified date"], "Missing")
 
     def test_plain_text_renderer_includes_all_required_summaries(self):
         rendered = PlainTextAIReadinessReportRenderer().render(self.report())
@@ -118,6 +139,13 @@ class AIReadinessReportRendererTests(unittest.TestCase):
         self.assertIn("Extracted Metadata", rendered)
         self.assertIn("Metadata Completeness: partial", rendered)
         self.assertIn("Claim evidence coverage: Not measured", rendered)
+        self.assertIn("Publication date: Available", rendered)
+        self.assertIn("Article structured data: Not measured", rendered)
+        self.assertIn("Direct Answer Coverage — Experimental Diagnostic", rendered)
+        self.assertIn("Passage Balance — Experimental Diagnostic", rendered)
+        self.assertIn("Not included in score", rendered)
+        self.assertIn("Value: Not measured", rendered)
+        self.assertNotIn("Definitive Stance", rendered)
         # Optional sections are absent when their analysis was not composed.
         self.assertNotIn("Structured Data (Schema.org)", rendered)
         self.assertIn("Metadata Completeness: partial", rendered)
@@ -133,6 +161,12 @@ class AIReadinessReportRendererTests(unittest.TestCase):
         self.assertIn("Passage Extractability — Experimental Diagnostic", rendered)
         self.assertIn("Not included in score", rendered)
         self.assertIn(">128 words oversized passage rate: Not measured", rendered)
+        self.assertIn("Publication date: Available", rendered)
+        self.assertIn("Unique passage ratio: Not measured", rendered)
+        self.assertIn("Direct Answer Coverage — Experimental Diagnostic", rendered)
+        self.assertIn("Passage Balance — Experimental Diagnostic", rendered)
+        self.assertIn("Value: Not measured", rendered)
+        self.assertNotIn("Definitive Stance", rendered)
 
     def test_renderers_show_measured_diagnostic_rates_without_classification(self):
         report = self.report()

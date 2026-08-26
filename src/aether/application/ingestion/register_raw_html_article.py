@@ -83,7 +83,7 @@ class NormalizedHtmlArticle:
     answered_question_heading_count: int = 0
     unanswered_question_heading_count: int = 0
     heading_passage_overlap_ratio: Optional[float] = None
-    definitive_stance_ratio: Optional[float] = None
+    direct_answer_coverage_ratio: Optional[float] = None
     json_ld_published_date: Optional[str] = None
     meta_published_date: Optional[str] = None
     time_tag_published_date: Optional[str] = None
@@ -120,6 +120,7 @@ class _ArticleHtmlCollector(HTMLParser):
         self.time_values: List[str] = []
         self.json_ld_documents: List[str] = []
         self.application_json_documents: List[str] = []
+        self.framework_hydration_documents: List[str] = []
         self.title_parts: List[str] = []
         # (containment priority, heading level, text)
         self.headings: List[Tuple[int, int, str]] = []
@@ -142,6 +143,7 @@ class _ArticleHtmlCollector(HTMLParser):
         self._non_passage_elements: List[bool] = []
         self._json_ld_parts: Optional[List[str]] = None
         self._application_json_parts: Optional[List[str]] = None
+        self._framework_hydration_parts: Optional[List[str]] = None
 
         self._table_depth = 0
         self._list_depth = 0
@@ -155,9 +157,9 @@ class _ArticleHtmlCollector(HTMLParser):
         self.answered_question_heading_count = 0
         self.unanswered_question_heading_count = 0
 
-        # GEO N-gram Overlap and Definitive Stance
+        # GEO heading overlap and question-scoped direct-answer coverage.
         self.heading_overlaps: List[float] = []
-        self.definitive_stances: List[float] = []
+        self.direct_answers: List[float] = []
         # Body heading/paragraph events are retained until the complete document
         # reveals which containment priority supplies the actual article body.
         self.geo_events: List[Tuple[str, int, str, bool]] = []
@@ -174,6 +176,10 @@ class _ArticleHtmlCollector(HTMLParser):
                 self._json_ld_parts = []
             elif tag == "script" and script_type == "application/json":
                 self._application_json_parts = []
+            elif tag == "script" and not attributes.get("src"):
+                # Retain inline framework state for a restricted, non-executing
+                # parser. Ordinary JavaScript is never evaluated.
+                self._framework_hydration_parts = []
             self._skip_depth += 1
             return
         is_non_passage_container = bool(
@@ -257,6 +263,11 @@ class _ArticleHtmlCollector(HTMLParser):
                     "".join(self._application_json_parts)
                 )
                 self._application_json_parts = None
+            if tag == "script" and self._framework_hydration_parts is not None:
+                self.framework_hydration_documents.append(
+                    "".join(self._framework_hydration_parts)
+                )
+                self._framework_hydration_parts = None
             self._skip_depth = max(0, self._skip_depth - 1)
             return
         if tag in self._NON_BODY_TAGS:
@@ -320,33 +331,29 @@ class _ArticleHtmlCollector(HTMLParser):
         if not self.paragraphs:
             return
         body_priority = max(priority for priority, _ in self.paragraphs)
-        pending_heading: Optional[Tuple[set, bool]] = None
+        pending_heading: Optional[Tuple[set, Optional[str]]] = None
         for kind, priority, text, flag in self.geo_events:
             if priority != body_priority:
                 continue
             if kind == "heading":
-                pending_heading = (_normalized_overlap_tokens(text), flag)
+                pending_heading = (
+                    _normalized_overlap_tokens(text),
+                    _question_type(text),
+                )
                 continue
             if pending_heading is None or not flag or _looks_like_date_metadata(text):
                 continue
 
-            heading_words, is_question = pending_heading
+            heading_words, question_type = pending_heading
             if heading_words:
                 passage_words = _normalized_overlap_tokens(text)
                 self.heading_overlaps.append(
                     len(passage_words.intersection(heading_words)) / len(heading_words)
                 )
-            if is_question:
-                # Preserve the existing stance semantics; only measurement
-                # availability changes in this task.
-                first_word = text.lower().split()[0] if text else ""
-                self.definitive_stances.append(
+            if question_type is not None:
+                self.direct_answers.append(
                     1.0
-                    if first_word
-                    in {
-                        "evet,", "evet", "hayır,", "hayır",
-                        "yes,", "yes", "no,", "no",
-                    }
+                    if _is_direct_answer(question_type, heading_words, text)
                     else 0.0
                 )
             pending_heading = None
@@ -357,6 +364,8 @@ class _ArticleHtmlCollector(HTMLParser):
                 self._json_ld_parts.append(data)
             if self._application_json_parts is not None:
                 self._application_json_parts.append(data)
+            if self._framework_hydration_parts is not None:
+                self._framework_hydration_parts.append(data)
             return
         if self._in_title:
             self.title_parts.append(data)
@@ -382,7 +391,7 @@ def _normalize_text(value: str) -> str:
     return " ".join(value.split())
 
 
-def _normalized_overlap_tokens(value: str) -> set:
+def _normalized_tokens(value: str) -> Tuple[str, ...]:
     normalized = unicodedata.normalize("NFC", value).translate(
         str.maketrans({"I": "ı", "İ": "i"})
     ).casefold()
@@ -396,7 +405,113 @@ def _normalized_overlap_tokens(value: str) -> set:
             current = []
     if current:
         tokens.append("".join(current))
-    return set(tokens)
+    return tuple(tokens)
+
+
+def _normalized_overlap_tokens(value: str) -> set:
+    return set(_normalized_tokens(value))
+
+
+_QUESTION_WORDS = {
+    "bu", "şu", "neden", "niçin", "niye", "hangi", "nedir", "nelerdir",
+    "nelere", "hangileri", "nasıl", "ne", "demek", "anlama", "gelir",
+    "şekilde", "mı", "mi", "mu", "mü", "why", "what", "how", "which",
+    "is", "are", "can", "should", "does", "do",
+}
+
+
+def _question_type(value: str) -> Optional[str]:
+    """Classify the small set of question forms this metric can measure."""
+    tokens = _normalized_tokens(value)
+    normalized = " ".join(tokens)
+    token_set = set(tokens)
+    if (
+        token_set.intersection({"neden", "niçin", "niye", "why"})
+        or "hangi nedenle" in normalized
+        or "sebebi nedir" in normalized
+    ):
+        return "cause"
+    if (
+        "nedir" in token_set
+        or "ne demek" in normalized
+        or "ne anlama gelir" in normalized
+        or normalized.startswith("what is ")
+        or normalized.startswith("what are ")
+    ):
+        return "definition"
+    if "nasıl" in token_set or "ne şekilde" in normalized or "how" in token_set:
+        return "method"
+    if (
+        token_set.intersection({"nelerdir", "nelere", "hangileri", "which"})
+        or "hangi" in token_set
+        or "ne gibi" in normalized
+    ):
+        return "factors"
+    if token_set.intersection({"mı", "mi", "mu", "mü"}):
+        return "yes_no"
+    if tokens and tokens[0] in {"is", "are", "can", "should", "does", "do"}:
+        return "yes_no"
+    return None
+
+
+def _is_relevant_answer(heading_words: set, passage: str) -> bool:
+    meaningful_heading_words = heading_words.difference(_QUESTION_WORDS)
+    return bool(
+        meaningful_heading_words.intersection(_normalized_overlap_tokens(passage))
+    )
+
+
+def _is_direct_answer(question_type: str, heading_words: set, passage: str) -> bool:
+    """Recognize bounded answer cues after a lightweight relevance check."""
+    tokens = _normalized_tokens(passage)
+    normalized = " ".join(tokens)
+    if question_type == "yes_no":
+        return bool(tokens and tokens[0] in {"evet", "hayır", "yes", "no"})
+    if not _is_relevant_answer(heading_words, passage):
+        return False
+    if question_type == "cause":
+        causal_phrases = (
+            "çünkü", "nedeniyle", "sebebiyle", "yüzünden", "kaynaklanır",
+            "kaynaklanabilir", "neden olur", "neden olabilir", "yol açar",
+            "yol açabilir", "sonucunda", "sonucu", "because", "due to",
+            "caused by", "results from", "leads to", "as a result",
+        )
+        conditional = re.search(
+            r"\b\w+(?:dığında|diğinde|duğunda|düğünde|tığında|tiğinde|"
+            r"tuğunda|tüğünde|dıklarında|diklerinde|duklarında|düklerinde|"
+            r"tıklarında|tiklerinde|tuklarında|tüklerinde)\b",
+            normalized,
+        )
+        return any(cue in normalized for cue in causal_phrases) or bool(conditional)
+    if question_type == "definition":
+        definition_phrases = (
+            "olarak tanımlanır", "ifade eder", "denir", "refers to",
+            "is defined as", "is a", "are a",
+        )
+        if any(cue in normalized for cue in definition_phrases):
+            return True
+        meaningful = heading_words.difference(_QUESTION_WORDS)
+        return bool(tokens and tokens[0] in meaningful and "bir" in tokens[:12])
+    if question_type == "method":
+        return any(
+            cue in normalized
+            for cue in (
+                "önce", "ardından", "daha sonra", "dikkat edilmelidir",
+                "seçilmelidir", "first", "then", "next", "step",
+                "method", "process", "should", "must",
+            )
+        )
+    if question_type == "factors":
+        explicit = any(
+            cue in normalized
+            for cue in ("şunlardır", "bunlardır", "include", "are as follows")
+        )
+        separators = passage.count(",") + passage.count(";")
+        conjunction_list = separators >= 1 and bool(
+            {"ve", "veya", "and", "or"}.intersection(tokens)
+        )
+        return explicit or separators >= 2 or conjunction_list
+    return False
 
 
 _MONTH_NAMES = {
@@ -461,9 +576,7 @@ def canonical_url_from_html(html: str, base_url: Optional[str] = None) -> Option
 _DATE_ONLY_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}\Z")
 
 
-def _parse_source_timestamp(
-    value: str, field_name: str, *, normalize_naive_to_utc: bool = False
-) -> datetime:
+def _parse_source_timestamp(value: str, field_name: str) -> Optional[datetime]:
     """Parse a publisher timestamp, normalizing a date-only value to midnight UTC.
 
     Schema.org types ``datePublished`` and ``dateModified`` as Date or DateTime,
@@ -472,8 +585,9 @@ def _parse_source_timestamp(
     an instant the publisher did not state, which is acceptable here because the
     product exposes only the calendar date and whether one is available.
 
-    A value that states a time of day without a timezone remains an error unless
-    the caller explicitly opts into deterministic UTC normalization.
+    A value that states a time of day without a timezone is parseable but does
+    not identify a trustworthy source instant. It is therefore unavailable;
+    no publisher, host, locale, or system timezone is inferred.
     """
     normalized = value.strip().replace("Z", "+00:00")
     if _DATE_ONLY_PATTERN.match(normalized):
@@ -486,10 +600,202 @@ def _parse_source_timestamp(
         parsed = datetime.fromisoformat(normalized)
     except ValueError as error:
         raise DomainValidationError(f"{field_name} must be ISO-8601") from error
-    if normalize_naive_to_utc and parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
+    if parsed.tzinfo is None:
+        return None
     require_aware(parsed, field_name)
     return parsed
+
+
+@dataclass(frozen=True)
+class _BodyCandidate:
+    """One identity-checked source of ordered article passages and headings."""
+
+    collector: _ArticleHtmlCollector
+
+    @property
+    def paragraphs(self) -> Tuple[str, ...]:
+        if not self.collector.paragraphs:
+            return ()
+        priority = max(item[0] for item in self.collector.paragraphs)
+        return tuple(
+            text for item_priority, text in self.collector.paragraphs
+            if item_priority == priority
+        )
+
+    @property
+    def word_count(self) -> int:
+        return sum(len(text.split()) for text in self.paragraphs)
+
+    @property
+    def heading_count(self) -> int:
+        return len(self.collector.headings)
+
+
+_JS_STRING = r'"(?:\\.|[^"\\])*"'
+_JS_IDENTIFIER = r"[A-Za-z_$][A-Za-z0-9_$]*"
+_SUPPORTED_BODY_BLOCK_TYPES = {"html", "rich-text", "richtext", "text"}
+_SUPPORTED_NON_TEXT_BLOCK_TYPES = {"figure", "image", "media"}
+
+
+def _decode_js_string(value: str) -> Optional[str]:
+    """Decode a JSON-compatible JavaScript string literal without evaluation."""
+    try:
+        decoded = json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return decoded if isinstance(decoded, str) else None
+
+
+def _split_javascript_items(value: str) -> Optional[Tuple[str, ...]]:
+    """Split a restricted comma list while respecting strings and containers."""
+    items: List[str] = []
+    start = 0
+    stack: List[str] = []
+    closing = {"(": ")", "[": "]", "{": "}"}
+    in_string = False
+    escaped = False
+    for index, character in enumerate(value):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            continue
+        if character == '"':
+            in_string = True
+        elif character in closing:
+            stack.append(closing[character])
+        elif character in ")]}":
+            if not stack or stack.pop() != character:
+                return None
+        elif character == "," and not stack:
+            items.append(value[start:index].strip())
+            start = index + 1
+    if in_string or stack:
+        return None
+    items.append(value[start:].strip())
+    return tuple(items)
+
+
+def _javascript_object_ranges(value: str) -> Tuple[Tuple[int, int], ...]:
+    """Return balanced object-literal ranges, ignoring braces inside strings."""
+    ranges: List[Tuple[int, int]] = []
+    stack: List[int] = []
+    in_string = False
+    escaped = False
+    for index, character in enumerate(value):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            continue
+        if character == '"':
+            in_string = True
+        elif character == "{":
+            stack.append(index)
+        elif character == "}" and stack:
+            ranges.append((stack.pop(), index + 1))
+    if in_string or stack:
+        return ()
+    return tuple(sorted(ranges))
+
+
+def _resolved_nuxt_aliases(document: str) -> Optional[Dict[str, Any]]:
+    """Resolve only primitive arguments of Nuxt 2's serialization IIFE."""
+    match = re.match(
+        rf"\s*window\.__NUXT__\s*=\s*\(function\((?P<params>{_JS_IDENTIFIER}(?:\s*,\s*{_JS_IDENTIFIER})*)?\)\{{",
+        document,
+    )
+    if match is None:
+        return None
+    invocation = document.rfind("}(")
+    suffix = document.rstrip()
+    if invocation < match.end() or not (suffix.endswith("));") or invocation + 2 >= len(document)):
+        return None
+    arguments_end = document.rfind("))")
+    if arguments_end <= invocation:
+        return None
+    parameters = tuple(
+        item.strip() for item in (match.group("params") or "").split(",") if item.strip()
+    )
+    arguments = _split_javascript_items(document[invocation + 2:arguments_end])
+    if arguments is None or len(parameters) != len(arguments):
+        return None
+
+    aliases: Dict[str, Any] = {}
+    for parameter, argument in zip(parameters, arguments):
+        if re.fullmatch(_JS_STRING, argument):
+            aliases[parameter] = _decode_js_string(argument)
+        elif argument == "true":
+            aliases[parameter] = True
+        elif argument == "false":
+            aliases[parameter] = False
+        elif argument == "null":
+            aliases[parameter] = None
+        elif re.fullmatch(r"-?(?:0|[1-9]\d*)(?:\.\d+)?", argument):
+            aliases[parameter] = float(argument) if "." in argument else int(argument)
+    return aliases
+
+
+def _js_property(object_source: str, name: str) -> Optional[str]:
+    match = re.search(
+        rf"(?:^|[,{{])\s*{re.escape(name)}\s*:\s*({_JS_STRING}|{_JS_IDENTIFIER})",
+        object_source,
+    )
+    return match.group(1) if match is not None else None
+
+
+def _resolved_js_value(value: Optional[str], aliases: Dict[str, Any]) -> Any:
+    if value is None:
+        return None
+    if value.startswith('"'):
+        return _decode_js_string(value)
+    return aliases.get(value)
+
+
+def _js_array_property(object_source: str, name: str) -> Optional[str]:
+    match = re.search(rf"(?:^|[,{{])\s*{re.escape(name)}\s*:\s*\[", object_source)
+    if match is None:
+        return None
+    start = object_source.find("[", match.start())
+    stack = 0
+    in_string = False
+    escaped = False
+    for index in range(start, len(object_source)):
+        character = object_source[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            continue
+        if character == '"':
+            in_string = True
+        elif character == "[":
+            stack += 1
+        elif character == "]":
+            stack -= 1
+            if stack == 0:
+                return object_source[start + 1:index]
+    return None
+
+
+def _article_paths_match(candidate_path: str, source_path: str) -> bool:
+    """Match an exact route or the same non-empty canonical path identity."""
+    candidate = urlparse(candidate_path).path.rstrip("/") or "/"
+    source = urlparse(source_path).path.rstrip("/") or "/"
+    if candidate == source:
+        return True
+    candidate_identity = candidate.rsplit("/", 1)[-1]
+    source_identity = source.rsplit("/", 1)[-1]
+    return bool(candidate_identity and candidate_identity == source_identity)
 
 
 class HtmlArticleNormalizer:
@@ -506,7 +812,6 @@ class HtmlArticleNormalizer:
         collector = _ArticleHtmlCollector()
         collector.feed(raw_article.html)
         collector.close()
-        collector.calculate_geo_metrics()
 
         # og:title outranks a JSON-LD headline deliberately. Both are declared
         # by the publisher, but og:title arrives through the HTML parser with
@@ -519,11 +824,10 @@ class HtmlArticleNormalizer:
         if not title:
             raise DomainValidationError("raw article html has no title")
 
-        body = self._body_from(collector.paragraphs)
-        if not body:
-            body = self._body_from_application_json(
-                collector.application_json_documents, raw_article.source_url
-            )
+        body_candidate = self._select_body_candidate(collector, raw_article.source_url)
+        body_collector = body_candidate.collector if body_candidate else collector
+        body_collector.calculate_geo_metrics()
+        body = "\n\n".join(body_candidate.paragraphs) if body_candidate else ""
         if not body:
             raise DomainValidationError("raw article html has no visible paragraphs")
 
@@ -594,22 +898,22 @@ class HtmlArticleNormalizer:
             ),
             declared_titles=self._declared_titles(collector),
             declared_descriptions=self._declared_descriptions(collector),
-            declared_headings=self._declared_headings(collector),
+            declared_headings=self._declared_headings(body_collector),
             internal_links=tuple(internal_links_list),
             outbound_domains=tuple(sorted(outbound_domains_set)),
             outbound_body_domains=tuple(sorted(outbound_body_domains_set)),
-            table_word_count=collector.table_word_count,
-            list_word_count=collector.list_word_count,
-            blockquote_word_count=collector.blockquote_word_count,
-            answered_question_heading_count=collector.answered_question_heading_count,
-            unanswered_question_heading_count=collector.unanswered_question_heading_count,
+            table_word_count=body_collector.table_word_count,
+            list_word_count=body_collector.list_word_count,
+            blockquote_word_count=body_collector.blockquote_word_count,
+            answered_question_heading_count=body_collector.answered_question_heading_count,
+            unanswered_question_heading_count=body_collector.unanswered_question_heading_count,
             heading_passage_overlap_ratio=(
-                sum(collector.heading_overlaps) / len(collector.heading_overlaps)
-                if collector.heading_overlaps else None
+                sum(body_collector.heading_overlaps) / len(body_collector.heading_overlaps)
+                if body_collector.heading_overlaps else None
             ),
-            definitive_stance_ratio=(
-                sum(collector.definitive_stances) / len(collector.definitive_stances)
-                if collector.definitive_stances else None
+            direct_answer_coverage_ratio=(
+                sum(body_collector.direct_answers) / len(body_collector.direct_answers)
+                if body_collector.direct_answers else None
             ),
             json_ld_published_date=json_ld_published_date,
             meta_published_date=meta_published_date,
@@ -846,19 +1150,43 @@ class HtmlArticleNormalizer:
         )
 
     @classmethod
-    def _body_from_application_json(
+    def _select_body_candidate(
+        cls, collector: _ArticleHtmlCollector, source_url: str
+    ) -> Optional[_BodyCandidate]:
+        dom_candidate = _BodyCandidate(collector) if collector.paragraphs else None
+        structured_candidates = cls._application_json_body_candidates(
+            collector.application_json_documents, source_url
+        ) + cls._nuxt_body_candidates(
+            collector.framework_hydration_documents, source_url
+        )
+        if not structured_candidates:
+            return dom_candidate
+
+        structured = structured_candidates[0]
+        if dom_candidate is None:
+            return structured
+        if structured.paragraphs == dom_candidate.paragraphs:
+            return dom_candidate
+
+        # A matching structured source may replace a visible shell only when it
+        # strictly dominates it on both passage population and article words,
+        # and exposes an article outline. Length alone can never select an
+        # unrelated payload because candidates have already passed identity and
+        # article-type checks.
+        if (
+            structured.heading_count > 0
+            and len(structured.paragraphs) > len(dom_candidate.paragraphs)
+            and structured.word_count > dom_candidate.word_count
+        ):
+            return structured
+        return dom_candidate
+
+    @classmethod
+    def _application_json_body_candidates(
         cls, documents: List[str], source_url: str
-    ) -> str:
-        """Read paragraph HTML from a matching server-supplied JSON payload.
-
-        Some applications deliver article content in an ``application/json``
-        hydration payload and let the browser render it later. The extraction
-        remains deterministic: JSON documents and objects are considered in
-        source order, and a candidate must identify the current source path,
-        declare ``type: article``, and contain a list of body blocks.
-        """
-
+    ) -> Tuple[_BodyCandidate, ...]:
         source_path = urlparse(source_url).path
+        candidates: List[_BodyCandidate] = []
         for document in documents:
             try:
                 payload = json.loads(document)
@@ -867,22 +1195,123 @@ class HtmlArticleNormalizer:
             for value in cls._json_values_in_document_order(payload):
                 if not cls._is_matching_article_payload(value, source_path):
                     continue
-                paragraphs = cls._paragraphs_from_body_blocks(value["body"])
-                if paragraphs:
-                    return "\n\n".join(paragraphs)
-        return ""
+                candidate = cls._candidate_from_body_blocks(value["body"])
+                if candidate is not None:
+                    candidates.append(candidate)
+        return tuple(candidates)
 
     @classmethod
-    def _paragraphs_from_body_blocks(cls, blocks: List[Any]) -> Tuple[str, ...]:
-        paragraphs: List[str] = []
+    def _body_from_application_json(
+        cls, documents: List[str], source_url: str
+    ) -> str:
+        """Compatibility view of the identity-checked JSON body candidate."""
+        candidates = cls._application_json_body_candidates(documents, source_url)
+        return "\n\n".join(candidates[0].paragraphs) if candidates else ""
+
+    @classmethod
+    def _candidate_from_body_blocks(
+        cls, blocks: List[Any]
+    ) -> Optional[_BodyCandidate]:
+        if not blocks:
+            return None
+        values: List[str] = []
         for block in blocks:
-            if not isinstance(block, dict) or not isinstance(block.get("value"), str):
+            if not isinstance(block, dict):
+                return None
+            block_type = block.get("type") or block.get("blockType")
+            value = block.get("value")
+            if not isinstance(block_type, str) or not isinstance(value, str):
+                return None
+            normalized_type = block_type.casefold()
+            if normalized_type in _SUPPORTED_NON_TEXT_BLOCK_TYPES:
                 continue
-            collector = _ArticleHtmlCollector()
-            collector.feed(block["value"])
-            collector.close()
-            paragraphs.extend(text for _, text in collector.paragraphs)
-        return tuple(paragraphs)
+            if normalized_type not in _SUPPORTED_BODY_BLOCK_TYPES:
+                return None
+            values.append(value)
+
+        # A link-only block after substantive content marks a trailing related
+        # content region. Nothing after that boundary is article passage text.
+        probes: List[_ArticleHtmlCollector] = []
+        for value in values:
+            probe = _ArticleHtmlCollector()
+            probe.feed(value)
+            probe.close()
+            probes.append(probe)
+        linked_heading_blocks = tuple(
+            bool(probe.links and probe.headings and not probe.paragraphs)
+            for probe in probes
+        )
+
+        selected_values: List[str] = []
+        for index, value in enumerate(values):
+            # Repeated linked-heading blocks form a generic related-content
+            # boundary. A single linked heading remains valid article markup.
+            if (
+                selected_values
+                and linked_heading_blocks[index]
+                and any(linked_heading_blocks[index + 1:])
+            ):
+                break
+            selected_values.append(value)
+
+        body_collector = _ArticleHtmlCollector()
+        for value in selected_values:
+            body_collector.feed(value)
+        body_collector.close()
+        candidate = _BodyCandidate(body_collector)
+        return candidate if candidate.paragraphs else None
+
+    @classmethod
+    def _nuxt_body_candidates(
+        cls, documents: List[str], source_url: str
+    ) -> Tuple[_BodyCandidate, ...]:
+        source_path = urlparse(source_url).path.rstrip("/") or "/"
+        candidates: List[_BodyCandidate] = []
+        for document in documents:
+            aliases = _resolved_nuxt_aliases(document)
+            if aliases is None:
+                continue
+            for start, end in _javascript_object_ranges(document):
+                object_source = document[start:end]
+                path = _resolved_js_value(_js_property(object_source, "path"), aliases)
+                article_type = _resolved_js_value(
+                    _js_property(object_source, "type"), aliases
+                )
+                if (
+                    not isinstance(path, str)
+                    or not _article_paths_match(path, source_path)
+                    or not isinstance(article_type, str)
+                    or article_type.casefold() not in {"article", "newsarticle"}
+                ):
+                    continue
+                body_source = _js_array_property(object_source, "body")
+                if body_source is None:
+                    continue
+                items = _split_javascript_items(body_source)
+                if items is None:
+                    continue
+                blocks: List[Dict[str, str]] = []
+                valid = True
+                for item in items:
+                    if not (item.startswith("{") and item.endswith("}")):
+                        valid = False
+                        break
+                    block_type = _resolved_js_value(
+                        _js_property(item, "type"), aliases
+                    )
+                    block_value = _resolved_js_value(
+                        _js_property(item, "value"), aliases
+                    )
+                    if not isinstance(block_type, str) or not isinstance(block_value, str):
+                        valid = False
+                        break
+                    blocks.append({"type": block_type, "value": block_value})
+                if not valid:
+                    continue
+                candidate = cls._candidate_from_body_blocks(blocks)
+                if candidate is not None:
+                    candidates.append(candidate)
+        return tuple(candidates)
 
     @staticmethod
     def _is_matching_article_payload(value: Any, source_path: str) -> bool:
@@ -904,7 +1333,6 @@ class HtmlArticleNormalizer:
             return _parse_source_timestamp(
                 json_ld_published_value,
                 "JSON-LD Article datePublished",
-                normalize_naive_to_utc=True,
             )
         published_value = self._first_metadata(
             collector.metadata, ("article:published_time",)
@@ -1030,7 +1458,7 @@ class RegisterRawHtmlArticle:
                 answered_question_heading_count=normalized.answered_question_heading_count,
                 unanswered_question_heading_count=normalized.unanswered_question_heading_count,
                 heading_passage_overlap_ratio=normalized.heading_passage_overlap_ratio,
-                definitive_stance_ratio=normalized.definitive_stance_ratio,
+                direct_answer_coverage_ratio=normalized.direct_answer_coverage_ratio,
                 json_ld_published_date=normalized.json_ld_published_date,
                 meta_published_date=normalized.meta_published_date,
                 time_tag_published_date=normalized.time_tag_published_date,

@@ -42,10 +42,14 @@
       .geo-dimension-detail { border-top: 1px solid #e0e8f1; margin-top: 13px; padding-top: 13px; }
       .geo-dimension-detail h5 { font-size: .92rem; margin: 0 0 10px; }
       .geo-signal-list { list-style: none; margin: 0; padding: 0; }
-      .geo-signal-row { align-items: baseline; display: flex; gap: 10px; justify-content: space-between; padding: 5px 0; }
-      .geo-signal-row span { color: #58677b; font-size: .84rem; }
-      .geo-signal-row strong { font-size: .86rem; white-space: nowrap; }
-      @media (max-width: 640px) { .shell { width: min(100% - 28px, 1120px); padding-top: 30px; } .form-panel, #report-card { padding: 19px; } .tabs { overflow-x: auto; } }
+      #seo-score-grid, #geo-score-grid { align-items: start; }
+      #seo-score-grid .metric-card, #geo-score-grid .metric-card { align-self: start; min-width: 0; }
+      .geo-signal-row { align-items: baseline; display: flex; gap: 10px; justify-content: space-between; min-width: 0; padding: 5px 0; }
+      .geo-signal-row span { color: #58677b; flex: 1 1 auto; font-size: .84rem; min-width: 0; overflow-wrap: normal; word-break: normal; }
+      .geo-signal-row strong { flex: 0 1 55%; font-size: .86rem; min-width: 0; overflow-wrap: normal; text-align: right; white-space: normal; word-break: normal; }
+      .geo-signal-row-stacked { align-items: flex-start; flex-direction: column; }
+      .geo-signal-row-stacked strong { flex: none; max-width: 100%; text-align: left; }
+      @media (max-width: 640px) { .shell { width: min(100% - 28px, 1120px); padding-top: 30px; } .form-panel, #report-card { padding: 19px; } .tabs { overflow-x: auto; } .geo-signal-row { align-items: flex-start; flex-direction: column; } .geo-signal-row strong { flex: none; max-width: 100%; text-align: left; } }
     </style>
   </head>
   <body>
@@ -152,6 +156,18 @@
           <div id="passage-extractability-metrics" class="metric-grid"></div>
         </section>
 
+        <section class="section" aria-labelledby="passage-balance-heading">
+          <h3 id="passage-balance-heading">Passage Balance — Experimental diagnostic</h3>
+          <p>Mean passage words divided by maximum passage words. Not included in score.</p>
+          <div id="passage-balance-metric" class="metric-grid"></div>
+        </section>
+
+        <section class="section" aria-labelledby="direct-answer-coverage-heading">
+          <h3 id="direct-answer-coverage-heading">Direct Answer Coverage — Experimental diagnostic</h3>
+          <p>Share of measurable question headings answered in the first eligible passage. Not included in score.</p>
+          <div id="direct-answer-coverage-metric" class="metric-grid"></div>
+        </section>
+
         <div class="section"><h3>Metadata availability</h3><p id="metadata-summary">Source fields found in the article.</p><table class="metadata-table"><tbody id="metadata-table"></tbody></table><div id="missing-list" class="missing-list"></div></div>
 
         <div class="section" id="editor-section"><h3>Editor Recommendations</h3><p class="muted" id="editor-subtitle"></p><p id="editor-compared"></p><div id="editor-list"></div></div>
@@ -167,18 +183,27 @@
       const statusBadge = (value) => `<span class="badge ${value}">${titleCase(value)}</span>`;
       const metric = (label, value) => `<div class="metric-card"><p>${label}</p><strong>${value}</strong></div>`;
       const scoreValue = (value) => value !== null ? `${value.toFixed(1)} / 100` : 'Not measured';
-      const geoDimensionCard = (dimension) => {
+      const signalValue = (value) => value === null
+        ? 'Not measured'
+        : (typeof value === 'number' ? value.toFixed(1) : value);
+      const signalRowClass = (value) => {
+        const textual = typeof value === 'string' ? value : '';
+        return textual.includes(',') || textual.length > 40
+          ? 'geo-signal-row geo-signal-row-stacked'
+          : 'geo-signal-row';
+      };
+      const scoreDimensionCard = (dimension, scoreType) => {
         if (!dimension.detail) {
           return `<div class="metric-card"><p class="score-weight">%${dimension.weight}</p><h4 style="margin: 0 0 5px; font-size: 1rem;">${dimension.label}</h4><strong style="color: #45617d;">${scoreValue(dimension.val)}</strong></div>`;
         }
-        const detailId = `geo-${dimension.key.replaceAll('_', '-')}-detail`;
+        const detailId = `${scoreType}-${dimension.key.replaceAll('_', '-')}-detail`;
         const rows = dimension.detail.signals.map((signal) => `
-          <li class="geo-signal-row" title="${signal.explanation}">
-            <span>&bull; ${signal.label}</span><strong>${signal.value === null ? 'Not measured' : signal.value.toFixed(1)}</strong>
+          <li class="${signalRowClass(signal.value)}" title="${signal.explanation}">
+            <span>&bull; ${signal.label}</span><strong>${signalValue(signal.value)}</strong>
           </li>
         `).join('');
         return `<div class="metric-card">
-          <button type="button" class="geo-dimension-button" data-geo-detail-toggle aria-expanded="false" aria-controls="${detailId}">
+          <button type="button" class="geo-dimension-button" data-score-detail-toggle aria-expanded="false" aria-controls="${detailId}">
             <p class="score-weight">%${dimension.weight}</p>
             <h4 style="margin: 0 0 5px; font-size: 1rem;">${dimension.label}</h4>
             <strong style="color: #45617d;">${scoreValue(dimension.val)}</strong>
@@ -190,7 +215,7 @@
           </div>
         </div>`;
       };
-      const toggleGeoDetail = (button) => {
+      const toggleScoreDetail = (button) => {
         const detail = document.querySelector(`#${button.getAttribute('aria-controls')}`);
         const expanded = button.getAttribute('aria-expanded') === 'true';
         button.setAttribute('aria-expanded', String(!expanded));
@@ -262,13 +287,8 @@
                 assessment.seo_score.technical_access
             ];
             
-            document.querySelector('#seo-score-grid').innerHTML = seoDimensions.map(d => `
-                <div class="metric-card">
-                    <p class="score-weight">%${d.weight}</p>
-                    <h4 style="margin: 0 0 5px; font-size: 1rem;">${d.label}</h4>
-                    <strong style="color: #45617d;">${d.val !== null ? d.val.toFixed(1) + ' / 100' : 'N/A'}</strong>
-                </div>
-            `).join('');
+            document.querySelector('#seo-score-grid').innerHTML = seoDimensions
+              .map(d => scoreDimensionCard(d, 'seo')).join('');
             document.querySelector('#score-section').classList.remove('hidden');
         } else {
             document.querySelector('#score-section').classList.add('hidden');
@@ -283,12 +303,13 @@
                 assessment.geo_score.discoverability
             ];
             
-            document.querySelector('#geo-score-grid').innerHTML = geoDimensions.map(geoDimensionCard).join('');
-            const geoToggleButtons = document.querySelectorAll('[data-geo-detail-toggle]');
-            geoToggleButtons.forEach((button) => {
-              button.addEventListener('click', () => toggleGeoDetail(button));
-            });
+            document.querySelector('#geo-score-grid').innerHTML = geoDimensions
+              .map(d => scoreDimensionCard(d, 'geo')).join('');
         }
+
+        document.querySelectorAll('[data-score-detail-toggle]').forEach((button) => {
+          button.addEventListener('click', () => toggleScoreDetail(button));
+        });
 
         const cards = [
           ['Metadata', assessment.metadata, 'Fields an AI system needs to identify and attribute this article'],
@@ -306,6 +327,20 @@
             `>${band.bound} words`,
             band.rate === null ? 'Not measured' : `${(band.rate * 100).toFixed(1)}% oversized passages`
           )).join('');
+
+        const passageBalanceDiagnostic = view.passage_balance;
+        document.querySelector('#passage-balance-metric').innerHTML = metric(
+          'Passage Balance',
+          `${(passageBalanceDiagnostic.ratio * 100).toFixed(1)}%`
+        );
+
+        const directAnswerDiagnostic = view.direct_answer_coverage;
+        document.querySelector('#direct-answer-coverage-metric').innerHTML = metric(
+          'Direct Answer Coverage',
+          directAnswerDiagnostic.ratio === null
+            ? 'Not measured'
+            : `${(directAnswerDiagnostic.ratio * 100).toFixed(1)}%`
+        );
 
         const missing = view.metadata.filter((field) => !field.available);
         document.querySelector('#metadata-summary').textContent = missing.length ? `${missing.length} metadata field${missing.length === 1 ? '' : 's'} missing from the stored article.` : 'All currently assessed metadata fields are available.';

@@ -1,7 +1,7 @@
 """Project an existing assessment into immutable user-facing report summaries."""
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 from aether.application.analysis.analyze_content_duplication import RepeatedPassage
 from aether.application.analysis.analyze_passage_quality import PassageProfile
@@ -46,6 +46,22 @@ class PassageQualitySummary:
 
 
 @dataclass(frozen=True)
+class DirectAnswerCoverageDiagnostic:
+    """Experimental question-answer signal that is not included in scoring."""
+
+    ratio: Optional[float]
+    included_in_score: bool = False
+
+
+@dataclass(frozen=True)
+class PassageBalanceDiagnostic:
+    """Experimental passage-length distribution signal, excluded from scoring."""
+
+    ratio: float
+    included_in_score: bool = False
+
+
+@dataclass(frozen=True)
 class ScoreDimensionSummary:
     """A user-facing summary of a single score dimension."""
     weight_percentage: int
@@ -54,21 +70,21 @@ class ScoreDimensionSummary:
 
 
 @dataclass(frozen=True)
-class GEOSignalDetail:
-    """One deterministic input to a GEO dimension, if it was measurable."""
+class ScoreSignalDetail:
+    """One deterministic input to a score dimension, if it was measurable."""
 
     label: str
-    value: Optional[float]
+    value: Optional[Union[float, str]]
     explanation: str
 
 
 @dataclass(frozen=True)
-class GEODimensionDetail:
-    """Presentation detail for one GEO dimension and its existing inputs."""
+class ScoreDimensionDetail:
+    """Presentation detail for one score dimension and its existing inputs."""
 
     label: str
     dimension_score: Optional[float]
-    signals: Tuple[GEOSignalDetail, ...]
+    signals: Tuple[ScoreSignalDetail, ...]
 
 
 @dataclass(frozen=True)
@@ -79,6 +95,10 @@ class SEOScoreSummary:
     structured_data: ScoreDimensionSummary
     semantic_quality: ScoreDimensionSummary
     technical_access: ScoreDimensionSummary
+    entity_coverage_detail: ScoreDimensionDetail
+    structured_data_detail: ScoreDimensionDetail
+    semantic_quality_detail: ScoreDimensionDetail
+    technical_access_detail: ScoreDimensionDetail
 
 
 @dataclass(frozen=True)
@@ -89,10 +109,10 @@ class GEOScoreSummary:
     entity_authority: ScoreDimensionSummary
     structural_richness: ScoreDimensionSummary
     discoverability: ScoreDimensionSummary
-    semantic_completeness_detail: GEODimensionDetail
-    entity_authority_detail: GEODimensionDetail
-    structural_richness_detail: GEODimensionDetail
-    discoverability_detail: GEODimensionDetail
+    semantic_completeness_detail: ScoreDimensionDetail
+    entity_authority_detail: ScoreDimensionDetail
+    structural_richness_detail: ScoreDimensionDetail
+    discoverability_detail: ScoreDimensionDetail
 
 
 @dataclass(frozen=True)
@@ -135,6 +155,8 @@ class AIReadinessReport:
     structural_summary: StructuralSummary
     metadata_summary: MetadataSummary
     passage_quality_summary: PassageQualitySummary
+    passage_balance_diagnostic: PassageBalanceDiagnostic
+    direct_answer_coverage_diagnostic: DirectAnswerCoverageDiagnostic
     assessment_summary: AssessmentSummary
     content_reuse_summary: Optional[ContentReuseSummary] = None
     structured_data_summary: Optional[StructuredDataSummary] = None
@@ -180,6 +202,18 @@ class BuildAIReadinessReport:
                 weight_percentage=raw_seo.technical_access.weight_percentage,
                 dimension_score=raw_seo.technical_access.dimension_score,
                 weighted_contribution=raw_seo.technical_access.weighted_contribution,
+            ),
+            entity_coverage_detail=self._entity_coverage_detail(
+                report, raw_seo.entity_coverage.dimension_score
+            ),
+            structured_data_detail=self._seo_structured_data_detail(
+                report, raw_seo.structured_data.dimension_score
+            ),
+            semantic_quality_detail=self._semantic_quality_detail(
+                report, raw_seo.semantic_quality.dimension_score
+            ),
+            technical_access_detail=self._technical_access_detail(
+                report, raw_seo.technical_access.dimension_score
             ),
         )
 
@@ -248,6 +282,12 @@ class BuildAIReadinessReport:
                     passage_quality.oversized_passage_rate_512
                 ),
             ),
+            passage_balance_diagnostic=PassageBalanceDiagnostic(
+                ratio=passage_quality.passage_balance_ratio,
+            ),
+            direct_answer_coverage_diagnostic=DirectAnswerCoverageDiagnostic(
+                ratio=structural.direct_answer_coverage_ratio,
+            ),
             assessment_summary=AssessmentSummary(
                 metadata_completeness=assessment.metadata_completeness,
                 seo_score=seo_summary,
@@ -259,17 +299,148 @@ class BuildAIReadinessReport:
         )
 
     @staticmethod
+    def _entity_coverage_detail(
+        report, dimension_score: Optional[float]
+    ) -> ScoreDimensionDetail:
+        metadata = report.metadata_analysis
+        return ScoreDimensionDetail(
+            label="Entity Coverage",
+            dimension_score=dimension_score,
+            signals=(
+                ScoreSignalDetail(
+                    "Publication date",
+                    "Available" if metadata.publication_date_available else "Missing",
+                    "Whether a publication date was available to the SEO formula",
+                ),
+                ScoreSignalDetail(
+                    "Last modified date",
+                    "Available" if metadata.last_modified_date_available else "Missing",
+                    "Whether a last-modified date was available to the SEO formula",
+                ),
+                ScoreSignalDetail(
+                    "Author",
+                    "Available" if metadata.author_available else "Missing",
+                    "Whether an author was available to the SEO formula",
+                ),
+                ScoreSignalDetail(
+                    "Description",
+                    "Available" if metadata.description_available else "Missing",
+                    "Whether a description was available to the SEO formula",
+                ),
+            ),
+        )
+
+    @staticmethod
+    def _seo_structured_data_detail(
+        report, dimension_score: Optional[float]
+    ) -> ScoreDimensionDetail:
+        analysis = report.structured_data_analysis
+        if analysis is None:
+            values = (None, None, None, None)
+        else:
+            values = (
+                "Present" if analysis.article_node_present else "Missing",
+                ", ".join(analysis.declared_article_properties) or "None",
+                ", ".join(analysis.missing_article_properties) or "None",
+                dimension_score,
+            )
+        return ScoreDimensionDetail(
+            label="Structured Data",
+            dimension_score=dimension_score,
+            signals=tuple(
+                ScoreSignalDetail(label, value, explanation)
+                for label, value, explanation in zip(
+                    (
+                        "Article structured data",
+                        "Declared expected properties",
+                        "Missing expected properties",
+                        "Property coverage",
+                    ),
+                    values,
+                    (
+                        "Whether an Article or NewsArticle node was found",
+                        "Expected Article properties declared by that node",
+                        "Expected Article properties absent from that node",
+                        "Declared expected properties divided by all expected properties",
+                    ),
+                )
+            ),
+        )
+
+    @staticmethod
+    def _semantic_quality_detail(
+        report, dimension_score: Optional[float]
+    ) -> ScoreDimensionDetail:
+        analysis = report.content_duplication_analysis
+        if analysis is None:
+            values = (None, None, None, None)
+        else:
+            total = analysis.total_passage_count
+            repeated = len(analysis.repeated_passages)
+            unique = max(0, total - repeated)
+            values = (float(total), float(unique), float(repeated), dimension_score)
+        return ScoreDimensionDetail(
+            label="Semantic Quality",
+            dimension_score=dimension_score,
+            signals=tuple(
+                ScoreSignalDetail(label, value, explanation)
+                for label, value, explanation in zip(
+                    (
+                        "Total passages",
+                        "Unique passages",
+                        "Repeated passages",
+                        "Unique passage ratio",
+                    ),
+                    values,
+                    (
+                        "Passages included in duplication analysis",
+                        "Total passages minus repeated passages, floored at zero",
+                        "Passages reported as repeated",
+                        "Unique passages divided by total passages",
+                    ),
+                )
+            ),
+        )
+
+    @staticmethod
+    def _technical_access_detail(
+        report, dimension_score: Optional[float]
+    ) -> ScoreDimensionDetail:
+        analysis = report.declared_consistency_analysis
+        if analysis is None:
+            values = (None, None)
+        else:
+            values = (
+                "Yes" if not analysis.titles_agree else "No",
+                "Yes" if not analysis.descriptions_agree else "No",
+            )
+        return ScoreDimensionDetail(
+            label="Technical Access",
+            dimension_score=dimension_score,
+            signals=(
+                ScoreSignalDetail(
+                    "Title sources disagree",
+                    values[0],
+                    "Disagreement flag read by the existing SEO formula",
+                ),
+                ScoreSignalDetail(
+                    "Description sources disagree",
+                    values[1],
+                    "Disagreement flag read by the existing SEO formula",
+                ),
+            ),
+        )
+
+    @staticmethod
     def _semantic_completeness_detail(
         report, dimension_score: Optional[float]
-    ) -> GEODimensionDetail:
+    ) -> ScoreDimensionDetail:
         profiles = report.passage_quality_analysis.passage_profiles
         structural = report.structural_analysis
         fluency = report.fluency_analysis
 
         statistics_coverage = None
         heading_passage_overlap = None
-        definitive_stance = None
-        passage_balance = None
         sentence_balance = None
         structural_variety = None
         if profiles:
@@ -281,47 +452,32 @@ class BuildAIReadinessReport:
                 heading_passage_overlap = (
                     structural.heading_passage_overlap_ratio * 100.0
                 )
-            if structural.definitive_stance_ratio is not None:
-                definitive_stance = structural.definitive_stance_ratio * 100.0
-            passage_balance = (
-                report.passage_quality_analysis.passage_balance_ratio * 100.0
-            )
             if fluency is not None:
                 sentence_balance = fluency.sentence_balance_ratio * 100.0
                 structural_variety = (
                     min(1.0, fluency.structural_variety_ratio) * 100.0
                 )
 
-        return GEODimensionDetail(
+        return ScoreDimensionDetail(
             label="Semantic Completeness",
             dimension_score=dimension_score,
             signals=(
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Statistics coverage",
                     value=statistics_coverage,
                     explanation="Share of passages containing statistics",
                 ),
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Heading-passage overlap",
                     value=heading_passage_overlap,
                     explanation="Measured overlap between headings and passages",
                 ),
-                GEOSignalDetail(
-                    label="Definitive stance",
-                    value=definitive_stance,
-                    explanation="Share of passages with a definitive stance",
-                ),
-                GEOSignalDetail(
-                    label="Passage balance",
-                    value=passage_balance,
-                    explanation="Balance of passage word counts",
-                ),
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Sentence balance",
                     value=sentence_balance,
                     explanation="Fluency sentence-balance ratio",
                 ),
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Structural variety",
                     value=structural_variety,
                     explanation="Fluency structural-variety ratio, capped at 100",
@@ -332,7 +488,7 @@ class BuildAIReadinessReport:
     @staticmethod
     def _entity_authority_detail(
         report, dimension_score: Optional[float]
-    ) -> GEODimensionDetail:
+    ) -> ScoreDimensionDetail:
         structured_data = report.structured_data_analysis
         links = report.internal_link_analysis
         structural = report.structural_analysis
@@ -366,21 +522,21 @@ class BuildAIReadinessReport:
         if claim_evidence is not None and claim_evidence.detectable_claim_count > 0:
             claim_evidence_coverage = claim_evidence.claim_evidence_coverage * 100.0
 
-        return GEODimensionDetail(
+        return ScoreDimensionDetail(
             label="Entity Authority",
             dimension_score=dimension_score,
             signals=(
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Author declaration",
                     value=author_declaration,
                     explanation="Schema.org Article author declaration",
                 ),
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Outbound body sources",
                     value=outbound_body_sources,
                     explanation="Whether the article body links to an external domain",
                 ),
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Trust index",
                     value=(
                         None
@@ -389,7 +545,7 @@ class BuildAIReadinessReport:
                     ),
                     explanation="Trust-weighted outbound body sources",
                 ),
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Third-party source ratio",
                     value=(
                         None
@@ -398,17 +554,17 @@ class BuildAIReadinessReport:
                     ),
                     explanation="Share of outbound body sources that are third-party",
                 ),
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Supported entities",
                     value=supported_entities,
                     explanation="One minus the unsupported entity ratio",
                 ),
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Citation coverage",
                     value=citation_coverage,
                     explanation="Share of passages containing a citation",
                 ),
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Claim evidence coverage",
                     value=claim_evidence_coverage,
                     explanation="Share of detectable claims with evidence",
@@ -419,7 +575,7 @@ class BuildAIReadinessReport:
     @staticmethod
     def _structural_richness_detail(
         report, dimension_score: Optional[float]
-    ) -> GEODimensionDetail:
+    ) -> ScoreDimensionDetail:
         structural = report.structural_analysis
         table_share = None
         list_share = None
@@ -454,31 +610,31 @@ class BuildAIReadinessReport:
                     * 100.0
                 )
 
-        return GEODimensionDetail(
+        return ScoreDimensionDetail(
             label="Structural Richness",
             dimension_score=dimension_score,
             signals=(
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Table word share",
                     value=table_share,
                     explanation="Table words as a share of the richness denominator",
                 ),
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="List word share",
                     value=list_share,
                     explanation="List words as a share of the richness denominator",
                 ),
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Blockquote word share",
                     value=blockquote_share,
                     explanation="Blockquote words as a share of the richness denominator",
                 ),
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Structured content ratio",
                     value=structured_content_ratio,
                     explanation="Combined table, list, and blockquote word ratio",
                 ),
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Answered question ratio",
                     value=answered_question_ratio,
                     explanation="Share of question headings that have an answer",
@@ -489,7 +645,7 @@ class BuildAIReadinessReport:
     @staticmethod
     def _discoverability_detail(
         report, dimension_score: Optional[float]
-    ) -> GEODimensionDetail:
+    ) -> ScoreDimensionDetail:
         links = report.internal_link_analysis
         outgoing_links = None
         body_links = None
@@ -505,26 +661,26 @@ class BuildAIReadinessReport:
                 else 0.0
             )
 
-        return GEODimensionDetail(
+        return ScoreDimensionDetail(
             label="Discoverability",
             dimension_score=dimension_score,
             signals=(
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Outgoing links",
                     value=outgoing_links,
                     explanation="Count of outgoing links",
                 ),
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Body links",
                     value=body_links,
                     explanation="Count of outgoing links retained in the article body",
                 ),
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Body link ratio",
                     value=body_link_ratio,
                     explanation="Body links divided by outgoing links",
                 ),
-                GEOSignalDetail(
+                ScoreSignalDetail(
                     label="Unique targets",
                     value=unique_targets,
                     explanation="Count of unique outgoing link targets",

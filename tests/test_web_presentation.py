@@ -15,6 +15,9 @@ from tests.page_script import run_page_script  # noqa: E402
 
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "trt_world_erdogan_kazakhstan.html"
+AA_NAIVE_MODIFIED_FIXTURE_PATH = (
+    Path(__file__).parent / "fixtures" / "aa_naive_date_modified.html"
+)
 
 
 class StubHtmlFetcher:
@@ -242,6 +245,39 @@ class WebPresentationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("Metadata Completeness: complete", response.json()["report"])
 
+    def test_aa_style_naive_json_ld_modified_date_still_produces_a_report(self):
+        html = AA_NAIVE_MODIFIED_FIXTURE_PATH.read_text(encoding="utf-8")
+
+        response = self.client.post(
+            "/analyze/file",
+            data={},
+            files={"file": ("aa.html", html, "text/html")},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIsNotNone(payload["report"])
+        self.assertIn("Last Modified Date Available: False", payload["report"])
+        metadata = {
+            field["label"]: field["available"]
+            for field in payload["view"]["metadata"]
+        }
+        self.assertTrue(metadata["Publication date"])
+        self.assertFalse(metadata["Last modified date"])
+        semantic_signals = {
+            signal["label"]: signal["value"]
+            for signal in payload["view"]["assessment"]["geo_score"][
+                "semantic_completeness"
+            ]["detail"]["signals"]
+        }
+        self.assertNotIn("Direct answer coverage", semantic_signals)
+        self.assertEqual(
+            payload["view"]["direct_answer_coverage"]["ratio"], 1.0
+        )
+        self.assertFalse(
+            payload["view"]["direct_answer_coverage"]["included_in_score"]
+        )
+
     def test_file_submission_requires_source_url_only_when_canonical_is_absent(self):
         html = """
             <html lang="en"><head><title>No canonical URL</title></head>
@@ -351,8 +387,6 @@ class WebPresentationTests(unittest.TestCase):
             [
                 "Statistics coverage",
                 "Heading-passage overlap",
-                "Definitive stance",
-                "Passage balance",
                 "Sentence balance",
                 "Structural variety",
             ],
@@ -378,9 +412,9 @@ class WebPresentationTests(unittest.TestCase):
             ["Outgoing links", "Body links", "Body link ratio", "Unique targets"],
         )
 
-    def test_all_geo_cards_have_accessible_toggles_and_detail_rows(self):
+    def test_all_score_cards_have_accessible_toggles_and_detail_rows(self):
         template = self._template()
-        self.assertIn("data-geo-detail-toggle", template)
+        self.assertIn("data-score-detail-toggle", template)
         self.assertIn('aria-expanded="false"', template)
         self.assertIn('aria-controls="${detailId}"', template)
 
@@ -404,6 +438,143 @@ class WebPresentationTests(unittest.TestCase):
         self.assertIn("Body link ratio", rendered)
         self.assertIn("Not measured", rendered)
 
+        seo_rendered = dom["#seo-score-grid"]["html"]
+        self.assertEqual(seo_rendered.count('aria-expanded="false"'), 4)
+        self.assertEqual(seo_rendered.count("aria-controls="), 4)
+        self.assertEqual(seo_rendered.count("Details"), 4)
+        for label in (
+            "Publication date",
+            "Last modified date",
+            "Author",
+            "Description",
+            "Article structured data",
+            "Declared expected properties",
+            "Missing expected properties",
+            "Property coverage",
+            "Total passages",
+            "Unique passages",
+            "Repeated passages",
+            "Unique passage ratio",
+            "Title sources disagree",
+            "Description sources disagree",
+        ):
+            self.assertIn(label, seo_rendered)
+
+    def test_score_grids_use_natural_card_heights_and_wrap_long_signals(self):
+        template = self._template()
+
+        self.assertIn(
+            "#seo-score-grid, #geo-score-grid { align-items: start; }",
+            template,
+        )
+        self.assertIn("align-self: start", template)
+        self.assertIn("min-width: 0", template)
+        self.assertIn("overflow-wrap: normal", template)
+        self.assertIn("word-break: normal", template)
+        self.assertNotIn("overflow-wrap: anywhere", template)
+        self.assertNotIn("word-break: break-word", template)
+        self.assertIn("white-space: normal", template)
+        self.assertIn("flex-direction: column", template)
+        self.assertIn("geo-signal-row-stacked", template)
+
+    def test_long_structured_data_value_remains_complete_in_card_html(self):
+        long_value = (
+            "author, dateModified, datePublished, description, headline, image, "
+            "mainEntityOfPage, publisher"
+        )
+        dimension = {
+            "key": "structured_data",
+            "val": 100.0,
+            "label": "Yapısal Veri",
+            "weight": 25,
+            "detail": {
+                "label": "Structured Data",
+                "dimension_score": 100.0,
+                "signals": [
+                    {
+                        "label": "Declared expected properties",
+                        "value": long_value,
+                        "explanation": "Existing score inputs",
+                    }
+                ],
+            },
+        }
+
+        dom = run_page_script(
+            "document.querySelector('#long-signal').innerHTML = "
+            f"scoreDimensionCard({json.dumps(dimension)}, 'seo');"
+        )
+        rendered = dom["#long-signal"]["html"]
+        self.assertIn(long_value, rendered)
+        for identifier in (
+            "dateModified",
+            "datePublished",
+            "mainEntityOfPage",
+        ):
+            self.assertIn(identifier, rendered)
+        self.assertIn("geo-signal-row-stacked", rendered)
+        self.assertIn('aria-expanded="false"', rendered)
+        self.assertIn("aria-controls=", rendered)
+
+    def test_short_signal_value_keeps_compact_row_markup(self):
+        dimension = {
+            "key": "technical_access",
+            "val": 100.0,
+            "label": "Teknik Erişim",
+            "weight": 20,
+            "detail": {
+                "label": "Technical Access",
+                "dimension_score": 100.0,
+                "signals": [
+                    {
+                        "label": "Title sources disagree",
+                        "value": "No",
+                        "explanation": "Existing score input",
+                    }
+                ],
+            },
+        }
+
+        dom = run_page_script(
+            "document.querySelector('#short-signal').innerHTML = "
+            f"scoreDimensionCard({json.dumps(dimension)}, 'seo');"
+        )
+        rendered = dom["#short-signal"]["html"]
+        self.assertIn('class="geo-signal-row"', rendered)
+        self.assertNotIn("geo-signal-row-stacked", rendered)
+
+    def test_technical_access_web_detail_matches_consistency_score(self):
+        html = """
+            <html lang="tr"><head>
+              <title>Birinci başlık</title>
+              <meta property="og:title" content="Tamamen farklı başlık">
+              <meta name="description" content="Birinci açıklama">
+              <meta property="og:description" content="Tamamen farklı açıklama">
+            </head><body><main><p>Özgün paragraf.</p></main></body></html>
+        """
+        response = self.client.post(
+            "/analyze/file",
+            data={"source_url": "https://example.com/tutarsiz"},
+            files={"file": ("article.html", html, "text/html")},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        technical = response.json()["view"]["assessment"]["seo_score"][
+            "technical_access"
+        ]
+        signals = {
+            signal["label"]: signal["value"]
+            for signal in technical["detail"]["signals"]
+        }
+        self.assertEqual(technical["val"], 0.0)
+        self.assertEqual(
+            signals,
+            {
+                "Title sources disagree": "Yes",
+                "Description sources disagree": "Yes",
+            },
+        )
+
     def test_passage_extractability_is_a_separate_unscored_diagnostic(self):
         view = self._analysed_view()
         diagnostic = view["passage_extractability"]
@@ -421,6 +592,60 @@ class WebPresentationTests(unittest.TestCase):
         self.assertIn('aria-labelledby="passage-extractability-heading"', template)
         self.assertIn("Experimental diagnostic", template)
         self.assertIn("Not included in score", template)
+
+    def test_direct_answer_coverage_is_a_separate_unscored_diagnostic(self):
+        view = self._analysed_view()
+        diagnostic = view["direct_answer_coverage"]
+
+        self.assertFalse(diagnostic["included_in_score"])
+        self.assertNotIn(
+            "Direct answer coverage",
+            {
+                signal["label"]
+                for signal in view["assessment"]["geo_score"][
+                    "semantic_completeness"
+                ]["detail"]["signals"]
+            },
+        )
+        template = self._template()
+        self.assertIn('aria-labelledby="direct-answer-coverage-heading"', template)
+        self.assertIn("Direct Answer Coverage — Experimental diagnostic", template)
+        self.assertIn("Not included in score", template)
+
+    def test_passage_balance_is_a_separate_neutral_unscored_diagnostic(self):
+        view = self._analysed_view()
+        diagnostic = view["passage_balance"]
+
+        self.assertIsInstance(diagnostic["ratio"], float)
+        self.assertFalse(diagnostic["included_in_score"])
+        semantic_signals = {
+            signal["label"]
+            for signal in view["assessment"]["geo_score"][
+                "semantic_completeness"
+            ]["detail"]["signals"]
+        }
+        self.assertNotIn("Passage balance", semantic_signals)
+
+        template = self._template()
+        self.assertIn('aria-labelledby="passage-balance-heading"', template)
+        self.assertIn("Passage Balance — Experimental diagnostic", template)
+        self.assertIn("Not included in score", template)
+
+        dom = run_page_script(f"renderReport({json.dumps(view)}, 'report');")
+        rendered = dom["#passage-balance-metric"]["html"]
+        self.assertIn("Passage Balance", rendered)
+        self.assertNotIn("good", rendered.lower())
+        self.assertNotIn("bad", rendered.lower())
+        self.assertNotIn("pass", rendered.lower())
+        self.assertNotIn("fail", rendered.lower())
+
+    def test_unmeasured_direct_answer_coverage_renders_not_measured(self):
+        view = self._analysed_view()
+        view["direct_answer_coverage"]["ratio"] = None
+
+        dom = run_page_script(f"renderReport({json.dumps(view)}, 'report');")
+        rendered = dom["#direct-answer-coverage-metric"]["html"]
+        self.assertIn("Not measured", rendered)
 
     def test_passage_extractability_bands_render_without_classification(self):
         view = self._analysed_view()
@@ -442,37 +667,42 @@ class WebPresentationTests(unittest.TestCase):
         rendered = dom["#passage-extractability-metrics"]["html"]
         self.assertEqual(rendered.count("Not measured"), 3)
 
-    def test_geo_dimension_panels_toggle_independently(self):
+    def test_seo_and_geo_dimension_panels_toggle_independently(self):
         dom = run_page_script("""
-          const semanticButton = document.querySelector('#semantic-button');
-          const entityButton = document.querySelector('#entity-button');
-          semanticButton.setAttribute('aria-controls', 'semantic-panel');
-          entityButton.setAttribute('aria-controls', 'entity-panel');
-          semanticButton.setAttribute('aria-expanded', 'false');
-          entityButton.setAttribute('aria-expanded', 'false');
-          document.querySelector('#semantic-panel').classList.add('hidden');
-          document.querySelector('#entity-panel').classList.add('hidden');
+          const seoOne = document.querySelector('#seo-one-button');
+          const seoTwo = document.querySelector('#seo-two-button');
+          const geoOne = document.querySelector('#geo-one-button');
+          for (const [button, panel] of [[seoOne, 'seo-one-panel'], [seoTwo, 'seo-two-panel'], [geoOne, 'geo-one-panel']]) {
+            button.setAttribute('aria-controls', panel);
+            button.setAttribute('aria-expanded', 'false');
+            document.querySelector(`#${panel}`).classList.add('hidden');
+          }
 
-          toggleGeoDetail(semanticButton);
-          toggleGeoDetail(entityButton);
+          toggleScoreDetail(seoOne);
+          toggleScoreDetail(seoTwo);
+          toggleScoreDetail(geoOne);
           document.querySelector('#both-open').textContent = [
-            semanticButton.getAttribute('aria-expanded'),
-            entityButton.getAttribute('aria-expanded'),
-            document.querySelector('#semantic-panel').classList.contains('hidden'),
-            document.querySelector('#entity-panel').classList.contains('hidden')
+            seoOne.getAttribute('aria-expanded'),
+            seoTwo.getAttribute('aria-expanded'),
+            geoOne.getAttribute('aria-expanded'),
+            document.querySelector('#seo-one-panel').classList.contains('hidden'),
+            document.querySelector('#seo-two-panel').classList.contains('hidden'),
+            document.querySelector('#geo-one-panel').classList.contains('hidden')
           ].join(',');
 
-          toggleGeoDetail(semanticButton);
+          toggleScoreDetail(seoOne);
           document.querySelector('#one-closed').textContent = [
-            semanticButton.getAttribute('aria-expanded'),
-            entityButton.getAttribute('aria-expanded'),
-            document.querySelector('#semantic-panel').classList.contains('hidden'),
-            document.querySelector('#entity-panel').classList.contains('hidden')
+            seoOne.getAttribute('aria-expanded'),
+            seoTwo.getAttribute('aria-expanded'),
+            geoOne.getAttribute('aria-expanded'),
+            document.querySelector('#seo-one-panel').classList.contains('hidden'),
+            document.querySelector('#seo-two-panel').classList.contains('hidden'),
+            document.querySelector('#geo-one-panel').classList.contains('hidden')
           ].join(',');
         """)
 
-        self.assertEqual(dom["#both-open"]["text"], "true,true,false,false")
-        self.assertEqual(dom["#one-closed"]["text"], "false,true,true,false")
+        self.assertEqual(dom["#both-open"]["text"], "true,true,true,false,false,false")
+        self.assertEqual(dom["#one-closed"]["text"], "false,true,true,true,false,false")
 
     def test_template_only_reads_view_fields_the_server_sends(self):
         """Guards the drift that removing a report field previously caused."""

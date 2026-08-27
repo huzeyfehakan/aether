@@ -33,6 +33,23 @@ capabilities.
 
 ## In progress
 
+**Draft Markdown structure and SEO/GEO previews.** Implemented and intentionally
+left uncommitted because the requester prohibited git add/commit/push. ATX
+H1-H6 headings and blank-line paragraphs now enter normal HTML structural
+analysis, and draft results expose preview scores with source-only dimensions
+left unmeasured. Clipboard fragment precedence and shared delegated score-detail
+toggles now cover the draft result path. The full Python/server suite passes
+(313 tests, 14 skipped);
+browser JavaScript verification remains outstanding because Node is unavailable.
+
+**Published passage details.** Implemented and intentionally uncommitted. The
+published report now exposes each final production `PassageProfile` text and
+its existing `word_count` in production order, behind the shared accessible
+Details toggle. The TRT regression remains 11 passages / 343 words; headings
+and metadata remain outside the passage list and totals. Draft passage details
+are intentionally out of scope because the draft review model does not retain
+the production passage profiles.
+
 **Check a draft before publishing.** Implemented, unreleased. Its usefulness is
 under review rather than settled — the checks are thinner than the reporting
 frame around them. See [`product-discovery.md`](product-discovery.md).

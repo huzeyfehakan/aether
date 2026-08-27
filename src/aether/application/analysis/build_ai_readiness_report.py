@@ -90,7 +90,7 @@ class ScoreDimensionDetail:
 @dataclass(frozen=True)
 class SEOScoreSummary:
     """A user-facing summary of the total SEO score and its dimensions."""
-    total: int
+    total: Optional[int]
     entity_coverage: ScoreDimensionSummary
     structured_data: ScoreDimensionSummary
     semantic_quality: ScoreDimensionSummary
@@ -104,7 +104,7 @@ class SEOScoreSummary:
 @dataclass(frozen=True)
 class GEOScoreSummary:
     """A user-facing summary of the total GEO score and its dimensions."""
-    total: int
+    total: Optional[int]
     semantic_completeness: ScoreDimensionSummary
     entity_authority: ScoreDimensionSummary
     structural_richness: ScoreDimensionSummary
@@ -303,28 +303,39 @@ class BuildAIReadinessReport:
         report, dimension_score: Optional[float]
     ) -> ScoreDimensionDetail:
         metadata = report.metadata_analysis
+        values = (
+            None,
+            None,
+            None,
+            None,
+        ) if dimension_score is None else (
+            "Available" if metadata.publication_date_available else "Missing",
+            "Available" if metadata.last_modified_date_available else "Missing",
+            "Available" if metadata.author_available else "Missing",
+            "Available" if metadata.description_available else "Missing",
+        )
         return ScoreDimensionDetail(
             label="Entity Coverage",
             dimension_score=dimension_score,
             signals=(
                 ScoreSignalDetail(
                     "Publication date",
-                    "Available" if metadata.publication_date_available else "Missing",
+                    values[0],
                     "Whether a publication date was available to the SEO formula",
                 ),
                 ScoreSignalDetail(
                     "Last modified date",
-                    "Available" if metadata.last_modified_date_available else "Missing",
+                    values[1],
                     "Whether a last-modified date was available to the SEO formula",
                 ),
                 ScoreSignalDetail(
                     "Author",
-                    "Available" if metadata.author_available else "Missing",
+                    values[2],
                     "Whether an author was available to the SEO formula",
                 ),
                 ScoreSignalDetail(
                     "Description",
-                    "Available" if metadata.description_available else "Missing",
+                    values[3],
                     "Whether a description was available to the SEO formula",
                 ),
             ),
@@ -335,7 +346,7 @@ class BuildAIReadinessReport:
         report, dimension_score: Optional[float]
     ) -> ScoreDimensionDetail:
         analysis = report.structured_data_analysis
-        if analysis is None:
+        if analysis is None or dimension_score is None:
             values = (None, None, None, None)
         else:
             values = (
@@ -372,7 +383,7 @@ class BuildAIReadinessReport:
         report, dimension_score: Optional[float]
     ) -> ScoreDimensionDetail:
         analysis = report.content_duplication_analysis
-        if analysis is None:
+        if analysis is None or dimension_score is None:
             values = (None, None, None, None)
         else:
             total = analysis.total_passage_count

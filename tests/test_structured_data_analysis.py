@@ -113,15 +113,15 @@ class StructuredDataAnalysisTests(unittest.TestCase):
 
     def test_names_undeclared_properties_in_words_an_editor_recognises(self):
         self.assertEqual(
-            missing_properties_phrase(("inLanguage",)), "Not declared: language"
+            missing_properties_phrase(("inLanguage",)), "Eksik alan: inLanguage"
         )
         self.assertEqual(
             missing_properties_phrase(("datePublished", "author")),
-            "Not declared: publication date and author",
+            "Eksik alanlar: datePublished, author",
         )
         self.assertEqual(
             missing_properties_phrase(("headline", "image", "inLanguage")),
-            "Not declared: headline, image and language",
+            "Eksik alanlar: headline, image, inLanguage",
         )
 
     def test_uses_the_real_trt_cocuk_fixture(self):

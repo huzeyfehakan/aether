@@ -120,6 +120,28 @@ class AssessAIReadiness:
             geo_score=geo_score,
         )
 
+    def execute_draft(
+        self,
+        report: ArticleAnalysisReport,
+        comparison_available: bool = False,
+    ) -> AIReadinessAssessment:
+        """Score only signals that exist before publication.
+
+        This deliberately delegates to the production calculators. The flags
+        affect availability only: no draft-specific formula or weight exists.
+        """
+        observations = self._observations_from(report)
+        return AIReadinessAssessment(
+            report=report,
+            observations=observations,
+            metadata_completeness=self._metadata_completeness(observations),
+            seo_score=self._calculate_seo_score(
+                report, observations, draft=True,
+                comparison_available=comparison_available,
+            ),
+            geo_score=self._calculate_geo_score(report, observations),
+        )
+
     @staticmethod
     def _observations_from(
         report: ArticleAnalysisReport,
@@ -156,6 +178,8 @@ class AssessAIReadiness:
         self,
         report: ArticleAnalysisReport,
         observations: AIReadinessObservations,
+        draft: bool = False,
+        comparison_available: bool = True,
     ) -> SEOScore:
         """Deterministically calculate SEO score from page measurements."""
 
@@ -168,7 +192,7 @@ class AssessAIReadiness:
             )
         )
 
-        entity_score = (
+        entity_score = None if draft else (
             available_metadata_count / 4.0
         ) * 100.0
 
@@ -188,7 +212,7 @@ class AssessAIReadiness:
 
         semantic_score = None
         dup_analysis = report.content_duplication_analysis
-        if dup_analysis is not None:
+        if dup_analysis is not None and comparison_available:
             if dup_analysis.total_passage_count > 0:
                 unique_passages = dup_analysis.total_passage_count - len(dup_analysis.repeated_passages)
                 semantic_score = (max(0, unique_passages) / dup_analysis.total_passage_count) * 100.0

@@ -10,6 +10,7 @@ sys.path.insert(0, "src")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from aether.presentation.web.app import create_app  # noqa: E402
+from aether.application.ingestion.prepare_draft import prepare_draft  # noqa: E402
 
 from tests.page_script import run_page_script  # noqa: E402
 
@@ -42,7 +43,7 @@ class WebPresentationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('data-endpoint="/analyze/url"', response.text)
         self.assertIn('data-endpoint="/analyze/draft"', response.text)
-        self.assertIn("Check a draft", response.text)
+        self.assertIn("Yayınlanmamış içeriği kontrol et", response.text)
         self.assertIn('id="assessment-grid"', response.text)
         self.assertIn('id="report"', response.text)
 
@@ -52,6 +53,115 @@ class WebPresentationTests(unittest.TestCase):
 
         self.assertNotIn('data-endpoint="/analyze/file"', response.text)
         self.assertNotIn("Upload HTML", response.text)
+
+    def test_index_leads_with_the_editor_workflow_and_hides_advanced_comparison(self):
+        page = self.client.get("/").text
+
+        self.assertIn("İçeriğinizin SEO ve AI görünürlüğünü ölçün", page)
+        self.assertIn("Yayındaki sayfayı kontrol et", page)
+        self.assertIn("Yayınlanmamış içeriği kontrol et", page)
+        self.assertIn('id="draft-tab" type="button" aria-controls="draft-fields" aria-expanded="false"', page)
+        self.assertIn('<summary>Gelişmiş seçenekler</summary>', page)
+
+    def test_published_result_information_architecture_is_summary_first(self):
+        page = self.client.get("/").text
+
+        labels = [
+            "Analiz Sonucu",
+            "SEO Skoru",
+            "SEO Detayları",
+            "GEO Skoru",
+            "GEO Detayları",
+            "Öneriler",
+            "Analiz Edilen Metni Gör",
+            "Teknik detaylar",
+        ]
+        positions = [page.index(label) for label in labels]
+        self.assertEqual(positions, sorted(positions))
+        self.assertNotIn("En önemli 3 iyileştirme", page)
+        self.assertNotIn("Tüm önerileri göster", page)
+        self.assertNotIn("Tüm detayları göster", page)
+
+    def test_each_score_owns_its_visible_dimension_grid(self):
+        page = self.client.get("/").text
+
+        seo_card = page[page.index('id="seo-summary-card"'):page.index('id="geo-summary-card"')]
+        geo_card = page[page.index('id="geo-summary-card"'):page.index("<!-- BİTİŞ")]
+        self.assertIn('id="seo-score-grid"', seo_card)
+        self.assertNotIn('id="geo-score-grid"', seo_card)
+        self.assertIn('id="geo-score-grid"', geo_card)
+        self.assertNotIn('class="collapsible-panel hidden"', seo_card + geo_card)
+
+    def test_dimension_and_signal_names_are_turkish_first_with_technical_secondary_text(self):
+        page = self.client.get("/").text
+
+        for key, friendly in (
+            ("entity_coverage", "Varlık Kapsamı"),
+            ("semantic_quality", "Anlamsal Kalite"),
+            ("entity_authority", "Kaynak ve Güvenilirlik"),
+            ("semantic_completeness", "İçerik Bütünlüğü"),
+        ):
+            self.assertIn(f"{key}: '{friendly}'", page)
+        for technical, friendly in (
+            ("Publication date", "Yayın tarihi"),
+            ("Declared expected properties", "Tanımlanan alanlar"),
+            ("Citation coverage", "Kaynaklandırma kapsamı"),
+        ):
+            self.assertIn(f"'{technical}': '{friendly}'", page)
+        self.assertIn('class="technical-name"', page)
+        self.assertIn('class="signal-technical-name"', page)
+
+    def test_score_meaning_colors_remain_independent_from_burgundy_theme(self):
+        page = self.client.get("/").text
+
+        self.assertIn("background: #B4232F", page)
+        self.assertIn(".score-good .score-total", page)
+        self.assertIn("color: #167448", page)
+        self.assertIn(".score-warn .score-total", page)
+        self.assertIn("color: #a66100", page)
+        self.assertIn(".score-low .score-total", page)
+
+    def test_all_recommendation_categories_share_one_visible_section(self):
+        page = self.client.get("/").text
+        section = page[page.index('id="recommendations-heading"'):page.index('id="analysed-text-heading"')]
+
+        self.assertIn('id="editor-list"', section)
+        self.assertIn('id="technical-list"', section)
+        self.assertIn("İçerikte Yapılabilecekler", section)
+        self.assertIn("Teknik / Site Düzeyinde Yapılabilecekler", section)
+        self.assertNotIn("hidden", section)
+
+    def test_published_recommendations_are_fully_turkish_at_the_web_boundary(self):
+        view = self._analysed_view()
+        recommendations = (
+            (view["editor"] or {"recommendations": []})["recommendations"]
+            + (view["technical"] or {"recommendations": []})["recommendations"]
+        )
+        self.assertTrue(recommendations)
+        self.assertIn("Bu öneriler sayfa şablonu veya CMS üzerinde", view["technical"]["subtitle"])
+
+        combined = " ".join(
+            value
+            for item in recommendations
+            for value in (item["headline"], item["what_to_do"], item["why_it_matters"])
+        ).lower()
+        for fragment in ("your article", "what to do", "why it matters", "things that need"):
+            self.assertNotIn(fragment, combined)
+        self.assertTrue(all(item["impact"] != "Structured Data" for item in recommendations))
+
+    def test_draft_result_copy_does_not_reintroduce_english_guidance(self):
+        draft = self._draft("# Başlık\n\nKısa taslak.", publisher="").json()["draft"]
+        combined = " ".join(
+            draft["checks_performed"]
+            + draft["checks_unavailable"]
+            + [
+                text
+                for item in draft["recommendations"]
+                for text in (item["headline"], item["what_to_do"], item["why_it_matters"])
+            ]
+        ).lower()
+        for fragment in ("your article", "publication date", "heading structure", "what to do"):
+            self.assertNotIn(fragment, combined)
 
     def test_the_editor_ui_no_longer_shows_controls_that_do_nothing(self):
         """Content type never reached an analysis; publisher is derived."""
@@ -100,7 +210,7 @@ class WebPresentationTests(unittest.TestCase):
         response = self._draft("<p>Bu ilk paragraftır.</p><p>İkinci.</p>")
 
         self.assertEqual(response.status_code, 422)
-        self.assertIn("enter the headline", response.json()["detail"])
+        self.assertIn("başlığı girin", response.json()["detail"])
 
     def test_a_supplied_headline_is_used_when_the_paste_has_no_heading(self):
         response = self._draft("<p>Bir paragraf.</p>", headline="Editörün başlığı")
@@ -114,7 +224,7 @@ class WebPresentationTests(unittest.TestCase):
             r["headline"] for r in response.json()["draft"]["recommendations"]
         )
 
-        self.assertNotIn("more than one main heading", findings)
+        self.assertNotIn("birden fazla ana başlık", findings)
 
     def test_a_draft_with_several_top_level_headings_is_reported(self):
         response = self._draft("<h1>Bir</h1><p>M.</p><h1>İki</h1><p>N.</p>")
@@ -122,9 +232,9 @@ class WebPresentationTests(unittest.TestCase):
         findings = " ".join(r["headline"] for r in draft["recommendations"])
         details = json.dumps(draft["recommendations"], ensure_ascii=False)
 
-        self.assertIn("more than one main heading", findings)
-        self.assertIn("claim to be the main heading", details)
-        self.assertNotIn("other article", details)
+        self.assertIn("birden fazla ana başlık", findings)
+        self.assertIn("başlık ana başlık olarak kullanılmış", details)
+        self.assertNotIn("başka makale", details)
 
     def test_a_plain_text_draft_says_headings_could_not_be_checked(self):
         response = self._draft(
@@ -133,10 +243,147 @@ class WebPresentationTests(unittest.TestCase):
         draft = response.json()["draft"]
 
         self.assertEqual(response.status_code, 200)
-        self.assertNotIn("Heading structure", draft["checks_performed"])
+        self.assertNotIn("Başlık yapısı", draft["checks_performed"])
         self.assertTrue(
-            any("carried no formatting" in c for c in draft["checks_unavailable"])
+            any("biçimlendirme içermediği" in c for c in draft["checks_unavailable"])
         )
+
+    def test_markdown_draft_preserves_atx_outline_and_paragraphs(self):
+        content = """# Çocuk İçin Belgeseller ve Sinema Filmleri
+
+Intro paragraph one.
+
+Intro paragraph two.
+
+## Doğa ve Hayvanlar Üzerine Belgeseller
+
+### Our Planet – Gezegenimiz
+
+Passage.
+
+### Inside the Mind of a Cat
+
+Passage.
+
+## Duygular Üzerine Filmler
+
+### Inside Out
+
+Passage."""
+        draft = self._draft(content, publisher="").json()["draft"]
+
+        self.assertEqual(draft["paragraph_count"], 5)
+        # Heading text and its Markdown markers are outside passage word count.
+        self.assertEqual(draft["word_count"], 9)
+        self.assertIn("Başlık yapısı", draft["checks_performed"])
+        self.assertFalse(
+            any("biçimlendirme içermediği" in item for item in draft["checks_unavailable"])
+        )
+
+    def test_clipboard_fragment_excludes_the_183_paragraph_wrapper(self):
+        """The rich clipboard wrapper, not passage collection, caused 183."""
+        words = [f"word{i}" for i in range(343)]
+        article_paragraphs = [
+            " ".join(words[index * 31 : (index + 1) * 31])
+            for index in range(10)
+        ] + [" ".join(words[310:])]
+        fragment = (
+            "<h1>Çocuk İçin Belgeseller ve Sinema Filmleri</h1>"
+            + "".join(f"<p>{paragraph}</p>" for paragraph in article_paragraphs)
+        )
+        contaminating_words = " ".join(f"chrome{i}" for i in range(1128))
+        wrapper_paragraphs = "".join(
+            f"<p>{part}</p>" for part in (
+                " ".join(contaminating_words.split()[index * 6 : (index + 1) * 6])
+                for index in range(171)
+            )
+        ) + f"<p>{' '.join(contaminating_words.split()[1026:])}</p>"
+        clipboard_html = (
+            "<html><head><style>p { color: red; }</style>"
+            "<script>window.unrelated = true;</script></head><body>"
+            + wrapper_paragraphs
+            + "<!--StartFragment-->"
+            + fragment
+            + "<!--EndFragment--><div>footer contamination</div></body></html>"
+        )
+
+        # Before fragment precedence this exact payload exposed 183 wrapper +
+        # article paragraphs and 1471 corresponding words to ingestion.
+        self.assertEqual(clipboard_html.count("<p>"), 183)
+        unbounded_html = clipboard_html.replace("<!--StartFragment-->", "").replace(
+            "<!--EndFragment-->", ""
+        )
+        inflated = self._draft(unbounded_html, publisher="").json()["draft"]
+        self.assertEqual(inflated["paragraph_count"], 183)
+        self.assertEqual(inflated["word_count"], 1471)
+
+        prepared = prepare_draft(clipboard_html, "", "tr")
+        self.assertNotIn("chrome0", prepared.html)
+        self.assertNotIn("window.unrelated", prepared.html)
+        self.assertNotIn("footer contamination", prepared.html)
+
+        draft = self._draft(clipboard_html, publisher="").json()["draft"]
+        self.assertEqual(draft["paragraph_count"], 11)
+        self.assertEqual(draft["word_count"], 343)
+
+    def test_draft_previews_preserve_unmeasured_dimensions_as_null(self):
+        draft = self._draft(
+            "# Başlık\n\nİlk paragraf.\n\n## Bölüm\n\nİkinci paragraf.",
+            publisher="",
+        ).json()["draft"]
+
+        seo = draft["seo_preview"]
+        geo = draft["geo_preview"]
+        self.assertIsNone(seo["total"])
+        for key in ("entity_coverage", "structured_data", "semantic_quality", "technical_access"):
+            self.assertIsNone(seo[key]["val"])
+            self.assertNotEqual(seo[key]["val"], 0.0)
+            self.assertTrue(
+                all(signal["value"] is None for signal in seo[key]["detail"]["signals"])
+            )
+        self.assertIsNotNone(geo["total"])
+        self.assertIsNone(geo["discoverability"]["val"])
+        self.assertNotEqual(geo["discoverability"]["val"], 0.0)
+
+        measured = [geo[key] for key in (
+            "semantic_completeness", "entity_authority", "structural_richness",
+            "discoverability",
+        ) if geo[key]["val"] is not None]
+        expected = round(
+            sum(item["val"] * item["weight"] / 100.0 for item in measured)
+            / (sum(item["weight"] for item in measured) / 100.0)
+        )
+        self.assertEqual(geo["total"], expected)
+
+    def test_draft_seo_preview_uses_measurable_corpus_comparison(self):
+        pipeline = self.client.app.state.pipeline
+        pipeline.analyze_report(
+            self.html,
+            "https://trt.example/published",
+            "TRT Çocuk",
+            "news_report",
+        )
+        review = pipeline.analyze_draft(
+            "# Yeni başlık\n\nÖzgün bir giriş paragrafı.\n\n## Bölüm\n\nÖzgün devam paragrafı.",
+            "",
+            "tr",
+            "TRT Çocuk",
+        )
+
+        self.assertEqual(review.seo_preview.semantic_quality.dimension_score, 100.0)
+        self.assertEqual(review.seo_preview.total, 100)
+        self.assertIsNone(review.seo_preview.entity_coverage.dimension_score)
+        self.assertIsNone(review.seo_preview.structured_data.dimension_score)
+        self.assertIsNone(review.seo_preview.technical_access.dimension_score)
+
+    def test_draft_result_page_labels_scores_as_previews(self):
+        page = self.client.get("/").text
+
+        self.assertIn("SEO Önizleme", page)
+        self.assertIn("GEO Önizleme", page)
+        self.assertIn("yalnızca yayınlanmadan önce ölçülebilen sinyallere", page)
+        self.assertIn("Yayınlandıktan sonra ölçülebilecekler", page)
+        self.assertIn("Henüz ölçülemiyor", page)
 
     def test_an_empty_draft_is_refused_with_an_editor_facing_message(self):
         response = self._draft("", headline="Bir başlık")
@@ -150,7 +397,7 @@ class WebPresentationTests(unittest.TestCase):
         draft = self._draft("<h1>Başlık</h1><p>Bir paragraf.</p>").json()["draft"]
         unavailable = " ".join(draft["checks_unavailable"]).lower()
 
-        self.assertIn("publication date", unavailable)
+        self.assertIn("yayın tarihi", unavailable)
         self.assertIn("schema.org", unavailable)
         self.assertNotIn("missing", unavailable)
 
@@ -219,6 +466,97 @@ class WebPresentationTests(unittest.TestCase):
         names = self.client.get("/publishers").json()["publishers"]
 
         self.assertNotIn("Taslaklar", names)
+
+    def test_published_trt_url_populates_same_process_corpus_then_draft_uses_it(self):
+        """One published article is enough; only an app restart loses it."""
+        source_url = (
+            "https://ebeveynakademisi.trtcocuk.net.tr/makale/"
+            "cocuk-icin-belgeseller-ve-sinema-filmleri-29038861"
+        )
+        html = (
+            Path(__file__).parent / "fixtures" / "trt_ebeveyn_belgeseller_nuxt.html"
+        ).read_text(encoding="utf-8")
+        app = create_app(StubHtmlFetcher(html))
+        client = TestClient(app)
+
+        self.assertEqual(client.get("/publishers").json()["publishers"], [])
+        published = client.post("/analyze/url", data={"url": source_url})
+        self.assertEqual(published.status_code, 200)
+        passage_details = published.json()["view"]["passage_details"]
+        expected_word_counts = [33, 8, 43, 3, 34, 5, 41, 75, 3, 95, 3]
+        self.assertEqual(passage_details["passage_count"], 11)
+        self.assertEqual(passage_details["word_count"], 343)
+        self.assertEqual(
+            [passage["position"] for passage in passage_details["passages"]],
+            list(range(1, 12)),
+        )
+        self.assertEqual(
+            [passage["word_count"] for passage in passage_details["passages"]],
+            expected_word_counts,
+        )
+        self.assertEqual(sum(expected_word_counts), passage_details["word_count"])
+        extracted_text = "\n".join(
+            passage["text"] for passage in passage_details["passages"]
+        )
+        self.assertIn("Bilimsel verilere dayanan Our Planet", extracted_text)
+        for excluded in (
+            "24 Aralık 2025",
+            "TRT Çocuk\n",
+            "Önemli Hatırlatma",
+            "Hazırlayan:",
+            "AİLECE İZLENECEK",
+        ):
+            self.assertNotIn(excluded, extracted_text)
+        publisher = "ebeveynakademisi.trtcocuk.net.tr"
+        self.assertEqual(client.get("/publishers").json()["publishers"], [publisher])
+
+        repository = app.state.pipeline.repository
+        version_id = published.json()["view"]["identity"]["article_version_id"]
+        shared = repository.list_passages_for_version(
+            version_id
+        )[0].text
+        content = f"# Yeni taslak\n\n{shared}"
+        standalone_response = client.post(
+            "/analyze/draft",
+            data={
+                "content": content,
+                "headline": "",
+                "language": "tr",
+                "publisher": "",
+            },
+        )
+        self.assertEqual(standalone_response.status_code, 200)
+        standalone = standalone_response.json()["draft"]
+
+        compared_response = client.post(
+            "/analyze/draft",
+            data={
+                "content": content,
+                "headline": "",
+                "language": "tr",
+                "publisher": publisher,
+            },
+        )
+        self.assertEqual(compared_response.status_code, 200)
+        draft = compared_response.json()["draft"]
+
+        self.assertEqual(draft["paragraph_count"], standalone["paragraph_count"])
+        self.assertEqual(draft["word_count"], standalone["word_count"])
+        self.assertIsNone(standalone["seo_preview"]["semantic_quality"]["val"])
+        self.assertEqual(draft["compared_article_count"], 1)
+        self.assertEqual(draft["seo_preview"]["semantic_quality"]["val"], 0.0)
+        self.assertEqual(draft["seo_preview"]["total"], 0)
+        self.assertTrue(
+            any(
+                "diğer makalelerinizde de yer alıyor" in item["headline"]
+                for item in draft["recommendations"]
+            )
+        )
+
+        # create_app owns the repository. Development --reload creates a new
+        # app and therefore an intentionally empty process-scoped corpus.
+        restarted = TestClient(create_app(StubHtmlFetcher(html)))
+        self.assertEqual(restarted.get("/publishers").json()["publishers"], [])
 
     def test_url_submission_fetches_html_and_returns_existing_plain_text_report(self):
         response = self.client.post(
@@ -293,7 +631,7 @@ class WebPresentationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertEqual(
             response.json()["detail"],
-            "HTML file needs a source URL because no canonical URL was found",
+            "canonical URL bulunamadığı için HTML dosyası bir kaynak URL gerektirir.",
         )
 
     def test_file_submission_resolves_the_same_canonical_link_as_ingestion(self):
@@ -332,7 +670,7 @@ class WebPresentationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
         self.assertEqual(
             response.json()["detail"],
-            "HTML file needs a source URL because no canonical URL was found",
+            "canonical URL bulunamadığı için HTML dosyası bir kaynak URL gerektirir.",
         )
 
     def test_page_shell_is_not_cached_so_it_cannot_outlive_the_payload(self):
@@ -425,50 +763,71 @@ class WebPresentationTests(unittest.TestCase):
         rendered = dom["#geo-score-grid"]["html"]
         self.assertEqual(rendered.count('aria-expanded="false"'), 4)
         self.assertEqual(rendered.count("aria-controls="), 4)
-        self.assertEqual(rendered.count("Details"), 4)
+        self.assertEqual(rendered.count("Detayları gör"), 4)
         self.assertIn("Semantic Completeness", rendered)
         self.assertIn("Entity Authority", rendered)
         self.assertIn("Structural Richness", rendered)
         self.assertIn("Discoverability", rendered)
-        self.assertIn("Statistics coverage", rendered)
-        self.assertIn("Author declaration", rendered)
-        self.assertIn("Citation coverage", rendered)
-        self.assertIn("Claim evidence coverage", rendered)
-        self.assertIn("Structured content ratio", rendered)
-        self.assertIn("Body link ratio", rendered)
-        self.assertIn("Not measured", rendered)
+        geo_details = dom["#geo-details"]["html"]
+        self.assertEqual(geo_details.count("dimension-detail-panel hidden"), 4)
+        for label in (
+            "Statistics coverage", "Author declaration", "Citation coverage",
+            "Claim evidence coverage", "Structured content ratio", "Body link ratio",
+        ):
+            self.assertIn(label, geo_details)
+        self.assertIn("Henüz ölçülemiyor", geo_details)
 
         seo_rendered = dom["#seo-score-grid"]["html"]
         self.assertEqual(seo_rendered.count('aria-expanded="false"'), 4)
         self.assertEqual(seo_rendered.count("aria-controls="), 4)
-        self.assertEqual(seo_rendered.count("Details"), 4)
+        self.assertEqual(seo_rendered.count("Detayları gör"), 4)
+        seo_details = dom["#seo-details"]["html"]
         for label in (
-            "Publication date",
-            "Last modified date",
-            "Author",
-            "Description",
-            "Article structured data",
-            "Declared expected properties",
-            "Missing expected properties",
-            "Property coverage",
-            "Total passages",
-            "Unique passages",
-            "Repeated passages",
-            "Unique passage ratio",
-            "Title sources disagree",
-            "Description sources disagree",
+            "Publication date", "Last modified date", "Author", "Description",
+            "Article structured data", "Declared expected properties",
+            "Missing expected properties", "Property coverage", "Total passages",
+            "Unique passages", "Repeated passages", "Unique passage ratio",
+            "Title sources disagree", "Description sources disagree",
         ):
-            self.assertIn(label, seo_rendered)
+            self.assertIn(label, seo_details)
 
-    def test_score_grids_use_natural_card_heights_and_wrap_long_signals(self):
+    def test_draft_score_cards_use_unique_matching_detail_targets(self):
+        draft = self._draft(
+            "# Başlık\n\nGiriş.\n\n## Bölüm\n\nİkinci paragraf.",
+            publisher="",
+        ).json()["draft"]
+        self.assertTrue(draft["geo_preview"]["semantic_completeness"]["detail"]["signals"])
+        self.assertTrue(draft["geo_preview"]["entity_authority"]["detail"]["signals"])
+        self.assertTrue(draft["geo_preview"]["structural_richness"]["detail"]["signals"])
+        self.assertTrue(draft["geo_preview"]["discoverability"]["detail"]["signals"])
+
+        template = self._template()
+        self.assertIn("renderDimensionGroup(score, dimensions, `draft-${kind}`)", template)
+        self.assertIn("`${scoreType}-${dimension.key.replaceAll('_', '-')}-detail`", template)
+        self.assertIn('aria-controls="${detailId}"', template)
+        self.assertIn('id="${detailId}" class="dimension-detail-panel hidden"', template)
+        self.assertIn("document.addEventListener('click'", template)
+        self.assertIn("event.target.closest('[data-score-detail-toggle]')", template)
+        self.assertNotIn("querySelectorAll('[data-score-detail-toggle]').forEach", template)
+
+    def test_passage_details_use_shared_accessible_toggle_contract(self):
         template = self._template()
 
-        self.assertIn(
-            "#seo-score-grid, #geo-score-grid { align-items: start; }",
-            template,
-        )
-        self.assertIn("align-self: start", template)
+        self.assertIn('type="button"', template)
+        self.assertIn('aria-controls="passage-details-panel"', template)
+        self.assertIn('id="passage-details-panel" class="geo-dimension-detail hidden"', template)
+        self.assertIn('data-score-detail-toggle aria-expanded="false"', template)
+        self.assertIn("passage.word_count", template)
+        self.assertIn("escapeHtml(passage.text)", template)
+
+    def test_compact_score_grids_keep_detail_panels_outside_cards(self):
+        template = self._template()
+
+        self.assertIn(".dimension-grid { align-items: stretch", template)
+        self.assertIn("min-height: 174px", template)
         self.assertIn("min-width: 0", template)
+        self.assertIn('class="dimension-detail-panel hidden"', template)
+        self.assertIn('class="dimension-detail-stack"', template)
         self.assertIn("overflow-wrap: normal", template)
         self.assertIn("word-break: normal", template)
         self.assertNotIn("overflow-wrap: anywhere", template)
@@ -501,10 +860,16 @@ class WebPresentationTests(unittest.TestCase):
         }
 
         dom = run_page_script(
-            "document.querySelector('#long-signal').innerHTML = "
+            "document.querySelector('#long-card').innerHTML = "
             f"scoreDimensionCard({json.dumps(dimension)}, 'seo');"
+            "document.querySelector('#long-detail').innerHTML = "
+            f"scoreDimensionDetail({json.dumps(dimension)}, 'seo');"
         )
-        rendered = dom["#long-signal"]["html"]
+        card_rendered = dom["#long-card"]["html"]
+        rendered = dom["#long-detail"]["html"]
+        self.assertNotIn(long_value, card_rendered)
+        self.assertIn("8 / 8 mevcut", rendered)
+        self.assertIn("Tam liste", rendered)
         self.assertIn(long_value, rendered)
         for identifier in (
             "dateModified",
@@ -513,8 +878,8 @@ class WebPresentationTests(unittest.TestCase):
         ):
             self.assertIn(identifier, rendered)
         self.assertIn("geo-signal-row-stacked", rendered)
-        self.assertIn('aria-expanded="false"', rendered)
-        self.assertIn("aria-controls=", rendered)
+        self.assertIn('aria-expanded="false"', card_rendered)
+        self.assertIn("aria-controls=", card_rendered)
 
     def test_short_signal_value_keeps_compact_row_markup(self):
         dimension = {
@@ -537,7 +902,7 @@ class WebPresentationTests(unittest.TestCase):
 
         dom = run_page_script(
             "document.querySelector('#short-signal').innerHTML = "
-            f"scoreDimensionCard({json.dumps(dimension)}, 'seo');"
+            f"scoreDimensionDetail({json.dumps(dimension)}, 'seo');"
         )
         rendered = dom["#short-signal"]["html"]
         self.assertIn('class="geo-signal-row"', rendered)
@@ -590,8 +955,8 @@ class WebPresentationTests(unittest.TestCase):
 
         template = self._template()
         self.assertIn('aria-labelledby="passage-extractability-heading"', template)
-        self.assertIn("Experimental diagnostic", template)
-        self.assertIn("Not included in score", template)
+        self.assertIn("Deneysel tanı", template)
+        self.assertIn("Skora dahil değildir", template)
 
     def test_direct_answer_coverage_is_a_separate_unscored_diagnostic(self):
         view = self._analysed_view()
@@ -609,8 +974,8 @@ class WebPresentationTests(unittest.TestCase):
         )
         template = self._template()
         self.assertIn('aria-labelledby="direct-answer-coverage-heading"', template)
-        self.assertIn("Direct Answer Coverage — Experimental diagnostic", template)
-        self.assertIn("Not included in score", template)
+        self.assertIn("Doğrudan Cevaplama — Deneysel tanı", template)
+        self.assertIn("Skora dahil değildir", template)
 
     def test_passage_balance_is_a_separate_neutral_unscored_diagnostic(self):
         view = self._analysed_view()
@@ -628,12 +993,12 @@ class WebPresentationTests(unittest.TestCase):
 
         template = self._template()
         self.assertIn('aria-labelledby="passage-balance-heading"', template)
-        self.assertIn("Passage Balance — Experimental diagnostic", template)
-        self.assertIn("Not included in score", template)
+        self.assertIn("Paragraf Dengesi — Deneysel tanı", template)
+        self.assertIn("Skora dahil değildir", template)
 
         dom = run_page_script(f"renderReport({json.dumps(view)}, 'report');")
         rendered = dom["#passage-balance-metric"]["html"]
-        self.assertIn("Passage Balance", rendered)
+        self.assertIn("Paragraf Dengesi", rendered)
         self.assertNotIn("good", rendered.lower())
         self.assertNotIn("bad", rendered.lower())
         self.assertNotIn("pass", rendered.lower())
@@ -645,16 +1010,16 @@ class WebPresentationTests(unittest.TestCase):
 
         dom = run_page_script(f"renderReport({json.dumps(view)}, 'report');")
         rendered = dom["#direct-answer-coverage-metric"]["html"]
-        self.assertIn("Not measured", rendered)
+        self.assertIn("Henüz ölçülemiyor", rendered)
 
     def test_passage_extractability_bands_render_without_classification(self):
         view = self._analysed_view()
 
         dom = run_page_script(f"renderReport({json.dumps(view)}, 'report');")
         rendered = dom["#passage-extractability-metrics"]["html"]
-        self.assertIn("&gt;128 words", rendered)
-        self.assertIn("&gt;256 words", rendered)
-        self.assertIn("&gt;512 words", rendered)
+        self.assertIn("&gt;128 kelime", rendered)
+        self.assertIn("&gt;256 kelime", rendered)
+        self.assertIn("&gt;512 kelime", rendered)
         self.assertNotIn("good", rendered.lower())
         self.assertNotIn("bad", rendered.lower())
 
@@ -665,7 +1030,7 @@ class WebPresentationTests(unittest.TestCase):
 
         dom = run_page_script(f"renderReport({json.dumps(view)}, 'report');")
         rendered = dom["#passage-extractability-metrics"]["html"]
-        self.assertEqual(rendered.count("Not measured"), 3)
+        self.assertEqual(rendered.count("Henüz ölçülemiyor"), 3)
 
     def test_seo_and_geo_dimension_panels_toggle_independently(self):
         dom = run_page_script("""
@@ -756,23 +1121,23 @@ class WebPresentationTests(unittest.TestCase):
         reuse = response.json()["view"]["editor"]
         self.assertEqual(
             reuse["compared_articles"],
-            "Compared against previously analyzed articles from this publisher "
-            "(1 article).",
+            "Bu yayıncıdan daha önce analiz edilen makalelerle karşılaştırıldı "
+            "(1 makale).",
         )
         recommendation = next(
             item
             for item in reuse["recommendations"]
-            if item["headline"].startswith("This paragraph also appears")
+            if item["headline"].startswith("Bu paragraf diğer makalelerinizde")
         )
         self.assertEqual(
             recommendation["headline"],
-            "This paragraph also appears in your other articles",
+            "Bu paragraf diğer makalelerinizde de yer alıyor",
         )
         self.assertEqual(
             recommendation["occurrences"][0]["detail"],
-            "Also appears in 1 other article",
+            "1 başka makalede de yer alıyor",
         )
-        self.assertIn("outside the article body", recommendation["what_to_do"])
+        self.assertIn("makale gövdesinin dışında", recommendation["what_to_do"])
         self.assertEqual(len(recommendation["occurrences"]), 1)
         self.assertIn(
             "Bu icerik bilgilendirme", recommendation["occurrences"][0]["excerpt"]
@@ -837,7 +1202,7 @@ class WebPresentationTests(unittest.TestCase):
         select = dom["#draft-publisher"]["html"]
 
         self.assertIn('<option value="">', select)
-        self.assertIn("Don", select)
+        self.assertIn("Karşılaştırma", select)
         self.assertLess(select.index('value=""'), select.index("trthaber.com"))
 
     def test_the_editor_is_told_what_comparing_will_do(self):
@@ -860,7 +1225,7 @@ class WebPresentationTests(unittest.TestCase):
 
         nothing_yet = run_page_script("await refreshPublishers();", publishers=[])
         self.assertIn(
-            "No articles have been checked yet",
+            "Sunucu başladığından beri makale analiz edilmediği",
             nothing_yet["#draft-compare-state"]["text"],
         )
 
@@ -881,9 +1246,9 @@ class WebPresentationTests(unittest.TestCase):
         ]
         unavailable = " ".join(draft["checks_unavailable"])
 
-        self.assertIn("no publisher was chosen", unavailable)
+        self.assertIn("yayıncı seçilmediği", unavailable)
         self.assertNotIn(
-            "Text repeated in your other articles", draft["checks_performed"]
+            "Diğer makalelerinizde tekrarlanan metin", draft["checks_performed"]
         )
 
     def test_a_publisher_with_nothing_checked_yet_says_so_differently(self):
@@ -893,8 +1258,8 @@ class WebPresentationTests(unittest.TestCase):
         ).json()["draft"]
         unavailable = " ".join(draft["checks_unavailable"])
 
-        self.assertIn("have been checked yet", unavailable)
-        self.assertNotIn("no publisher was chosen", unavailable)
+        self.assertIn("henüz makale analiz edilmediği", unavailable)
+        self.assertNotIn("yayıncı seçilmediği", unavailable)
 
     def test_no_publisher_display_name_is_invented_from_a_hostname(self):
         dom = run_page_script(
@@ -918,11 +1283,11 @@ class WebPresentationTests(unittest.TestCase):
 
         without = self._draft(draft, publisher="").json()["draft"]
         without_findings = " ".join(r["headline"] for r in without["recommendations"])
-        self.assertNotIn("also appears in your other articles", without_findings)
+        self.assertNotIn("diğer makalelerinizde de yer alıyor", without_findings)
 
         with_publisher = self._draft(draft, publisher=publisher).json()["draft"]
         findings = " ".join(r["headline"] for r in with_publisher["recommendations"])
-        self.assertIn("also appears in your other articles", findings)
+        self.assertIn("diğer makalelerinizde de yer alıyor", findings)
 
     def test_the_same_draft_and_publisher_stay_one_draft(self):
         publisher = "ebeveynakademisi.trtcocuk.net.tr"
@@ -967,7 +1332,7 @@ class WebPresentationTests(unittest.TestCase):
 
             self.assertEqual(draft["compared_article_count"], index)
             self.assertIn(
-                "Text repeated in your other articles", draft["checks_performed"]
+                "Diğer makalelerinizde tekrarlanan metin", draft["checks_performed"]
             )
 
     def test_drafts_are_never_counted_as_articles_to_compare_against(self):
@@ -987,15 +1352,15 @@ class WebPresentationTests(unittest.TestCase):
         first = self._publish("birinci", "Birinci metin.", publisher=publisher)
         self.assertEqual(
             first.json()["view"]["editor"]["compared_articles"],
-            "No previously analyzed articles from this publisher, so repeated "
-            "text could not be checked.",
+            "Bu yayıncıdan daha önce analiz edilmiş makale olmadığı için "
+            "tekrarlanan metin kontrol edilemedi.",
         )
 
         second = self._publish("ikinci", "Ikinci metin.", publisher=publisher)
         self.assertEqual(
             second.json()["view"]["editor"]["compared_articles"],
-            "Compared against previously analyzed articles from this publisher "
-            "(1 article).",
+            "Bu yayıncıdan daha önce analiz edilen makalelerle karşılaştırıldı "
+            "(1 makale).",
         )
 
     def test_a_draft_finding_reaches_the_page_instead_of_throwing(self):
@@ -1023,10 +1388,10 @@ class WebPresentationTests(unittest.TestCase):
         dom = run_page_script(f"renderDraft({json.dumps(draft)});")
         findings = dom["#draft-findings"]["html"]
 
-        self.assertIn("This paragraph also appears in your other articles", findings)
+        self.assertIn("Bu paragraf diğer makalelerinizde de yer alıyor", findings)
         self.assertIn(shared, findings)
-        self.assertIn("What to do.", findings)
-        self.assertNotIn("Nothing to change", findings)
+        self.assertIn("Ne yapmalısınız?", findings)
+        self.assertNotIn("değişiklik önerisi yok", findings)
 
     def test_a_draft_with_nothing_to_report_still_says_so(self):
         """The branch that did work must keep working."""
@@ -1034,15 +1399,15 @@ class WebPresentationTests(unittest.TestCase):
 
         dom = run_page_script(f"renderDraft({json.dumps(draft)});")
 
-        self.assertIn("Nothing to change", dom["#draft-findings"]["html"])
+        self.assertIn("değişiklik önerisi yok", dom["#draft-findings"]["html"])
 
     def test_index_shows_both_audience_sections(self):
         response = self.client.get("/")
 
         self.assertIn('id="editor-section"', response.text)
         self.assertIn('id="technical-section"', response.text)
-        self.assertIn("Editor Recommendations", response.text)
-        self.assertIn("Technical AI Readiness", response.text)
+        self.assertIn("İçerikte Yapılabilecekler", response.text)
+        self.assertIn("Teknik / Site Düzeyinde Yapılabilecekler", response.text)
 
     def test_a_page_with_no_article_text_is_explained_not_rejected(self):
         """A video or listing page is an expected outcome, not an error."""
@@ -1061,8 +1426,8 @@ class WebPresentationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         outcome = response.json()["outcome"]
         self.assertEqual(outcome["outcome"], "no_article_text_found")
-        self.assertIn("No article text was found", outcome["headline"])
-        self.assertIn("nothing is wrong", outcome["what_to_do"])
+        self.assertIn("makale metni bulunamadı", outcome["headline"])
+        self.assertIn("sorun yoktur", outcome["what_to_do"])
         self.assertIsNone(response.json()["report"])
 
     def test_an_article_whose_text_cannot_be_read_is_named_as_a_problem(self):
@@ -1084,8 +1449,8 @@ class WebPresentationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         outcome = response.json()["outcome"]
         self.assertEqual(outcome["outcome"], "article_text_unreadable")
-        self.assertIn("says it is an article", outcome["headline"])
-        self.assertIn("maintains the site", outcome["what_to_do"])
+        self.assertIn("kendisini makale olarak tanımlıyor", outcome["headline"])
+        self.assertIn("teknik ekiple", outcome["what_to_do"])
 
     def test_no_outcome_exposes_parser_wording(self):
         """An editor never sees why the parser stopped."""
@@ -1114,7 +1479,7 @@ class WebPresentationTests(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 422)
-        self.assertEqual(response.json()["detail"], "URL must be an absolute HTTP(S) URL")
+        self.assertEqual(response.json()["detail"], "URL, http veya https ile başlayan geçerli bir adres olmalıdır.")
 
     def test_file_submission_can_use_existing_optional_metadata_fallbacks(self):
         html = """
@@ -1161,7 +1526,7 @@ class WebPresentationTests(unittest.TestCase):
         # With the always-true fields gone, a page carrying none of the four
         # fields that can vary is correctly "missing" rather than "partial".
         self.assertIn("Metadata Completeness: partial", report)
-        self.assertIn("This article does not say when it was published", report)
+        self.assertIn("Makalenin yayın tarihi belirtilmemiş", report)
 
 
 if __name__ == "__main__":

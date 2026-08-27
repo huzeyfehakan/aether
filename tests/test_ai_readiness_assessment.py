@@ -320,6 +320,42 @@ class AIReadinessAssessmentTests(unittest.TestCase):
 
         self.assertEqual(len(set(results)), 1)
 
+    def test_draft_geo_excludes_direct_answer_and_passage_balance_diagnostics(self):
+        report = self.report(
+            metadata_available=(False, False, False, False, False, False, False),
+            coverage_ratio=0.5,
+            covered_paragraphs=1,
+            structural_counts=(2, 80, 1),
+        )
+        baseline = replace(
+            report,
+            structural_analysis=replace(
+                report.structural_analysis,
+                direct_answer_coverage_ratio=0.0,
+            ),
+            passage_quality_analysis=replace(
+                report.passage_quality_analysis,
+                passage_balance_ratio=0.0,
+            ),
+        )
+        changed_diagnostics = replace(
+            baseline,
+            structural_analysis=replace(
+                baseline.structural_analysis,
+                direct_answer_coverage_ratio=1.0,
+            ),
+            passage_quality_analysis=replace(
+                baseline.passage_quality_analysis,
+                passage_balance_ratio=1.0,
+            ),
+        )
+
+        scorer = AssessAIReadiness()
+        self.assertEqual(
+            scorer.execute_draft(baseline).geo_score,
+            scorer.execute_draft(changed_diagnostics).geo_score,
+        )
+
     def test_semantic_completeness_renormalizes_unmeasured_optional_signals(self):
         metadata = MetadataAnalysis(
             article_id="article-1",

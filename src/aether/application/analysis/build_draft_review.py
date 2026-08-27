@@ -30,6 +30,10 @@ from aether.application.analysis.derive_editor_recommendations import (
     DeriveEditorRecommendations,
     EditorRecommendation,
 )
+from aether.application.analysis.build_ai_readiness_report import (
+    GEOScoreSummary,
+    SEOScoreSummary,
+)
 
 class DraftCheck(str, Enum):
     """A check a draft's own text can answer."""
@@ -79,6 +83,8 @@ class DraftReview:
     recommendations: Tuple[EditorRecommendation, ...]
     checks_performed: Tuple[DraftCheck, ...]
     checks_unavailable: Tuple[UnavailableCheck, ...]
+    seo_preview: Optional[SEOScoreSummary]
+    geo_preview: Optional[GEOScoreSummary]
 
     @property
     def has_findings(self) -> bool:
@@ -99,6 +105,8 @@ class BuildDraftReview:
         headline: str,
         heading_check_available: bool,
         comparison_requested: bool = True,
+        seo_preview: Optional[SEOScoreSummary] = None,
+        geo_preview: Optional[GEOScoreSummary] = None,
     ) -> DraftReview:
         structural = report.structural_analysis
         duplication = report.content_duplication_analysis
@@ -128,4 +136,6 @@ class BuildDraftReview:
             recommendations=self._recommendations.execute(report),
             checks_performed=tuple(performed),
             checks_unavailable=tuple(unavailable),
+            seo_preview=seo_preview,
+            geo_preview=geo_preview,
         )

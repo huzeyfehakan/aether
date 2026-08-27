@@ -65,6 +65,7 @@ from aether.presentation.editor_recommendation_text import (
     category_subtitle,
     compared_articles_phrase,
     heading_count_phrase,
+    impact_label,
     missing_properties_phrase,
     recommendation_text,
     repeated_in_phrase,
@@ -186,11 +187,23 @@ class AIReadinessPipeline:
         analysis_report = self._build_draft_report.execute(
             registration.article, registration.article_version.article_version_id
         )
+        comparison_available = bool(
+            comparison_requested
+            and analysis_report.content_duplication_analysis is not None
+            and analysis_report.content_duplication_analysis.compared_article_count > 0
+        )
+        preview_report = self._build_readiness_report.execute(
+            self._assess_readiness.execute_draft(
+                analysis_report, comparison_available=comparison_available
+            )
+        )
         return self._build_draft_review.execute(
             analysis_report,
             prepared.headline,
             prepared.heading_check_available,
             comparison_requested,
+            preview_report.assessment_summary.seo_score,
+            preview_report.assessment_summary.geo_score,
         )
 
     def analyze(
@@ -238,6 +251,23 @@ _TEMPLATE_PATH = Path(__file__).parent / "templates" / "index.html"
 #: requires a publisher, and this is not one: no draft filed here is ever
 #: compared against anything, because drafts are excluded from every corpus.
 _DRAFTS_WITHOUT_A_PUBLISHER = "Unpublished drafts"
+
+
+_USER_ERROR_TEXT = {
+    "URL must be an absolute HTTP(S) URL": "URL, http veya https ile başlayan geçerli bir adres olmalıdır.",
+    "source URL must be an absolute HTTP(S) URL": "Kaynak URL, http veya https ile başlayan geçerli bir adres olmalıdır.",
+    "There is nothing to check yet. Paste your article into the box above.": "Henüz kontrol edilecek içerik yok. Makalenizi yukarıdaki alana yapıştırın.",
+    "This draft has no heading. Please enter the headline you plan to publish.": "Taslağın başlığı yok. Yayınlamayı planladığınız başlığı girin.",
+    "Fallback publication date must be ISO-8601": "Yayın tarihi geçerli bir tarih biçiminde olmalıdır.",
+    "Fallback publication date must include a timezone": "Yayın tarihi saat dilimi içermelidir.",
+    "HTML file needs a source URL because no canonical URL was found": "canonical URL bulunamadığı için HTML dosyası bir kaynak URL gerektirir.",
+    "HTML file must be UTF-8 encoded": "HTML dosyası UTF-8 kodlamasında olmalıdır.",
+}
+
+
+def _user_error_text(error: Exception) -> str:
+    """Translate known validation messages at the web presentation boundary."""
+    return _USER_ERROR_TEXT.get(str(error), str(error))
 
 
 def _canonical_url_from_html(html: str) -> Optional[str]:
@@ -312,7 +342,7 @@ def _recommendation_views(report: Any, category) -> list:
                 "headline": text.headline,
                 "why_it_matters": text.why_it_matters,
                 "what_to_do": text.what_to_do,
-                "impact": _IMPACT_MAP.get(recommendation.code, ""),
+                "impact": impact_label(_IMPACT_MAP.get(recommendation.code, "")),
                 "occurrences": [],
             },
         )
@@ -435,6 +465,18 @@ def _report_view(report: Any) -> Dict[str, Any]:
             "passage_count": structure.total_passage_count,
             "word_count": structure.total_word_count,
         },
+        "passage_details": {
+            "passage_count": structure.total_passage_count,
+            "word_count": structure.total_word_count,
+            "passages": [
+                {
+                    "position": profile.ordinal_position + 1,
+                    "word_count": profile.word_count,
+                    "text": profile.text,
+                }
+                for profile in report.passage_quality_summary.passage_profiles
+            ],
+        },
         "passage_extractability": {
             "passage_count": report.passage_quality_summary.passage_count,
             "bands": (
@@ -514,6 +556,8 @@ def _draft_view(review: Any) -> Dict[str, Any]:
         "checks_unavailable": [
             unavailable_check_text(check) for check in review.checks_unavailable
         ],
+        "seo_preview": _seo_score_view(review.seo_preview),
+        "geo_preview": _geo_score_view(review.geo_preview),
         "recommendations": [
             {
                 "headline": recommendation_text(r).headline,
@@ -523,6 +567,42 @@ def _draft_view(review: Any) -> Dict[str, Any]:
             }
             for r in review.recommendations
         ],
+    }
+
+
+def _seo_score_view(score: Any) -> Optional[Dict[str, Any]]:
+    if score is None:
+        return None
+    return {
+        "total": score.total,
+        **{
+            key: _score_dimension_view(
+                key, getattr(score, key), getattr(score, f"{key}_detail"),
+                seo_dimension_text(key)["label"],
+            )
+            for key in (
+                "entity_coverage", "structured_data", "semantic_quality",
+                "technical_access",
+            )
+        },
+    }
+
+
+def _geo_score_view(score: Any) -> Optional[Dict[str, Any]]:
+    if score is None:
+        return None
+    return {
+        "total": score.total,
+        **{
+            key: _score_dimension_view(
+                key, getattr(score, key), getattr(score, f"{key}_detail"),
+                geo_dimension_text(key)["label"],
+            )
+            for key in (
+                "semantic_completeness", "entity_authority",
+                "structural_richness", "discoverability",
+            )
+        },
     }
 
 
@@ -602,7 +682,7 @@ def create_app(fetcher: Optional[HtmlFetcher] = None) -> FastAPI:
             )
             return _analysis_response(report)
         except (HtmlFetchError, DomainValidationError) as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
+            raise HTTPException(status_code=422, detail=_user_error_text(error)) from error
 
     @app.get("/publishers")
     def publishers() -> Dict[str, Any]:
@@ -629,9 +709,9 @@ def create_app(fetcher: Optional[HtmlFetcher] = None) -> FastAPI:
                 content, headline, language, publisher
             )
         except (DraftContentRequired, DraftHeadlineRequired) as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
+            raise HTTPException(status_code=422, detail=_user_error_text(error)) from error
         except DomainValidationError as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
+            raise HTTPException(status_code=422, detail=_user_error_text(error)) from error
         return {"draft": _draft_view(review)}
 
     @app.post("/analyze/file")
@@ -662,10 +742,10 @@ def create_app(fetcher: Optional[HtmlFetcher] = None) -> FastAPI:
             return _analysis_response(report)
         except UnicodeDecodeError as error:
             raise HTTPException(
-                status_code=422, detail="HTML file must be UTF-8 encoded"
+                status_code=422, detail=_USER_ERROR_TEXT["HTML file must be UTF-8 encoded"]
             ) from error
         except DomainValidationError as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
+            raise HTTPException(status_code=422, detail=_user_error_text(error)) from error
 
     return app
 

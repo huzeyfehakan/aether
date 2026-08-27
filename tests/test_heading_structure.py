@@ -15,6 +15,7 @@ from aether.application.ingestion.register_raw_html_article import (  # noqa: E4
     RegisterRawHtmlArticle,
 )
 from aether.domain.common import DomainValidationError  # noqa: E402
+from aether.application.ingestion.prepare_draft import prepare_draft  # noqa: E402
 
 
 OBSERVED_AT = datetime(2026, 8, 7, 9, 0, tzinfo=timezone.utc)
@@ -51,6 +52,51 @@ class HeadingStructureTests(unittest.TestCase):
 
         self.assertEqual([h.level for h in analysis.headings], [1, 2])
         self.assertEqual(analysis.top_level_count, 1)
+
+    def test_markdown_atx_levels_enter_the_html_heading_analysis(self):
+        prepared = prepare_draft(
+            "# Ana başlık\n\nGiriş.\n\n## Bölüm\n\nMetin.\n\n### Alt bölüm\n\nMetin.",
+            headline="",
+            language="tr",
+        )
+        registration = self.register.execute(
+            RawHtmlArticle(
+                html=prepared.html,
+                source_url=prepared.source_url,
+                publisher="Draft",
+                article_type="draft",
+                observed_at=OBSERVED_AT,
+            )
+        )
+        analysis = self.analyze.execute(
+            registration.article, registration.article_version.article_version_id
+        )
+
+        self.assertTrue(prepared.heading_check_available)
+        self.assertEqual([heading.level for heading in analysis.headings], [1, 2, 3])
+        self.assertEqual(
+            [heading.text for heading in analysis.headings],
+            ["Ana başlık", "Bölüm", "Alt bölüm"],
+        )
+
+    def test_publisher_context_cannot_change_prepared_draft_content(self):
+        content = "# Ana başlık\n\nBirinci paragraf.\n\n## Bölüm\n\nİkinci paragraf."
+
+        standalone = prepare_draft(content, "", "tr", publisher="")
+        compared = prepare_draft(
+            content,
+            "",
+            "tr",
+            publisher="publisher.example",
+        )
+
+        self.assertEqual(compared.html, standalone.html)
+        self.assertEqual(compared.headline, standalone.headline)
+        self.assertEqual(
+            compared.heading_check_available,
+            standalone.heading_check_available,
+        )
+        self.assertNotEqual(compared.source_url, standalone.source_url)
 
     def test_reports_an_article_with_no_main_heading(self):
         analysis = self.analyze_body(
@@ -141,8 +187,8 @@ class HeadingStructureTests(unittest.TestCase):
 
         self.assertEqual(recommendation.heading_count, 2)
         self.assertEqual(recommendation.other_article_count, 0)
-        self.assertIn("main heading", heading_count_phrase(recommendation.heading_count))
-        self.assertNotIn("other article", heading_count_phrase(recommendation.heading_count))
+        self.assertIn("ana başlık", heading_count_phrase(recommendation.heading_count))
+        self.assertNotIn("başka makale", heading_count_phrase(recommendation.heading_count))
 
     def test_rejects_an_article_version_from_a_different_article(self):
         first = self.ingest("birinci", "<h1>Bir</h1><p>Metin.</p>")

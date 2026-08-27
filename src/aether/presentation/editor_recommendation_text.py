@@ -34,21 +34,128 @@ class RecommendationText:
 
 
 CATEGORY_TITLES: Dict[RecommendationCategory, str] = {
-    RecommendationCategory.EDITOR: "Editor Recommendations",
-    RecommendationCategory.TECHNICAL: "Technical AI Readiness",
+    RecommendationCategory.EDITOR: "İçerikte Yapılabilecekler",
+    RecommendationCategory.TECHNICAL: "Teknik / Site Düzeyinde Yapılabilecekler",
 }
 
 CATEGORY_SUBTITLES: Dict[RecommendationCategory, str] = {
-    RecommendationCategory.EDITOR: "Things you can change in this article now.",
+    RecommendationCategory.EDITOR: "Bu makalede şimdi yapabileceğiniz iyileştirmeler.",
     RecommendationCategory.TECHNICAL: (
-        "Things that need a change to the page template or the CMS. These "
-        "usually apply to every article on the site, not just this one. Share "
-        "them with whoever maintains it."
+        "Bu öneriler sayfa şablonu veya CMS üzerinde değişiklik gerektirir. "
+        "Genellikle yalnızca bu makaleyi değil, sitedeki diğer makaleleri de "
+        "etkiler. Teknik ekip veya site yöneticisiyle paylaşabilirsiniz."
+    ),
+}
+
+# Turkish is the default interface language. Detection continues to emit only
+# codes and evidence; this table owns how every code is presented to an editor.
+_TEXT_TR: Dict[RecommendationCode, RecommendationText] = {
+    RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: RecommendationText(
+        "Bu sayfa kendisini makale olarak tanımlamıyor",
+        "Schema.org Article yapılandırılmış verisi, yazılımların sayfanın türünü, yazarını ve yayın tarihini doğrudan okumasını sağlar.",
+        "Sayfaya headline, datePublished, author ve publisher alanlarını içeren Schema.org Article işaretlemesi ekleyin.",
+    ),
+    RecommendationCode.INCOMPLETE_ARTICLE_STRUCTURED_DATA: RecommendationText(
+        "Makale yapılandırılmış verilerinde eksik alanlar var",
+        "Sayfa kendisini makale olarak tanımlıyor ancak Schema.org Article için beklenen bazı bilgileri bildirmiyor.",
+        "Eksik alanları Article yapılandırılmış verisine ekleyin.",
+    ),
+    RecommendationCode.MISSING_PUBLICATION_DATE: RecommendationText(
+        "Makalenin yayın tarihi belirtilmemiş", "Yayın tarihi, içeriğin güncelliğini ve haber akışındaki yerini anlamayı sağlar. Bu bilgi olmadan yeni bir haber eski bir içerikten güvenilir biçimde ayrılamaz.",
+        "CMS'deki yayın tarihi alanını doldurun; doluysa tarihin yayınlanan sayfaya ulaştığını kontrol edin.",
+    ),
+    RecommendationCode.MISSING_AUTHOR: RecommendationText(
+        "Makalenin yazarı belirtilmemiş", "Yazar bilgisi içeriğin kime veya hangi editoryal birime ait olduğunu açıklar. Bu alan boş olduğunda çalışmanın arkasındaki kişinin veya yayın biriminin uzmanlığı görünmez kalır.",
+        "CMS'deki yazar alanını kişi veya sorumlu yayın biriminin adıyla doldurun.",
+    ),
+    RecommendationCode.MISSING_SUMMARY: RecommendationText(
+        "Makalenin özeti yok", "Özet, içeriğin konusunu arama sonuçları ve paylaşılan bağlantılar için kısa biçimde açıklar.",
+        "CMS'deki özet veya açıklama alanına, başlığı tekrarlamayan bir ya da iki cümle yazın.",
+    ),
+    RecommendationCode.MISSING_LAST_MODIFIED_DATE: RecommendationText(
+        "Makalenin son güncellenme tarihi belirtilmemiş", "Son güncellenme tarihi düzeltme veya genişletmelerin daha yeni sürümde olduğunu gösterir.",
+        "Makale düzenlendiğinde article:modified_time veya Schema.org dateModified alanını yayınlayın.",
+    ),
+    RecommendationCode.NO_TOP_LEVEL_HEADING: RecommendationText(
+        "Makalenin ana başlığı yok", "Ana başlık, içeriğin tamamının konusunu sayfa içinde açıkça belirtir.",
+        "Makale gövdesinin başına, kalın metin yerine CMS'nin sunduğu ana başlık biçimini kullanarak bir H1 ekleyin.",
+    ),
+    RecommendationCode.MULTIPLE_TOP_LEVEL_HEADINGS: RecommendationText(
+        "Makalede birden fazla ana başlık var", "Birden fazla H1, hangi başlığın makaleyi tanımladığını belirsizleştirir.",
+        "Makale için tek bir H1 bırakın; diğerlerini bölüm başlığı düzeyine indirin.",
+    ),
+    RecommendationCode.WEAK_ARTICLE_OPENING: RecommendationText(
+        "Makalenin girişi çok kısa", "Kısa bir giriş, devamındaki kapsamlı içerik için yeterli bağlam sağlamayabilir.",
+        "Başlangıca makalenin konusunu açıkça özetleyen bir veya iki cümle ekleyin.",
+    ),
+    RecommendationCode.WEAK_TOPIC_INTRODUCTION: RecommendationText(
+        "Makalenin konusu girişte açıkça kurulmuyor", "İlk paragraf, başlıktaki ana kavramların çok azını içeriyor.",
+        "Makalenin ana konusunu ilk paragrafta açıkça tanıtın.",
+    ),
+    RecommendationCode.TITLE_SOURCES_DISAGREE: RecommendationText(
+        "Sayfadaki başlıklar birbiriyle uyuşmuyor", "Tarayıcı başlığı, sosyal paylaşım başlığı ve yapılandırılmış veri farklı metinler bildiriyor.",
+        "Doğru başlığı belirleyip CMS'deki diğer başlık kaynaklarını onunla eşleştirin.",
+    ),
+    RecommendationCode.DESCRIPTION_SOURCES_DISAGREE: RecommendationText(
+        "Sayfadaki özetler birbiriyle uyuşmuyor", "Arama, sosyal paylaşım ve yapılandırılmış veri alanları aynı makale için farklı özetler bildiriyor.",
+        "Doğru özeti belirleyip CMS'deki diğer açıklama kaynaklarını onunla eşleştirin.",
+    ),
+    RecommendationCode.BODY_MOSTLY_REPEATED_TEXT: RecommendationText(
+        "Makalenin büyük bölümü diğer makalelerde de bulunan metinlerden oluşuyor", "Tekrarlanan metin makaleye özgü bilgiyi geri plana iter.",
+        "Makalenin kendi metninin eksiksiz yayınlandığını kontrol edin; standart uyarıları mümkünse makale gövdesinin dışına taşıyın.",
+    ),
+    RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY: RecommendationText(
+        "Bu paragraf diğer makalelerinizde de yer alıyor", "Tekrarlanan paragraf bu makaleyi diğerlerinden ayıran bilgiye katkı sağlamaz.",
+        "Metni kaldırın veya yeniden yazın; otomatik ekleniyorsa site ekibinden makale gövdesinin dışında yayınlamasını isteyin.",
+    ),
+    RecommendationCode.NO_OUTBOUND_LINKS: RecommendationText(
+        "Makalede dış kaynak bağlantısı yok", "Dış kaynaklar önemli iddiaların dayanağını ve araştırmanın kapsamını görünür kılar.",
+        "İddiaları destekleyen güvenilir ve ilgili dış kaynaklara bağlantı ekleyin.",
+    ),
+    RecommendationCode.NO_CITATIONS: RecommendationText(
+        "Makalede kaynak gösterimi yok", "Kaynak gösterimi, doğrulanabilir iddiaların hangi kanıta dayandığını açıklar.",
+        "Önemli iddialara güvenilir kaynak bağlantıları veya açık atıflar ekleyin.",
+    ),
+    RecommendationCode.NO_STATISTICS: RecommendationText(
+        "Makalede istatistik veya sayısal veri yok", "Sayısal veriler iddiaları somutlaştırır ve kapsamı daha açık hale getirir.",
+        "Uygun olan iddiaları güvenilir istatistikler, yüzdeler veya sayısal verilerle destekleyin.",
+    ),
+    RecommendationCode.ORPHAN_PAGE: RecommendationText(
+        "Makaleye site içinden bağlantı verilmiyor", "Site içi bağlantılar ilgili içerikler arasındaki ilişkiyi ve erişim yolunu gösterir.",
+        "İlgili kategori veya makalelerden bu sayfaya anlamlı bir iç bağlantı ekleyin.",
+    ),
+    RecommendationCode.NO_INTERNAL_BODY_LINKS: RecommendationText(
+        "Makale gövdesinde iç bağlantı yok", "İç bağlantılar okuyucuyu ilgili içeriklere yönlendirir ve konu bağlamını güçlendirir.",
+        "Ana metne sitenizdeki ilgili makalelere yönlendiren bağlantılar ekleyin.",
+    ),
+    RecommendationCode.CONTENT_BLOAT: RecommendationText(
+        "Konuyla zayıf ilişkili paragrafları sadeleştirin", "Başlığıyla ortak kavram taşımayan paragraflar makalenin düzenini belirsizleştirebilir.",
+        "Ana konuyla ilişkisi zayıf paragrafları kaldırın, yeniden yazın veya uygun bölüm altında konumlandırın.",
+    ),
+    RecommendationCode.SKIPPED_HEADING_LEVEL: RecommendationText(
+        "Başlık hiyerarşisinde seviye atlanmış", "H1, H2 ve H3 sırası makalenin mantıksal bölüm yapısını gösterir.",
+        "Başlık seviyelerini numara atlamadan sıralı biçimde düzenleyin.",
+    ),
+    RecommendationCode.CONFLICTING_PUBLISHED_DATES: RecommendationText(
+        "Yayın tarihleri birbiriyle uyuşmuyor", "Meta, JSON-LD ve time alanlarındaki farklı tarihler güncellik bilgisini belirsizleştirir.",
+        "CMS'nin JSON-LD, article:published_time ve HTML time alanlarında aynı yayın tarihini kullandığını doğrulayın.",
+    ),
+    RecommendationCode.UNSUPPORTED_ENTITIES: RecommendationText(
+        "Kurum ve ürün adlarını kaynaklarla destekleyin", "Özel isimlerin geçtiği bazı paragraflarda onları destekleyen bağımsız kanıt bulunmuyor.",
+        "İlgili paragraflara güvenilir istatistikler veya bağımsız dış kaynaklar ekleyin.",
+    ),
+    RecommendationCode.LOW_TRUST_INDEX: RecommendationText(
+        "Kaynak güvenilirliğini güçlendirin", "İçerikteki kaynak çeşitliliği ve bağımsız dayanaklar sınırlı görünüyor.",
+        "Önemli iddiaları birincil ve bağımsız güvenilir kaynaklarla destekleyin.",
+    ),
+    RecommendationCode.MISSING_SAME_AS_SCHEMA: RecommendationText(
+        "Yapılandırılmış veride sameAs eksik", "sameAs, yazar ve kurum gibi varlıkların doğrulanmış profillerle eşleştirilmesini sağlar.",
+        "Schema.org JSON-LD içinde uygun Wikipedia veya Wikidata profillerini sameAs alanıyla belirtin.",
     ),
 }
 
 
-_TEXT: Dict[RecommendationCode, RecommendationText] = {
+_TEXT_EN: Dict[RecommendationCode, RecommendationText] = {
     RecommendationCode.NO_ARTICLE_STRUCTURED_DATA: RecommendationText(
         headline="This page does not identify itself as an article",
         why_it_matters=(
@@ -316,7 +423,7 @@ _TEXT: Dict[RecommendationCode, RecommendationText] = {
 
 def recommendation_text(recommendation: EditorRecommendation) -> RecommendationText:
     """Return the editor-facing wording for one recommendation."""
-    return _TEXT[recommendation.code]
+    return _TEXT_TR[recommendation.code]
 
 
 def category_title(category: RecommendationCategory) -> str:
@@ -330,13 +437,13 @@ def category_subtitle(category: RecommendationCategory) -> str:
 #: Editor-facing names for the Schema.org properties this report checks.
 _PROPERTY_LABELS = {
     "headline": "headline",
-    "description": "summary",
-    "datePublished": "publication date",
-    "dateModified": "last updated date",
+    "description": "description",
+    "datePublished": "datePublished",
+    "dateModified": "dateModified",
     "author": "author",
     "publisher": "publisher",
     "image": "image",
-    "inLanguage": "language",
+    "inLanguage": "inLanguage",
 }
 
 
@@ -344,19 +451,19 @@ def missing_properties_phrase(missing_properties) -> str:
     """Name the undeclared details in words an editor recognises."""
     labels = [_PROPERTY_LABELS.get(name, name) for name in missing_properties]
     if len(labels) == 1:
-        return f"Not declared: {labels[0]}"
-    return "Not declared: " + ", ".join(labels[:-1]) + f" and {labels[-1]}"
+        return f"Eksik alan: {labels[0]}"
+    return "Eksik alanlar: " + ", ".join(labels)
 
 
 #: Editor-facing names for the places a page can state its title.
 _TITLE_SOURCE_LABELS = {
-    "document_title": "Browser tab title",
-    "open_graph": "Social sharing title",
-    "structured_data": "Structured data headline",
-    "meta_description": "Search result summary",
-    "og_description": "Social sharing summary",
-    "twitter_description": "Twitter card summary",
-    "structured_data_description": "Structured data summary",
+    "document_title": "Tarayıcı sekmesi başlığı",
+    "open_graph": "Sosyal paylaşım başlığı",
+    "structured_data": "Yapılandırılmış veri başlığı",
+    "meta_description": "Arama sonucu özeti",
+    "og_description": "Sosyal paylaşım özeti",
+    "twitter_description": "Twitter kartı özeti",
+    "structured_data_description": "Yapılandırılmış veri özeti",
 }
 
 
@@ -367,8 +474,8 @@ def title_source_label(source: str) -> str:
 def shared_words_phrase(repeated_word_count: int, total_word_count: int) -> str:
     """State the share as the two counts, so the reader judges rather than a rule."""
     return (
-        f"{repeated_word_count} of {total_word_count} words in this article "
-        "also appear in your other articles"
+        f"Bu makaledeki {total_word_count} kelimenin {repeated_word_count} tanesi "
+        "diğer makalelerinizde de yer alıyor"
     )
 
 
@@ -379,14 +486,14 @@ def heading_count_phrase(heading_count: int) -> str:
     the report words as "also appears in N other articles" and which described
     a heading count as though it were duplication.
     """
-    return f"{heading_count} headings claim to be the main heading"
+    return f"{heading_count} başlık ana başlık olarak kullanılmış"
 
 
 def repeated_in_phrase(other_article_count: int) -> str:
     """Describe how widely a paragraph is repeated, in plain language."""
     if other_article_count == 1:
-        return "Also appears in 1 other article"
-    return f"Also appears in {other_article_count} other articles"
+        return "1 başka makalede de yer alıyor"
+    return f"{other_article_count} başka makalede de yer alıyor"
 
 
 def compared_articles_phrase(compared_article_count: int) -> str:
@@ -399,11 +506,24 @@ def compared_articles_phrase(compared_article_count: int) -> str:
     """
     if compared_article_count == 0:
         return (
-            "No previously analyzed articles from this publisher, so repeated "
-            "text could not be checked."
+            "Bu yayıncıdan daha önce analiz edilmiş makale olmadığı için "
+            "tekrarlanan metin kontrol edilemedi."
         )
-    article_word = "article" if compared_article_count == 1 else "articles"
     return (
-        "Compared against previously analyzed articles from this publisher "
-        f"({compared_article_count} {article_word})."
+        "Bu yayıncıdan daha önce analiz edilen makalelerle karşılaştırıldı "
+        f"({compared_article_count} makale)."
     )
+
+
+_IMPACT_LABELS = {
+    "Structured Data": "Yapısal Veri", "Metadata": "Meta Bilgiler",
+    "Semantic Quality": "Anlamsal Kalite", "Entity Authority": "Kaynak ve Güvenilirlik",
+    "Semantic Completeness": "İçerik Bütünlüğü", "Discoverability": "Bulunabilirlik",
+    "Structural Richness": "İçerik Yapısı", "Entity Coverage": "Varlık Kapsamı",
+    "Technical Access": "Teknik Erişim",
+}
+
+
+def impact_label(value: str) -> str:
+    """Return the Turkish display label without changing internal keys."""
+    return _IMPACT_LABELS.get(value, value)

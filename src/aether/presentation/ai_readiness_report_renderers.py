@@ -132,6 +132,7 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
                     "ordinal_position": profile.ordinal_position,
                     "word_count": profile.word_count,
                     "character_count": profile.character_count,
+                    "text": profile.text,
                 }
                 for profile in report.passage_quality_summary.passage_profiles
             ],
@@ -396,8 +397,8 @@ class PlainTextAIReadinessReportRenderer:
                         lines.append(f'  "{occurrence.excerpt}"')
                 lines.extend(
                     (
-                        f"  Why it matters: {text.why_it_matters}",
-                        f"  What to do: {text.what_to_do}",
+                        f"  Neden önemli: {text.why_it_matters}",
+                        f"  Ne yapmalısınız: {text.what_to_do}",
                     )
                 )
         return tuple(lines)

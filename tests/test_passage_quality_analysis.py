@@ -57,6 +57,10 @@ class PassageQualityAnalysisTests(unittest.TestCase):
             [(profile.word_count, profile.character_count) for profile in analysis.passage_profiles],
             [(2, len("One two.")), (3, len("Three four five."))],
         )
+        self.assertEqual(
+            [profile.text for profile in analysis.passage_profiles],
+            ["One two.", "Three four five."],
+        )
 
     def test_analysis_is_deterministic_and_immutable(self):
         registered = self.register_article(

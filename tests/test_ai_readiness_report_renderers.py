@@ -63,6 +63,7 @@ class AIReadinessReportRendererTests(unittest.TestCase):
                         character_count=20,
                         contains_statistics=False,
                         contains_citation=False,
+                        text="Exact extracted passage text.",
                     ),
                 ),
                 passage_balance_ratio=1.0,
@@ -79,6 +80,10 @@ class AIReadinessReportRendererTests(unittest.TestCase):
 
         self.assertEqual(payload["article_identity"]["article_id"], "article-1")
         self.assertEqual(payload["structural_summary"]["total_word_count"], 4)
+        self.assertEqual(
+            payload["passage_quality_summary"]["passage_profiles"][0]["text"],
+            "Exact extracted passage text.",
+        )
         self.assertTrue(payload["metadata_summary"]["author_available"])
         entity_detail = payload["assessment_summary"]["geo_score"][
             "entity_authority"

@@ -30,6 +30,7 @@ from aether.application.analysis.build_article_analysis_report import (  # noqa:
     BuildArticleAnalysisReport,
 )
 from aether.application.analysis.derive_editor_recommendations import (  # noqa: E402
+    EditorRecommendation,
     RecommendationCategory,
     RecommendationCode,
 )
@@ -42,6 +43,8 @@ from aether.presentation.ai_readiness_report_renderers import (  # noqa: E402
 )
 from aether.presentation.editor_recommendation_text import (  # noqa: E402
     compared_articles_phrase,
+    impact_label,
+    missing_properties_phrase,
     recommendation_text,
 )
 
@@ -135,6 +138,7 @@ class EditorRecommendationTests(unittest.TestCase):
                 observed_at=OBSERVED_AT,
             )
         )
+
         analysis = BuildArticleAnalysisReport(
             AnalyzeArticleStructure(self.repository),
             AnalyzeArticleMetadata(self.repository),
@@ -157,6 +161,30 @@ class EditorRecommendationTests(unittest.TestCase):
         )
         self.assertIn(RecommendationCode.TITLE_SOURCES_DISAGREE, codes)
         self.assertIn(RecommendationCode.DESCRIPTION_SOURCES_DISAGREE, codes)
+
+    def test_every_recommendation_code_has_complete_turkish_presentation_text(self):
+        english_fragments = ("this article", "what to do", "why it matters", "add the", "your article")
+
+        for code in RecommendationCode:
+            text = recommendation_text(EditorRecommendation(code=code))
+            combined = " ".join((text.headline, text.why_it_matters, text.what_to_do)).lower()
+            self.assertTrue(text.headline and text.why_it_matters and text.what_to_do)
+            for fragment in english_fragments:
+                self.assertNotIn(fragment, combined, code)
+
+    def test_technical_names_are_preserved_inside_turkish_copy(self):
+        structured = recommendation_text(
+            EditorRecommendation(code=RecommendationCode.NO_ARTICLE_STRUCTURED_DATA)
+        )
+        same_as = recommendation_text(
+            EditorRecommendation(code=RecommendationCode.MISSING_SAME_AS_SCHEMA)
+        )
+
+        self.assertIn("Schema.org Article", structured.what_to_do)
+        self.assertIn("JSON-LD", same_as.what_to_do)
+        self.assertIn("sameAs", same_as.what_to_do)
+        self.assertEqual(missing_properties_phrase(("inLanguage",)), "Eksik alan: inLanguage")
+        self.assertEqual(impact_label("Structured Data"), "Yapısal Veri")
 
     def test_every_metadata_recommendation_names_a_concrete_action(self):
         """Naming the gap is not advice; the editor must know what to do."""
@@ -281,9 +309,9 @@ class EditorRecommendationTests(unittest.TestCase):
 
     def test_states_how_many_articles_were_compared(self):
         for count, expected in (
-            (0, "No previously analyzed articles from this publisher"),
-            (1, "previously analyzed articles from this publisher (1 article)"),
-            (4, "previously analyzed articles from this publisher (4 articles)"),
+            (0, "daha önce analiz edilmiş makale olmadığı"),
+            (1, "(1 makale)"),
+            (4, "(4 makale)"),
         ):
             with self.subTest(count=count):
                 self.assertIn(expected, compared_articles_phrase(count))
@@ -294,14 +322,10 @@ class EditorRecommendationTests(unittest.TestCase):
 
         rendered = PlainTextAIReadinessReportRenderer().render(self.report_for(first))
 
-        self.assertIn("Editor Recommendations", rendered)
-        self.assertIn("Things you can change in this article now.", rendered)
-        self.assertIn(
-            "Compared against previously analyzed articles from this publisher "
-            "(1 article).",
-            rendered,
-        )
-        self.assertIn("What to do:", rendered)
+        self.assertIn("İçerikte Yapılabilecekler", rendered)
+        self.assertIn("Bu makalede şimdi yapabileceğiniz iyileştirmeler.", rendered)
+        self.assertIn("(1 makale)", rendered)
+        self.assertIn("Ne yapmalısınız:", rendered)
 
     def test_repeated_paragraphs_share_one_explanation(self):
         """Repeating the rationale per occurrence buries the occurrences."""
@@ -315,9 +339,9 @@ class EditorRecommendationTests(unittest.TestCase):
         self.assertEqual(
             len(self.of_code(report, RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY)), 2
         )
-        self.assertEqual(rendered.count("Why it matters: Repeated text"), 1)
+        self.assertEqual(rendered.count("Neden önemli: Tekrarlanan paragraf"), 1)
         self.assertEqual(
-            rendered.count("This paragraph also appears in your other articles"), 1
+            rendered.count("Bu paragraf diğer makalelerinizde de yer alıyor"), 1
         )
         self.assertIn(NOTICE, rendered)
         self.assertIn(second_notice, rendered)
@@ -364,9 +388,9 @@ class EditorRecommendationTests(unittest.TestCase):
         )[0]
         wording = recommendation_text(recommendation).why_it_matters.lower()
 
-        self.assertIn("share vocabulary", wording)
-        self.assertNotIn("directly answer", wording)
-        self.assertNotIn("definitive stance", wording)
+        self.assertIn("ortak kavram", wording)
+        self.assertNotIn("doğrudan cevap", wording)
+        self.assertNotIn("kesin tutum", wording)
 
 
 if __name__ == "__main__":

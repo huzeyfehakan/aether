@@ -19,33 +19,32 @@ from aether.application.analysis.build_draft_review import (
 )
 
 PERFORMED_TEXT: Dict[DraftCheck, str] = {
-    DraftCheck.PARAGRAPH_STRUCTURE: "Paragraph structure",
-    DraftCheck.HEADING_STRUCTURE: "Heading structure",
-    DraftCheck.REPEATED_TEXT: "Text repeated in your other articles",
+    DraftCheck.PARAGRAPH_STRUCTURE: "Paragraf yapısı",
+    DraftCheck.HEADING_STRUCTURE: "Başlık yapısı",
+    DraftCheck.REPEATED_TEXT: "Diğer makalelerinizde tekrarlanan metin",
 }
 
 UNAVAILABLE_TEXT: Dict[UnavailableCheck, str] = {
     UnavailableCheck.PUBLISHED_METADATA: (
-        "Publication date, byline and summary, which are set when the article "
-        "is published"
+        "Makale yayınlandığında belirlenen yayın tarihi, yazar ve özet"
     ),
     UnavailableCheck.DECLARED_CONSISTENCY: (
-        "Whether the page states one headline and one summary, which needs the "
-        "published page"
+        "Sayfanın tek bir başlık ve özet bildirip bildirmediği; bunun için "
+        "yayınlanmış sayfa gerekir"
     ),
     UnavailableCheck.STRUCTURED_DATA: (
-        "Schema.org structured data, which the site template produces"
+        "Site şablonunun ürettiği Schema.org yapılandırılmış verisi"
     ),
     UnavailableCheck.HEADING_STRUCTURE_WITHOUT_MARKUP: (
-        "Heading structure, because the pasted draft carried no formatting"
+        "Yapıştırılan taslak biçimlendirme içermediği için başlık yapısı"
     ),
     UnavailableCheck.REPEATED_TEXT_NO_PUBLISHER: (
-        "Text repeated in your other articles, because no publisher was chosen "
-        "to compare this draft against"
+        "Taslağın karşılaştırılacağı yayıncı seçilmediği için diğer "
+        "makalelerde tekrarlanan metin"
     ),
     UnavailableCheck.REPEATED_TEXT_NO_ARTICLES: (
-        "Text repeated in your other articles, because no articles from that "
-        "publisher have been checked yet"
+        "Bu yayıncıdan henüz makale analiz edilmediği için diğer makalelerde "
+        "tekrarlanan metin"
     ),
 }
 

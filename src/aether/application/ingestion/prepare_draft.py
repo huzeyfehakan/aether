@@ -13,11 +13,9 @@ What is supplied here is recorded, never guessed:
 * the language comes from the editor, because a clipboard fragment carries no
   language attribute and inferring one from the text would be a guess.
 
-Plain text is wrapped one paragraph per blank-line-separated block, which is
-the same rule ingestion already uses to split a stored body into passages. No
-heading is inferred from a line's length, position or capitalisation: if the
-clipboard offered no markup, the draft has no headings and the report says the
-heading check could not run.
+Plain text is converted deterministically: ATX headings become matching HTML
+heading elements and blank-line-separated prose becomes paragraphs. No other
+Markdown or inferred heading convention is applied.
 """
 
 from dataclasses import dataclass
@@ -25,6 +23,7 @@ import json
 import re
 from hashlib import sha256
 from html import escape
+from html.parser import HTMLParser
 from typing import Optional
 
 
@@ -51,14 +50,112 @@ def _looks_like_markup(content: str) -> bool:
     ``text/plain``. The caller passes whichever it received, so this only has
     to tell a fragment of markup from a block of text.
     """
-    stripped = content.strip().lower()
-    return "<p" in stripped or "<h1" in stripped or "<div" in stripped or "<br" in stripped
+    return re.search(
+        r"<(?:p|h[1-6]|div|br|ul|ol|li|blockquote|pre|table|section|article)\b",
+        content,
+        re.IGNORECASE,
+    ) is not None
 
 
-def _paragraphs_from_plain_text(content: str) -> str:
-    """One paragraph per blank-line-separated block, as stored bodies split."""
-    blocks = [block.strip() for block in content.split("\n\n")]
-    return "".join(f"<p>{escape(block)}</p>" for block in blocks if block)
+_CLIPBOARD_FRAGMENT = re.compile(
+    r"<!--\s*StartFragment\s*-->(.*?)<!--\s*EndFragment\s*-->",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+class _DraftHtmlSanitizer(HTMLParser):
+    """Retain pasted rich text while discarding non-content document data."""
+
+    _DISCARDED_CONTEXTS = {"head", "script", "style", "noscript", "template"}
+    _WRAPPERS = {"html", "body"}
+    _VOID_ELEMENTS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+        self._discard_depth = 0
+
+    def handle_starttag(self, tag, attrs) -> None:
+        tag = tag.lower()
+        if tag in self._DISCARDED_CONTEXTS:
+            self._discard_depth += 1
+            return
+        if self._discard_depth or tag in {"meta", "link", "base"} or tag in self._WRAPPERS:
+            return
+        attributes = "".join(
+            f' {escape(name, quote=True)}="{escape(value or "", quote=True)}"'
+            for name, value in attrs
+            if not name.lower().startswith("on")
+        )
+        self.parts.append(f"<{tag}{attributes}>")
+
+    def handle_startendtag(self, tag, attrs) -> None:
+        self.handle_starttag(tag, attrs)
+
+    def handle_endtag(self, tag) -> None:
+        tag = tag.lower()
+        if tag in self._DISCARDED_CONTEXTS:
+            self._discard_depth = max(0, self._discard_depth - 1)
+            return
+        if self._discard_depth or tag in self._WRAPPERS or tag in self._VOID_ELEMENTS:
+            return
+        self.parts.append(f"</{tag}>")
+
+    def handle_data(self, data) -> None:
+        if not self._discard_depth:
+            self.parts.append(escape(data))
+
+
+def _rich_text_fragment(content: str) -> str:
+    """Use one clipboard representation and only its selected rich fragment.
+
+    Browsers commonly wrap the selected content in a complete clipboard HTML
+    document. The fragment comments, when present, are the source of truth;
+    head/style/script data and event-handler attributes are never draft prose.
+    """
+    fragment = _CLIPBOARD_FRAGMENT.search(content)
+    selected = fragment.group(1) if fragment is not None else content
+    parser = _DraftHtmlSanitizer()
+    parser.feed(selected)
+    parser.close()
+    return "".join(parser.parts)
+
+
+_ATX_HEADING = re.compile(r"^(#{1,6})(?:[ \t]+(.*?)[ \t]*|[ \t]*)$")
+
+
+def _html_from_plain_text(content: str) -> tuple[str, bool]:
+    """Convert only ATX headings and blank-line-separated paragraphs.
+
+    A heading also terminates a prose block, so Markdown that omits a blank
+    line immediately before a heading still produces the intended structure.
+    Embedded newlines inside a paragraph are retained as whitespace for HTML
+    ingestion; the Markdown markers themselves never enter article text.
+    """
+    output = []
+    paragraph_lines = []
+    has_headings = False
+
+    def flush_paragraph() -> None:
+        if paragraph_lines:
+            text = "\n".join(paragraph_lines).strip()
+            if text:
+                output.append(f"<p>{escape(text)}</p>")
+            paragraph_lines.clear()
+
+    for line in content.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        heading = _ATX_HEADING.fullmatch(line)
+        if heading is not None and heading.group(2):
+            flush_paragraph()
+            level = len(heading.group(1))
+            output.append(f"<h{level}>{escape(heading.group(2).strip())}</h{level}>")
+            has_headings = True
+        elif not line.strip():
+            flush_paragraph()
+        else:
+            paragraph_lines.append(line)
+    flush_paragraph()
+    return "".join(output), has_headings
 
 
 _TOP_LEVEL_HEADING = re.compile(r"<h1[^>]*>(.*?)</h1>", re.IGNORECASE | re.DOTALL)
@@ -115,13 +212,17 @@ def prepare_draft(
             "There is nothing to check yet. Paste your article into the box above."
         )
     has_markup = _looks_like_markup(content)
-    body = content if has_markup else _paragraphs_from_plain_text(content)
+    if has_markup:
+        body = _rich_text_fragment(content)
+    else:
+        body, has_markdown_headings = _html_from_plain_text(content)
+        has_markup = has_markdown_headings
     if not body.strip():
         raise DraftContentRequired(
             "There is nothing to check yet. Paste your article into the box above."
         )
 
-    from_markup = headline_in_markup(content) if has_markup else None
+    from_markup = headline_in_markup(body) if has_markup else None
     if from_markup:
         resolved, heading, headline_from_markup = from_markup, "", True
     elif headline.strip():

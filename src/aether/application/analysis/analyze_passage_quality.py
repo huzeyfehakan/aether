@@ -20,6 +20,7 @@ class PassageProfile:
     character_count: int
     contains_statistics: bool
     contains_citation: bool
+    text: str = ""
 
 
 @dataclass(frozen=True)
@@ -203,4 +204,5 @@ class AnalyzePassageQuality:
             character_count=len(text),
             contains_statistics=has_stats,
             contains_citation=has_citation,
+            text=text,
         )

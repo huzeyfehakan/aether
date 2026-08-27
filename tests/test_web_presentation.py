@@ -99,7 +99,7 @@ class WebPresentationTests(unittest.TestCase):
         page = self.client.get("/").text
 
         seo_card = page[page.index('id="seo-summary-card"'):page.index('id="geo-summary-card"')]
-        geo_card = page[page.index('id="geo-summary-card"'):page.index("<!-- BİTİŞ")]
+        geo_card = page[page.index('id="geo-summary-card"'):page.index("<!-- End AI readiness score section")]
         self.assertIn('id="seo-score-grid"', seo_card)
         self.assertNotIn('id="geo-score-grid"', seo_card)
         self.assertIn('id="geo-score-grid"', geo_card)
@@ -785,7 +785,8 @@ Passage."""
         self.assertEqual(geo_details.count("dimension-detail-panel hidden"), 4)
         for label in (
             "Statistics coverage", "Author declaration", "Citation coverage",
-            "Claim evidence coverage", "Structured content ratio", "Body link ratio",
+            "Claim evidence coverage", "Structured content ratio", "Body link saturation",
+            "Unique target ratio",
         ):
             self.assertIn(label, geo_details)
         self.assertIn("Not measured", geo_details)
@@ -857,7 +858,7 @@ Passage."""
         dimension = {
             "key": "structured_data",
             "val": 100.0,
-            "label": "Yapısal Veri",
+            "label": "Structured Data",
             "weight": 25,
             "detail": {
                 "label": "Structured Data",
@@ -881,8 +882,8 @@ Passage."""
         card_rendered = dom["#long-card"]["html"]
         rendered = dom["#long-detail"]["html"]
         self.assertNotIn(long_value, card_rendered)
-        self.assertIn("8 / 8 mevcut", rendered)
-        self.assertIn("Tam liste", rendered)
+        self.assertIn("8 / 8 present", rendered)
+        self.assertIn("Full list", rendered)
         self.assertIn(long_value, rendered)
         for identifier in (
             "dateModified",
@@ -898,7 +899,7 @@ Passage."""
         dimension = {
             "key": "technical_access",
             "val": 100.0,
-            "label": "Teknik Erişim",
+            "label": "Technical Access",
             "weight": 20,
             "detail": {
                 "label": "Technical Access",
@@ -1011,7 +1012,7 @@ Passage."""
 
         dom = run_page_script(f"renderReport({json.dumps(view)}, 'report');")
         rendered = dom["#passage-balance-metric"]["html"]
-        self.assertIn("Paragraf Dengesi", rendered)
+        self.assertIn("Passage Balance", rendered)
         self.assertNotIn("good", rendered.lower())
         self.assertNotIn("bad", rendered.lower())
         self.assertNotIn("pass", rendered.lower())
@@ -1030,9 +1031,9 @@ Passage."""
 
         dom = run_page_script(f"renderReport({json.dumps(view)}, 'report');")
         rendered = dom["#passage-extractability-metrics"]["html"]
-        self.assertIn("&gt;128 words", rendered)
-        self.assertIn("&gt;256 words", rendered)
-        self.assertIn("&gt;512 words", rendered)
+        self.assertIn(">128 words", rendered)
+        self.assertIn(">256 words", rendered)
+        self.assertIn(">512 words", rendered)
         self.assertNotIn("good", rendered.lower())
         self.assertNotIn("bad", rendered.lower())
 

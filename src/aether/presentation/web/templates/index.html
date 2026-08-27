@@ -172,7 +172,7 @@
       <section id="report-card" class="panel hidden" aria-live="polite">
         <div class="report-heading"><div><div class="eyebrow">Analysis complete</div><h2>Analysis Result</h2><p id="result-url" class="result-url"></p></div><button type="button" class="secondary" id="new-analysis">New Analysis</button><span id="report-state" class="sr-only"></span></div>
         
-        <!-- YENİ: AI Readiness Score Bölümü -->
+        <!-- AI readiness score section -->
         <div class="section" id="score-section" style="margin-top: 0;">
           <div class="score-summary-grid">
             <div class="score-summary" id="seo-summary-card">
@@ -195,7 +195,7 @@
             </div>
           </div>
         </div>
-        <!-- BİTİŞ: AI Readiness Score Bölümü -->
+        <!-- End AI readiness score section -->
 
         <section class="section" aria-labelledby="recommendations-heading"><h3 id="recommendations-heading">Recommendations</h3><div id="editor-section"><h4>Content Recommendations</h4><p class="muted" id="editor-subtitle"></p><p id="editor-compared"></p><div id="editor-list" class="recommendation-list"></div></div><div id="technical-section"><h4>Technical / Site Recommendations</h4><p class="muted" id="technical-subtitle"></p><div id="technical-list" class="recommendation-list"></div></div></section>
 
@@ -329,7 +329,7 @@
         const rows = dimension.detail.signals.map((signal) => `
           <li class="${signalRowClass(signal)}" title="${escapeHtml(signal.explanation || '')}">
             <span>&bull; ${escapeHtml(friendlySignals[signal.label] || signal.label)}<small class="signal-technical-name">${escapeHtml(signal.label)}</small></span>
-            <strong>${escapeHtml(compactSignalValue(signal, dimension.detail.signals))}${signal.label === 'Declared expected properties' && listItems(signal.value).length ? `<details class="signal-raw"><summary>Tam liste</summary><span>${escapeHtml(signal.value)}</span></details>` : ''}</strong>
+            <strong>${escapeHtml(compactSignalValue(signal, dimension.detail.signals))}${signal.label === 'Declared expected properties' && listItems(signal.value).length ? `<details class="signal-raw"><summary>Full list</summary><span>${escapeHtml(signal.value)}</span></details>` : ''}</strong>
           </li>
         `).join('');
         return `<section id="${detailId}" class="dimension-detail-panel hidden">
@@ -476,7 +476,7 @@
 
         const passageBalanceDiagnostic = view.passage_balance;
         document.querySelector('#passage-balance-metric').innerHTML = metric(
-          'Paragraf Dengesi',
+          'Passage Balance',
           `${(passageBalanceDiagnostic.ratio * 100).toFixed(1)}%`
         );
 
@@ -599,7 +599,7 @@
               return;
             }
 
-// YENİ: Backend'den gelen view ve report değişkenlerini gönderiyoruz.
+// Render the view and report returned by the backend.
             renderReport(data.view, data.report); 
             document.querySelector('#result-url').textContent = submittedUrl;
             reportCard.classList.remove('hidden'); 

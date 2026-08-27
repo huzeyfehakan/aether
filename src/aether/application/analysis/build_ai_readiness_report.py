@@ -3,6 +3,14 @@
 from dataclasses import dataclass
 from typing import Optional, Tuple, Union
 
+from enum import Enum
+
+class SignalKind(Enum):
+    SCORE = "SCORE"
+    RATIO = "RATIO"
+    COUNT = "COUNT"
+    MEASUREMENT = "MEASUREMENT"
+
 from aether.application.analysis.analyze_content_duplication import RepeatedPassage
 from aether.application.analysis.analyze_passage_quality import PassageProfile
 from aether.application.analysis.assess_ai_readiness import (
@@ -76,6 +84,8 @@ class ScoreSignalDetail:
     label: str
     value: Optional[Union[float, str]]
     explanation: str
+    kind: Optional[SignalKind] = None
+    is_context: bool = False
 
 
 @dataclass(frozen=True)
@@ -658,43 +668,39 @@ class BuildAIReadinessReport:
         report, dimension_score: Optional[float]
     ) -> ScoreDimensionDetail:
         links = report.internal_link_analysis
-        outgoing_links = None
-        body_links = None
-        body_link_ratio = None
-        unique_targets = None
+        structural = report.structural_analysis
+        
+        body_link_saturation = None
+        unique_target_ratio = None
+        
         if links is not None:
-            outgoing_links = float(links.outgoing_link_count)
-            body_links = float(links.body_link_count)
-            unique_targets = float(links.unique_target_count)
-            body_link_ratio = (
-                links.body_link_count / links.outgoing_link_count * 100.0
-                if links.outgoing_link_count > 0
-                else 0.0
-            )
+            if structural and structural.total_passage_count > 0:
+                density = links.body_link_count / structural.total_passage_count
+                body_link_saturation = (density / (1 + density)) * 100.0
+            else:
+                body_link_saturation = 0.0
+                
+            if links.body_link_count > 0:
+                unique_target_ratio = (links.unique_target_count / links.body_link_count) * 100.0
+            else:
+                unique_target_ratio = 0.0
 
         return ScoreDimensionDetail(
             label="Discoverability",
             dimension_score=dimension_score,
             signals=(
                 ScoreSignalDetail(
-                    label="Outgoing links",
-                    value=outgoing_links,
-                    explanation="Count of outgoing links",
+                    label="Body link saturation",
+                    value=body_link_saturation,
+                    explanation="Score contribution based on body link density",
+                    kind=SignalKind.RATIO,
                 ),
                 ScoreSignalDetail(
-                    label="Body links",
-                    value=body_links,
-                    explanation="Count of outgoing links retained in the article body",
-                ),
-                ScoreSignalDetail(
-                    label="Body link ratio",
-                    value=body_link_ratio,
-                    explanation="Body links divided by outgoing links",
-                ),
-                ScoreSignalDetail(
-                    label="Unique targets",
-                    value=unique_targets,
-                    explanation="Count of unique outgoing link targets",
+                    label="Unique target ratio",
+                    value=unique_target_ratio,
+                    explanation="Ratio of unique link targets to total body links",
+                    kind=SignalKind.RATIO,
+                    is_context=True,
                 ),
             ),
         )

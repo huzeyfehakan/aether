@@ -388,6 +388,8 @@ def _score_dimension_view(
                     "label": signal.label,
                     "value": signal.value,
                     "explanation": signal.explanation,
+                    "kind": signal.kind.value if signal.kind is not None else None,
+                    "is_context": signal.is_context,
                 }
                 for signal in detail.signals
             ],

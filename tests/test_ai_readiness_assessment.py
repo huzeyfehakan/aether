@@ -835,5 +835,46 @@ class AIReadinessAssessmentTests(unittest.TestCase):
         # 30 puanlik agirlik toplamdan dusuyor, sifir olarak sayilmiyor.
         self.assertEqual(geo.entity_authority.weighted_contribution, 0.0)
 
+    def test_discoverability_score_uses_passage_density_saturation(self):
+        from dataclasses import replace
+        # Base report with 2 passages
+        report_base = self.entity_authority_report()
+        
+        # Test density = 0 (0 links / 2 passages)
+        report_0 = replace(
+            report_base,
+            internal_link_analysis=replace(
+                report_base.internal_link_analysis,
+                body_link_count=0,
+                outgoing_link_count=0
+            )
+        )
+        score_0 = AssessAIReadiness().execute(report_0)
+        self.assertEqual(score_0.geo_score.discoverability.dimension_score, 0.0)
+
+        # Test density = 1 (2 links / 2 passages = 1) -> 1 / (1+1) * 100 = 50.0
+        report_1 = replace(
+            report_base,
+            internal_link_analysis=replace(
+                report_base.internal_link_analysis,
+                body_link_count=2,
+                outgoing_link_count=2
+            )
+        )
+        score_1 = AssessAIReadiness().execute(report_1)
+        self.assertEqual(score_1.geo_score.discoverability.dimension_score, 50.0)
+
+        # Test density = 10 (20 links / 2 passages = 10) -> 10 / 11 * 100 = ~90.9
+        report_10 = replace(
+            report_base,
+            internal_link_analysis=replace(
+                report_base.internal_link_analysis,
+                body_link_count=20,
+                outgoing_link_count=25
+            )
+        )
+        score_10 = AssessAIReadiness().execute(report_10)
+        self.assertAlmostEqual(score_10.geo_score.discoverability.dimension_score, (10 / 11) * 100.0)
+
 if __name__ == "__main__":
     unittest.main()

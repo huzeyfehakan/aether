@@ -747,7 +747,7 @@ Passage."""
                 signal["label"]
                 for signal in geo_score["discoverability"]["detail"]["signals"]
             ],
-            ["Outgoing links", "Body links", "Body link ratio", "Unique targets"],
+            ["Body link saturation", "Unique target ratio"],
         )
 
     def test_all_score_cards_have_accessible_toggles_and_detail_rows(self):

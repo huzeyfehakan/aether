@@ -65,6 +65,8 @@ frame around them. See [`product-discovery.md`](product-discovery.md).
   rationale and supersedes decision 0003.
 - The implementation is being evaluated before release.
 
+- **Discontinuity note**: Discoverability scores (and thus total GEO scores) generated before this change are not comparable to new scores due to the formula shift from body/outgoing ratio to paragraph density.
+
 **Topic introduction recommendation.** Implemented as a deterministic
 editorial prototype.
 
@@ -96,9 +98,9 @@ articles before retaining or changing their thresholds.
 
 | Level                    | Status                                                                      |
 | ------------------------ | --------------------------------------------------------------------------- |
-| **tests pass**           | Yes — 203 passed, 6 skipped                                                 |
-| **served-page verified** | Yes — the score and recommendation behaviours have been verified separately |
-| **feature complete**     | No — the merged behaviour still needs integrated browser verification       |
+| **tests pass**           | Yes — 303 passed, 14 skipped                                                |
+| **served-page verified** | Unverified — breakdown type formatting and new discoverability score need browser verification |
+| **feature complete**     | No — breakdown item separation and format changes completed but need full manual verification       |
 
 Why a green suite is weaker than it looks — the structural reasons — is
 recorded in [`architecture.md`](architecture.md). The vocabulary is in
@@ -106,8 +108,6 @@ recorded in [`architecture.md`](architecture.md). The vocabulary is in
 
 ## Next actions
 
-1. Verify the merged SEO/GEO score and editor recommendation behaviour together
-   on real publisher articles.
-2. Evaluate the topic-introduction threshold on those articles.
-3. Retain, change, or remove the prototypes based on that evaluation; do not
-   add further deterministic editorial recommendations before that review.
+1. Run browser verification on the breakdown formatting (SCORE/COUNT/RATIO/MEASUREMENT separation) and new context visual dimming.
+2. Evaluate the topic-introduction threshold on real publisher articles.
+3. Retain, change, or remove the prototypes based on that evaluation; do not add further deterministic editorial recommendations before that review.

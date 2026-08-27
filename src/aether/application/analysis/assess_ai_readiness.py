@@ -350,13 +350,16 @@ class AssessAIReadiness:
                 structural_richness = (richness_score * 0.5) + (q_score * 0.5)
 
         # 4. Discoverability (15%)
-        # Based solely on body links ratio (No potential_orphan or arbitrary constants)
+        # Based on body links density per passage (saturation function)
         discoverability = None
         links = report.internal_link_analysis
+        structural = report.structural_analysis
 
-        if links:
-            if links.outgoing_link_count > 0:
-                discoverability = (links.body_link_count / links.outgoing_link_count) * 100.0
+        if links and structural:
+            passages = structural.total_passage_count
+            if passages > 0:
+                density = links.body_link_count / passages
+                discoverability = (density / (1 + density)) * 100.0
             else:
                 discoverability = 0.0
 

@@ -61,6 +61,7 @@
       .geo-signal-row strong { flex: 0 1 55%; font-size: .86rem; min-width: 0; overflow-wrap: normal; text-align: right; white-space: normal; word-break: normal; }
       .geo-signal-row-stacked { align-items: flex-start; flex-direction: column; }
       .geo-signal-row-stacked strong { flex: none; max-width: 100%; text-align: left; }
+      .geo-signal-context { opacity: 0.6; }
       .choice-grid, .score-summary-grid { display: grid; gap: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .choice-card { border: 1px solid #dce5f0; border-radius: 18px; padding: 24px; }
       .choice-card h2 { font-size: 1.2rem; }
@@ -247,16 +248,25 @@
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
       })[character]);
       const scoreValue = (value) => value !== null ? `${value.toFixed(1)} / 100` : 'Henüz ölçülemiyor';
-      const signalValue = (value) => {
-        if (value === null) return 'Henüz ölçülemiyor';
-        if (typeof value === 'number') return value.toFixed(1);
-        return ({ Yes: 'Evet', No: 'Hayır', True: 'Mevcut', False: 'Eksik', Available: 'Mevcut', Missing: 'Eksik', Present: 'Mevcut', None: 'Yok' })[value] || value;
+      const signalValue = (signal) => {
+        if (signal.value === null) return 'Henüz ölçülemiyor';
+        const kind = signal.kind ? signal.kind.split('.').pop() : null; // Handle Enum string
+        if (kind === 'SCORE') return `${signal.value.toFixed(1)} / 100`;
+        if (kind === 'RATIO') return `%${signal.value.toFixed(1)}`;
+        if (kind === 'COUNT') return Math.round(signal.value).toLocaleString('tr-TR');
+        if (typeof signal.value === 'number') return signal.value.toFixed(1);
+        return ({ Yes: 'Evet', No: 'Hayır', True: 'Mevcut', False: 'Eksik', Available: 'Mevcut', Missing: 'Eksik', Present: 'Mevcut', None: 'Yok' })[signal.value] || signal.value;
       };
-      const signalRowClass = (value) => {
+      const signalRowClass = (signal) => {
+        const value = signal.value;
         const textual = typeof value === 'string' ? value : '';
-        return textual.includes(',') || textual.length > 40
+        let cls = textual.includes(',') || textual.length > 40
           ? 'geo-signal-row geo-signal-row-stacked'
           : 'geo-signal-row';
+        if (signal.is_context) {
+          cls += ' geo-signal-context';
+        }
+        return cls;
       };
       const friendlyDimensions = {
         entity_coverage: 'Varlık Kapsamı', semantic_quality: 'Anlamsal Kalite',
@@ -281,6 +291,7 @@
         'Structured content ratio': 'Yapılandırılmış içerik oranı',
         'Answered question ratio': 'Cevaplanan soru oranı', 'Outgoing links': 'Giden bağlantılar',
         'Body links': 'Gövde bağlantıları', 'Body link ratio': 'Gövde bağlantısı oranı',
+        'Body link saturation': 'Gövde bağlantı yoğunluğu', 'Unique target ratio': 'Benzersiz hedef oranı',
         'Unique targets': 'Benzersiz hedefler', 'Total passages': 'Toplam metin bölümü',
         'Unique passages': 'Benzersiz metin bölümü', 'Repeated passages': 'Tekrarlanan metin bölümü',
         'Unique passage ratio': 'Benzersiz bölüm oranı',
@@ -291,7 +302,7 @@
         ? value.split(',').map((item) => item.trim()).filter((item) => item && item !== 'None')
         : [];
       const compactSignalValue = (signal, signals) => {
-        if (signal.label !== 'Declared expected properties') return signalValue(signal.value);
+        if (signal.label !== 'Declared expected properties') return signalValue(signal);
         const declared = listItems(signal.value);
         const missingSignal = signals.find((item) => item.label === 'Missing expected properties');
         const missing = listItems(missingSignal ? missingSignal.value : '');
@@ -316,7 +327,7 @@
         const friendlyLabel = friendlyDimensions[dimension.key] || dimension.label;
         const technicalLabel = dimension.detail.label;
         const rows = dimension.detail.signals.map((signal) => `
-          <li class="${signalRowClass(signal.value)}" title="${escapeHtml(signal.explanation)}">
+          <li class="${signalRowClass(signal)}" title="${escapeHtml(signal.explanation || '')}">
             <span>&bull; ${escapeHtml(friendlySignals[signal.label] || signal.label)}<small class="signal-technical-name">${escapeHtml(signal.label)}</small></span>
             <strong>${escapeHtml(compactSignalValue(signal, dimension.detail.signals))}${signal.label === 'Declared expected properties' && listItems(signal.value).length ? `<details class="signal-raw"><summary>Tam liste</summary><span>${escapeHtml(signal.value)}</span></details>` : ''}</strong>
           </li>

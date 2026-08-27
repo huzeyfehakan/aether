@@ -1013,10 +1013,13 @@ Passage."""
         dom = run_page_script(f"renderReport({json.dumps(view)}, 'report');")
         rendered = dom["#passage-balance-metric"]["html"]
         self.assertIn("Passage Balance", rendered)
-        self.assertNotIn("good", rendered.lower())
-        self.assertNotIn("bad", rendered.lower())
-        self.assertNotIn("pass", rendered.lower())
-        self.assertNotIn("fail", rendered.lower())
+        normalized = rendered.lower()
+        for classification in ("good", "bad", "pass", "fail"):
+            self.assertNotIn(f">{classification}<", normalized)
+            self.assertNotRegex(
+                normalized,
+                rf'class="[^"]*\b{classification}\b[^"]*"',
+            )
 
     def test_unmeasured_direct_answer_coverage_renders_not_measured(self):
         view = self._analysed_view()
@@ -1407,13 +1410,21 @@ Passage."""
         self.assertIn("What to do:", findings)
         self.assertNotIn("no recommended changes", findings)
 
-    def test_a_draft_with_nothing_to_report_still_says_so(self):
-        """The branch that did work must keep working."""
+    def test_a_draft_without_statistics_renders_the_current_recommendation(self):
         draft = self._draft("<h1>Başlık</h1><p>Bir paragraf.</p>").json()["draft"]
+        recommendation = next(
+            item
+            for item in draft["recommendations"]
+            if item["headline"] == "This article contains no statistics or data points"
+        )
 
         dom = run_page_script(f"renderDraft({json.dumps(draft)});")
+        findings = dom["#draft-findings"]["html"]
 
-        self.assertIn("no recommended changes", dom["#draft-findings"]["html"])
+        self.assertIn(recommendation["headline"], findings)
+        self.assertIn("What to do:", findings)
+        self.assertIn("Why it matters", findings)
+        self.assertNotIn("no recommended changes", findings)
 
     def test_index_shows_both_audience_sections(self):
         response = self.client.get("/")

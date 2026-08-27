@@ -411,8 +411,8 @@ class PlainTextAIReadinessReportRenderer:
                         lines.append(f'  "{occurrence.excerpt}"')
                 lines.extend(
                     (
-                        f"  Neden önemli: {text.why_it_matters}",
-                        f"  Ne yapmalısınız: {text.what_to_do}",
+                        f"  Why it matters: {text.why_it_matters}",
+                        f"  What to do: {text.what_to_do}",
                     )
                 )
         return tuple(lines)

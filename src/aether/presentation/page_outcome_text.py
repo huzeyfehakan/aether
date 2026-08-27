@@ -25,29 +25,29 @@ class OutcomeText:
 
 _TEXT: Dict[PageOutcome, OutcomeText] = {
     PageOutcome.ARTICLE_TEXT_UNREADABLE: OutcomeText(
-        headline="Sayfa kendisini makale olarak tanımlıyor ancak metni okunamadı",
+        headline="The page identifies itself as an article, but its text could not be read",
         what_happened=(
-            "Sayfa yazılımlara kendisini makale olarak tanıtıyor ancak sunduğu "
-            "sayfada makale metni bulunmuyor. Tarayıcı dışında sayfayı okuyan "
-            "bir sistem yalnızca başlığı görüyor."
+            "The page identifies itself to software as an article, but the served "
+            "page contains no article text. A system reading outside a browser "
+            "can see only the title."
         ),
         what_to_do=(
-            "Bunu siteyi yöneten teknik ekiple paylaşın. Makale metni büyük "
-            "olasılıkla sayfa yüklendikten sonra tarayıcıda oluşturuluyor; "
-            "metnin sunucunun gönderdiği sayfada bulunması gerekir."
+            "Share this with the technical team that manages the site. The article "
+            "text is probably generated in the browser after the page loads; it "
+            "needs to be present in the page sent by the server."
         ),
     ),
     PageOutcome.NO_ARTICLE_TEXT_FOUND: OutcomeText(
-        headline="Bu sayfada makale metni bulunamadı",
+        headline="No article text was found on this page",
         what_happened=(
-            "Sayfadan makale metni okunamadı ve sayfa kendisini makale olarak "
-            "tanımlamıyor. Video, liste ve program sayfalarında bu beklenen "
-            "bir durumdur; Aether burada değerlendirecek bir makale bulamadı."
+            "No article text could be read, and the page does not identify itself "
+            "as an article. This is expected for video, listing, and program pages; "
+            "Aether found no article to assess here."
         ),
         what_to_do=(
-            "Bu bir makale değilse sorun yoktur ve işlem gerekmez. Makaleyse, "
-            "metin muhtemelen tarayıcıda sonradan oluşturulduğu için durumu "
-            "siteyi yöneten teknik ekiple paylaşın."
+            "If this is not an article, there is no problem and no action is needed. "
+            "If it is an article, share this with the technical team because the "
+            "text may be generated later in the browser."
         ),
     ),
 }
@@ -67,16 +67,16 @@ def declared_evidence(assessment: PageAssessment) -> Tuple[str, ...]:
     evidence = []
     if assessment.declared_page_type:
         evidence.append(
-            f"Sayfa kendisini “{assessment.declared_page_type}” olarak tanımlıyor."
+            f"The page identifies itself as “{assessment.declared_page_type}”."
         )
     if assessment.declared_types:
         evidence.append(
-            "Sayfadaki yapılandırılmış veri şu türleri tanımlıyor: "
+            "The structured data on the page declares these types: "
             + ", ".join(assessment.declared_types)
             + "."
         )
     else:
-        evidence.append("Sayfa yapılandırılmış veri yayınlamıyor.")
+        evidence.append("The page does not publish structured data.")
     return tuple(evidence)
 
 

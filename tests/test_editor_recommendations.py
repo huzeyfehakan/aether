@@ -162,17 +162,17 @@ class EditorRecommendationTests(unittest.TestCase):
         self.assertIn(RecommendationCode.TITLE_SOURCES_DISAGREE, codes)
         self.assertIn(RecommendationCode.DESCRIPTION_SOURCES_DISAGREE, codes)
 
-    def test_every_recommendation_code_has_complete_turkish_presentation_text(self):
-        english_fragments = ("this article", "what to do", "why it matters", "add the", "your article")
+    def test_every_recommendation_code_has_complete_english_presentation_text(self):
+        legacy_turkish_fragments = ("makale", "neden önemli", "ne yapmalısınız", "eksik alan")
 
         for code in RecommendationCode:
             text = recommendation_text(EditorRecommendation(code=code))
             combined = " ".join((text.headline, text.why_it_matters, text.what_to_do)).lower()
             self.assertTrue(text.headline and text.why_it_matters and text.what_to_do)
-            for fragment in english_fragments:
+            for fragment in legacy_turkish_fragments:
                 self.assertNotIn(fragment, combined, code)
 
-    def test_technical_names_are_preserved_inside_turkish_copy(self):
+    def test_technical_names_are_preserved_inside_english_copy(self):
         structured = recommendation_text(
             EditorRecommendation(code=RecommendationCode.NO_ARTICLE_STRUCTURED_DATA)
         )
@@ -183,8 +183,8 @@ class EditorRecommendationTests(unittest.TestCase):
         self.assertIn("Schema.org Article", structured.what_to_do)
         self.assertIn("JSON-LD", same_as.what_to_do)
         self.assertIn("sameAs", same_as.what_to_do)
-        self.assertEqual(missing_properties_phrase(("inLanguage",)), "Eksik alan: inLanguage")
-        self.assertEqual(impact_label("Structured Data"), "Yapısal Veri")
+        self.assertEqual(missing_properties_phrase(("inLanguage",)), "Missing field: inLanguage")
+        self.assertEqual(impact_label("Structured Data"), "Structured Data")
 
     def test_every_metadata_recommendation_names_a_concrete_action(self):
         """Naming the gap is not advice; the editor must know what to do."""
@@ -309,9 +309,9 @@ class EditorRecommendationTests(unittest.TestCase):
 
     def test_states_how_many_articles_were_compared(self):
         for count, expected in (
-            (0, "daha önce analiz edilmiş makale olmadığı"),
-            (1, "(1 makale)"),
-            (4, "(4 makale)"),
+            (0, "no articles from this publisher"),
+            (1, "(1 article)"),
+            (4, "(4 articles)"),
         ):
             with self.subTest(count=count):
                 self.assertIn(expected, compared_articles_phrase(count))
@@ -322,10 +322,10 @@ class EditorRecommendationTests(unittest.TestCase):
 
         rendered = PlainTextAIReadinessReportRenderer().render(self.report_for(first))
 
-        self.assertIn("İçerikte Yapılabilecekler", rendered)
-        self.assertIn("Bu makalede şimdi yapabileceğiniz iyileştirmeler.", rendered)
-        self.assertIn("(1 makale)", rendered)
-        self.assertIn("Ne yapmalısınız:", rendered)
+        self.assertIn("Content Recommendations", rendered)
+        self.assertIn("Improvements you can make to this article now.", rendered)
+        self.assertIn("(1 article)", rendered)
+        self.assertIn("What to do:", rendered)
 
     def test_repeated_paragraphs_share_one_explanation(self):
         """Repeating the rationale per occurrence buries the occurrences."""
@@ -339,9 +339,9 @@ class EditorRecommendationTests(unittest.TestCase):
         self.assertEqual(
             len(self.of_code(report, RecommendationCode.REPEATED_TEXT_IN_ARTICLE_BODY)), 2
         )
-        self.assertEqual(rendered.count("Neden önemli: Tekrarlanan paragraf"), 1)
+        self.assertEqual(rendered.count("Why it matters: Repeated text"), 1)
         self.assertEqual(
-            rendered.count("Bu paragraf diğer makalelerinizde de yer alıyor"), 1
+            rendered.count("This paragraph also appears in your other articles"), 1
         )
         self.assertIn(NOTICE, rendered)
         self.assertIn(second_notice, rendered)
@@ -388,9 +388,9 @@ class EditorRecommendationTests(unittest.TestCase):
         )[0]
         wording = recommendation_text(recommendation).why_it_matters.lower()
 
-        self.assertIn("ortak kavram", wording)
-        self.assertNotIn("doğrudan cevap", wording)
-        self.assertNotIn("kesin tutum", wording)
+        self.assertIn("share vocabulary", wording)
+        self.assertNotIn("direct answer", wording)
+        self.assertNotIn("definitive stance", wording)
 
 
 if __name__ == "__main__":

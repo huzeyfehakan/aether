@@ -6,17 +6,17 @@ class ScoreDimensionText(TypedDict):
     label: str
 
 _SEO_SCORE_TEXTS = {
-    "entity_coverage": {"label": "Varlık Kapsamı"},
-    "structured_data": {"label": "Yapısal Veri"},
+    "entity_coverage": {"label": "Entity Coverage"},
+    "structured_data": {"label": "Structured Data"},
     "semantic_quality": {"label": "Anlamsal Kalite"},
-    "technical_access": {"label": "Teknik Erişim"},
+    "technical_access": {"label": "Technical Access"},
 }
 
 _GEO_SCORE_TEXTS = {
-    "semantic_completeness": {"label": "Anlamsal Bütünlük"},
-    "entity_authority": {"label": "Varlık Otoritesi"},
-    "structural_richness": {"label": "Yapısal Zenginlik"},
-    "discoverability": {"label": "Keşfedilebilirlik"},
+    "semantic_completeness": {"label": "Semantic Completeness"},
+    "entity_authority": {"label": "Entity Authority"},
+    "structural_richness": {"label": "Structural Richness"},
+    "discoverability": {"label": "Discoverability"},
 }
 
 def seo_dimension_text(key: str) -> ScoreDimensionText:

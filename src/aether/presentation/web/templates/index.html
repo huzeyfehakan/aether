@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Aether — SEO ve AI Görünürlüğü</title>
+    <title>Aether — SEO and AI Visibility</title>
     <style>
       :root { color: #132238; background: #f4f7fb; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
       * { box-sizing: border-box; }
@@ -95,51 +95,51 @@
     <div class="shell">
       <header>
         <div class="eyebrow">Aether</div>
-        <h1>İçeriğinizin SEO ve AI görünürlüğünü ölçün</h1>
-        <p class="intro">Web sitenizi veya taslağınızı analiz edin, iyileştirme önerileri alın.</p>
+        <h1>Measure your content's SEO and AI visibility</h1>
+        <p class="intro">Analyze your website or draft and get recommendations for improvement.</p>
       </header>
 
-      <section class="panel" aria-label="Analiz kaynağı" style="padding: 20px;">
+      <section class="panel" aria-label="Analysis source" style="padding: 20px;">
         <div class="choice-grid">
         <div class="choice-card">
         <form class="form-panel active" id="url-form" data-endpoint="/analyze/url">
-          <h2>Yayındaki sayfayı kontrol et</h2>
-          <p class="muted">URL girin, sayfanızın SEO ve AI görünürlüğünü analiz edelim.</p>
+          <h2>Check a published page</h2>
+          <p class="muted">Enter a URL to analyze your page's SEO and AI visibility.</p>
           <label>URL <input name="url" type="url" placeholder="https://site.com/yazi" required /></label>
           <input name="article_type" type="hidden" value="news_report" />
           <div class="recovery hidden" data-recovery>
-            <p class="help">Bazı bilgiler sayfadan okunamadı. Lütfen doğrulayın.</p>
-            <label class="hidden" data-need="language">Makale hangi dilde?
+            <p class="help">Some information could not be read from the page. Please verify it.</p>
+            <label class="hidden" data-need="language">What language is the article in?
               <select name="fallback_language">
-                <option value="tr">Türkçe</option><option value="en">English</option>
-                <option value="ar">العربية</option><option value="ru">Русский</option>
-                <option value="de">Deutsch</option><option value="fr">Français</option>
+                <option value="tr">Turkish</option><option value="en">English</option>
+                <option value="ar">Arabic</option><option value="ru">Russian</option>
+                <option value="de">German</option><option value="fr">French</option>
               </select></label>
-            <label class="hidden" data-need="published">Makale ne zaman yayınlandı?
+            <label class="hidden" data-need="published">When was the article published?
               <input name="fallback_published_at" type="date" /></label>
           </div>
-          <button class="primary">Analiz Et</button>
+          <button class="primary">Analyze</button>
         </form>
         </div>
         <div class="choice-card">
-        <h2>Yayınlanmamış içeriği kontrol et</h2>
-        <p class="muted">Başlık ve içeriğinizi yapıştırın, yayınlamadan önce kontrol edin.</p>
-        <button class="tab" id="draft-tab" type="button" aria-controls="draft-fields" aria-expanded="false">Taslağı Analiz Et</button>
+        <h2>Check unpublished content</h2>
+        <p class="muted">Paste your headline and content to check them before publishing.</p>
+        <button class="tab" id="draft-tab" type="button" aria-controls="draft-fields" aria-expanded="false">Analyze Draft</button>
         <form class="form-panel" id="draft-form" data-endpoint="/analyze/draft">
           <div id="draft-fields" class="draft-fields hidden">
-          <label>Başlık <input name="headline" placeholder="Yayınlamayı planladığınız başlık" required /></label>
-          <label>İçerik <div class="paste-area" id="draft-content" contenteditable="true" data-placeholder="İçeriği buraya yapıştırın"></div></label>
+          <label>Headline <input name="headline" placeholder="The headline you plan to publish" required /></label>
+          <label>Content <div class="paste-area" id="draft-content" contenteditable="true" data-placeholder="Paste your content here"></div></label>
           <input name="content" type="hidden" />
-          <label>Dil
+          <label>Language
             <select name="language">
-              <option value="tr">Türkçe</option><option value="en">English</option>
-              <option value="ar">العربية</option><option value="ru">Русский</option>
-              <option value="de">Deutsch</option><option value="fr">Français</option>
+              <option value="tr">Turkish</option><option value="en">English</option>
+              <option value="ar">Arabic</option><option value="ru">Russian</option>
+              <option value="de">German</option><option value="fr">French</option>
             </select></label>
-          <details class="advanced-options"><summary>Gelişmiş seçenekler</summary>
-          <label>Yayıncıyla karşılaştır <select name="publisher" id="draft-publisher"></select>
+          <details class="advanced-options"><summary>Advanced options</summary>
+          <label>Compare with publisher <select name="publisher" id="draft-publisher"></select>
             <p class="help" id="draft-compare-state"></p></label></details>
-          <button class="primary">Taslağı Analiz Et</button>
+          <button class="primary">Analyze Draft</button>
           </div>
         </form>
         </div>
@@ -149,113 +149,113 @@
       <p id="status" role="alert"></p>
 
       <section id="draft-card" class="panel hidden" aria-live="polite">
-        <div class="report-heading"><div><div class="eyebrow">Taslak incelemesi</div><h2>Yayınlamadan önce neleri iyileştirebileceğinizi görün</h2></div></div>
+        <div class="report-heading"><div><div class="eyebrow">Draft review</div><h2>See what you can improve before publishing</h2></div></div>
         <p id="draft-summary" class="muted"></p>
         <div class="section" id="draft-preview-section">
-          <p class="muted">Bu skorlar yalnızca yayınlanmadan önce ölçülebilen sinyallere dayanır. Yayınlandıktan sonra sonuç değişebilir.</p>
+          <p class="muted">These scores are based only on signals measurable before publication. Results may change after publishing.</p>
           <div style="display: flex; gap: 32px; flex-wrap: wrap;">
-            <div style="flex: 1; min-width: 260px;"><h3>SEO Önizleme</h3><div class="score-headline"><span id="draft-seo-total" class="score-total">Henüz ölçülemiyor</span><span id="draft-seo-suffix"></span></div><div id="draft-seo-grid" class="dimension-grid"></div><div id="draft-seo-details" class="dimension-detail-stack"></div></div>
-            <div style="flex: 1; min-width: 260px;"><h3>GEO Önizleme</h3><div class="score-headline"><span id="draft-geo-total" class="score-total">Henüz ölçülemiyor</span><span id="draft-geo-suffix"></span></div><div id="draft-geo-grid" class="dimension-grid"></div><div id="draft-geo-details" class="dimension-detail-stack"></div></div>
+            <div style="flex: 1; min-width: 260px;"><h3>SEO Preview</h3><div class="score-headline"><span id="draft-seo-total" class="score-total">Not measured</span><span id="draft-seo-suffix"></span></div><div id="draft-seo-grid" class="dimension-grid"></div><div id="draft-seo-details" class="dimension-detail-stack"></div></div>
+            <div style="flex: 1; min-width: 260px;"><h3>GEO Preview</h3><div class="score-headline"><span id="draft-geo-total" class="score-total">Not measured</span><span id="draft-geo-suffix"></span></div><div id="draft-geo-grid" class="dimension-grid"></div><div id="draft-geo-details" class="dimension-detail-stack"></div></div>
           </div>
         </div>
         <div class="section"><h3>Kontrol edilenler</h3><ul id="draft-performed" class="not-checked"></ul><div id="draft-findings"></div></div>
-        <div class="section"><h3>Yayınlandıktan sonra ölçülebilecekler</h3><p class="muted">Canlı sayfa olmadan ölçülemeyen değerler “Henüz ölçülemiyor” olarak korunur; sıfır kabul edilmez.</p><ul id="draft-unavailable" class="not-checked"></ul></div>
+        <div class="section"><h3>Measurable after publishing</h3><p class="muted">Values that require a live page remain “Not measured” and are not treated as zero.</p><ul id="draft-unavailable" class="not-checked"></ul></div>
       </section>
 
       <section id="outcome-card" class="panel hidden" aria-live="polite">
-        <div class="report-heading"><div><div class="eyebrow">Analiz tamamlandı</div><h2 id="outcome-headline"></h2></div></div>
+        <div class="report-heading"><div><div class="eyebrow">Analysis complete</div><h2 id="outcome-headline"></h2></div></div>
         <p id="outcome-happened"></p>
         <ul id="outcome-evidence" class="muted"></ul>
-        <div class="recommendation"><p><strong>Ne yapmalısınız?</strong> <span id="outcome-action"></span></p></div>
+        <div class="recommendation"><p><strong>What to do:</strong> <span id="outcome-action"></span></p></div>
       </section>
 
       <section id="report-card" class="panel hidden" aria-live="polite">
-        <div class="report-heading"><div><div class="eyebrow">Analiz tamamlandı</div><h2>Analiz Sonucu</h2><p id="result-url" class="result-url"></p></div><button type="button" class="secondary" id="new-analysis">Yeni Analiz</button><span id="report-state" class="sr-only"></span></div>
+        <div class="report-heading"><div><div class="eyebrow">Analysis complete</div><h2>Analysis Result</h2><p id="result-url" class="result-url"></p></div><button type="button" class="secondary" id="new-analysis">New Analysis</button><span id="report-state" class="sr-only"></span></div>
         
         <!-- YENİ: AI Readiness Score Bölümü -->
         <div class="section" id="score-section" style="margin-top: 0;">
           <div class="score-summary-grid">
             <div class="score-summary" id="seo-summary-card">
-              <h3>SEO Skoru</h3>
+              <h3>SEO Score</h3>
               <div class="score-headline">
                 <span id="seo-score-total" class="score-total">0</span>
                 <span style="font-size: 1.1rem; color: #58677b;">/ 100</span>
               </div>
               <p id="seo-band" class="score-band"></p><p id="seo-band-copy" class="score-copy"></p>
-              <div class="score-details" aria-labelledby="seo-details-heading"><h4 id="seo-details-heading">SEO Detayları</h4><div id="seo-score-grid" class="dimension-grid"></div><div id="seo-details" class="dimension-detail-stack"></div></div>
+              <div class="score-details" aria-labelledby="seo-details-heading"><h4 id="seo-details-heading">SEO Details</h4><div id="seo-score-grid" class="dimension-grid"></div><div id="seo-details" class="dimension-detail-stack"></div></div>
             </div>
             <div class="score-summary" id="geo-summary-card">
-              <h3>GEO Skoru <span class="muted">(AI Görünürlüğü)</span></h3>
+              <h3>GEO Score <span class="muted">(AI Visibility)</span></h3>
               <div class="score-headline">
                 <span id="geo-score-total" class="score-total">0</span>
                 <span style="font-size: 1.1rem; color: #58677b;">/ 100</span>
               </div>
               <p id="geo-band" class="score-band"></p><p id="geo-band-copy" class="score-copy"></p>
-              <div class="score-details" aria-labelledby="geo-details-heading"><h4 id="geo-details-heading">GEO Detayları</h4><div id="geo-score-grid" class="dimension-grid"></div><div id="geo-details" class="dimension-detail-stack"></div></div>
+              <div class="score-details" aria-labelledby="geo-details-heading"><h4 id="geo-details-heading">GEO Details</h4><div id="geo-score-grid" class="dimension-grid"></div><div id="geo-details" class="dimension-detail-stack"></div></div>
             </div>
           </div>
         </div>
         <!-- BİTİŞ: AI Readiness Score Bölümü -->
 
-        <section class="section" aria-labelledby="recommendations-heading"><h3 id="recommendations-heading">Öneriler</h3><div id="editor-section"><h4>İçerikte Yapılabilecekler</h4><p class="muted" id="editor-subtitle"></p><p id="editor-compared"></p><div id="editor-list" class="recommendation-list"></div></div><div id="technical-section"><h4>Teknik / Site Düzeyinde Yapılabilecekler</h4><p class="muted" id="technical-subtitle"></p><div id="technical-list" class="recommendation-list"></div></div></section>
+        <section class="section" aria-labelledby="recommendations-heading"><h3 id="recommendations-heading">Recommendations</h3><div id="editor-section"><h4>Content Recommendations</h4><p class="muted" id="editor-subtitle"></p><p id="editor-compared"></p><div id="editor-list" class="recommendation-list"></div></div><div id="technical-section"><h4>Technical / Site Recommendations</h4><p class="muted" id="technical-subtitle"></p><div id="technical-list" class="recommendation-list"></div></div></section>
 
         <div class="section" aria-labelledby="analysed-text-heading">
-          <h3 id="analysed-text-heading">Analiz Edilen Metin</h3>
+          <h3 id="analysed-text-heading">Analyzed Text</h3>
           <button type="button" class="geo-dimension-button" data-score-detail-toggle aria-expanded="false" aria-controls="passage-details-panel">
-            <span>Analiz Edilen Metni Gör</span><span class="geo-detail-hint">Detaylar &#9662;</span>
+            <span>View Analyzed Text</span><span class="geo-detail-hint">Details &#9662;</span>
           </button>
           <div id="passage-details-panel" class="geo-dimension-detail hidden">
-            <h4>Çıkarılan metin bölümleri</h4>
+            <h4>Extracted passages</h4>
             <div id="passage-details-list"></div>
             <p id="passage-details-total" class="muted"></p>
           </div>
         </div>
 
-        <details class="technical"><summary>Değerlendirme ve teknik tanılar</summary>
-        <div class="section"><h3>Değerlendirme özeti</h3><div id="assessment-grid" class="assessment-grid"></div></div>
-        <div class="section"><h3>Makale yapısı</h3><p>Kaydedilen makalenin metin bölümü analizi için nasıl düzenlendiği.</p><div id="structure-metrics" class="metric-grid"></div></div>
+        <details class="technical"><summary>Assessment and technical diagnostics</summary>
+        <div class="section"><h3>Assessment Summary</h3><div id="assessment-grid" class="assessment-grid"></div></div>
+        <div class="section"><h3>Article structure</h3><p>How the saved article was organized for passage analysis.</p><div id="structure-metrics" class="metric-grid"></div></div>
 
         <section class="section" aria-labelledby="passage-extractability-heading">
-          <h3 id="passage-extractability-heading">Metin Bölümü Okunabilirliği — Deneysel tanı</h3>
-          <p>Çıkarılan bölümlerin kelime sayısı eşikleri. Skora dahil değildir.</p>
+          <h3 id="passage-extractability-heading">Passage Extractability — Experimental diagnostic</h3>
+          <p>Word-count thresholds for extracted passages. Not included in scoring.</p>
           <div id="passage-extractability-metrics" class="metric-grid"></div>
         </section>
 
         <section class="section" aria-labelledby="passage-balance-heading">
-          <h3 id="passage-balance-heading">Paragraf Dengesi — Deneysel tanı</h3>
-          <p>Ortalama bölüm uzunluğının en uzun bölüme oranı. Skora dahil değildir.</p>
+          <h3 id="passage-balance-heading">Passage Balance — Experimental diagnostic</h3>
+          <p>Ratio of average passage length to the longest passage. Not included in scoring.</p>
           <div id="passage-balance-metric" class="metric-grid"></div>
         </section>
 
         <section class="section" aria-labelledby="direct-answer-coverage-heading">
-          <h3 id="direct-answer-coverage-heading">Doğrudan Cevaplama — Deneysel tanı</h3>
-          <p>Ölçülebilen soru başlıklarından ilk uygun bölümde cevaplananların oranı. Skora dahil değildir.</p>
+          <h3 id="direct-answer-coverage-heading">Direct Answer Coverage — Experimental diagnostic</h3>
+          <p>Share of measurable question headings answered in the first eligible passage. Not included in scoring.</p>
           <div id="direct-answer-coverage-metric" class="metric-grid"></div>
         </section>
 
-        <div class="section"><h3>Metadata durumu</h3><p id="metadata-summary">Makalede bulunan kaynak alanları.</p><table class="metadata-table"><tbody id="metadata-table"></tbody></table><div id="missing-list" class="missing-list"></div></div>
+        <div class="section"><h3>Metadata status</h3><p id="metadata-summary">Source fields found in the article.</p><table class="metadata-table"><tbody id="metadata-table"></tbody></table><div id="missing-list" class="missing-list"></div></div>
 
-        <details class="technical"><summary>Teknik detaylar</summary><p class="help">Değişmez kimlikler ve düz metin raporu doğrulama ile sorun giderme için korunur.</p><pre id="report"></pre></details>
+        <details class="technical"><summary>Technical details</summary><p class="help">Immutable identifiers and the plain-text report are retained for verification and troubleshooting.</p><pre id="report"></pre></details>
         </details>
       </section>
     </div>
 
     <script>
-      const statusLabels = { complete: 'Tam', partial: 'Kısmi', missing: 'Eksik' };
+      const statusLabels = { complete: 'Complete', partial: 'Partial', missing: 'Missing' };
       const statusBadge = (value) => `<span class="badge ${value}">${statusLabels[value] || value}</span>`;
       const metric = (label, value) => `<div class="metric-card"><p>${label}</p><strong>${value}</strong></div>`;
       const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
       })[character]);
-      const scoreValue = (value) => value !== null ? `${value.toFixed(1)} / 100` : 'Henüz ölçülemiyor';
+      const scoreValue = (value) => value !== null ? `${value.toFixed(1)} / 100` : 'Not measured';
       const signalValue = (signal) => {
-        if (signal.value === null) return 'Henüz ölçülemiyor';
+        if (signal.value === null) return 'Not measured';
         const kind = signal.kind ? signal.kind.split('.').pop() : null; // Handle Enum string
         if (kind === 'SCORE') return `${signal.value.toFixed(1)} / 100`;
         if (kind === 'RATIO') return `%${signal.value.toFixed(1)}`;
         if (kind === 'COUNT') return Math.round(signal.value).toLocaleString('tr-TR');
         if (typeof signal.value === 'number') return signal.value.toFixed(1);
-        return ({ Yes: 'Evet', No: 'Hayır', True: 'Mevcut', False: 'Eksik', Available: 'Mevcut', Missing: 'Eksik', Present: 'Mevcut', None: 'Yok' })[signal.value] || signal.value;
+        return ({ Yes: 'Yes', No: 'No', True: 'Present', False: 'Missing', Available: 'Available', Missing: 'Missing', Present: 'Present', None: 'None' })[signal.value] || signal.value;
       };
       const signalRowClass = (signal) => {
         const value = signal.value;
@@ -269,34 +269,34 @@
         return cls;
       };
       const friendlyDimensions = {
-        entity_coverage: 'Varlık Kapsamı', semantic_quality: 'Anlamsal Kalite',
-        semantic_completeness: 'İçerik Bütünlüğü', entity_authority: 'Kaynak ve Güvenilirlik',
-        structural_richness: 'İçerik Yapısı', discoverability: 'Bulunabilirlik',
-        passage_balance: 'Paragraf Dengesi', direct_answer_coverage: 'Doğrudan Cevaplama',
-        technical_access: 'Teknik Erişim', structured_data: 'Yapısal Veri'
+        entity_coverage: 'Entity Coverage', semantic_quality: 'Semantic Quality',
+        semantic_completeness: 'Semantic Completeness', entity_authority: 'Entity Authority',
+        structural_richness: 'Structural Richness', discoverability: 'Discoverability',
+        passage_balance: 'Passage Balance', direct_answer_coverage: 'Direct Answer Coverage',
+        technical_access: 'Technical Access', structured_data: 'Structured Data'
       };
       const friendlySignals = {
-        'Publication date': 'Yayın tarihi', 'Last modified date': 'Son güncelleme',
-        'Author': 'Yazar', 'Description': 'Açıklama',
-        'Article structured data': 'Article yapılandırılmış verisi',
-        'Declared expected properties': 'Tanımlanan alanlar',
-        'Missing expected properties': 'Eksik alanlar', 'Property coverage': 'Alan kapsamı',
-        'Statistics coverage': 'Sayısal veri kapsamı', 'Heading-passage overlap': 'Başlık-paragraf uyumu',
-        'Sentence balance': 'Cümle dengesi', 'Structural variety': 'Yapısal çeşitlilik',
-        'Author declaration': 'Yazar bilgisi', 'Outbound body sources': 'Dış kaynaklar',
-        'Trust index': 'Güven skoru', 'Third-party source ratio': 'Bağımsız kaynak oranı',
-        'Supported entities': 'Desteklenen varlıklar', 'Citation coverage': 'Kaynaklandırma kapsamı',
-        'Claim evidence coverage': 'İddia kanıtı kapsamı', 'Table word share': 'Tablo metni oranı',
-        'List word share': 'Liste metni oranı', 'Blockquote word share': 'Alıntı metni oranı',
-        'Structured content ratio': 'Yapılandırılmış içerik oranı',
-        'Answered question ratio': 'Cevaplanan soru oranı', 'Outgoing links': 'Giden bağlantılar',
-        'Body links': 'Gövde bağlantıları', 'Body link ratio': 'Gövde bağlantısı oranı',
-        'Body link saturation': 'Gövde bağlantı yoğunluğu', 'Unique target ratio': 'Benzersiz hedef oranı',
-        'Unique targets': 'Benzersiz hedefler', 'Total passages': 'Toplam metin bölümü',
-        'Unique passages': 'Benzersiz metin bölümü', 'Repeated passages': 'Tekrarlanan metin bölümü',
-        'Unique passage ratio': 'Benzersiz bölüm oranı',
-        'Title sources disagree': 'Başlık kaynakları uyuşmuyor',
-        'Description sources disagree': 'Açıklama kaynakları uyuşmuyor'
+        'Publication date': 'Publication date', 'Last modified date': 'Last modified date',
+        'Author': 'Author', 'Description': 'Description',
+        'Article structured data': 'Article structured data',
+        'Declared expected properties': 'Declared expected properties',
+        'Missing expected properties': 'Missing expected properties', 'Property coverage': 'Property coverage',
+        'Statistics coverage': 'Statistics coverage', 'Heading-passage overlap': 'Heading-passage overlap',
+        'Sentence balance': 'Sentence balance', 'Structural variety': 'Structural variety',
+        'Author declaration': 'Author declaration', 'Outbound body sources': 'Outbound body sources',
+        'Trust index': 'Trust index', 'Third-party source ratio': 'Third-party source ratio',
+        'Supported entities': 'Supported entities', 'Citation coverage': 'Citation coverage',
+        'Claim evidence coverage': 'Claim evidence coverage', 'Table word share': 'Table word share',
+        'List word share': 'List word share', 'Blockquote word share': 'Blockquote word share',
+        'Structured content ratio': 'Structured content ratio',
+        'Answered question ratio': 'Answered question ratio', 'Outgoing links': 'Outgoing links',
+        'Body links': 'Body links', 'Body link ratio': 'Body link ratio',
+        'Body link saturation': 'Body link saturation', 'Unique target ratio': 'Unique target ratio',
+        'Unique targets': 'Unique targets', 'Total passages': 'Total passages',
+        'Unique passages': 'Unique passages', 'Repeated passages': 'Repeated passages',
+        'Unique passage ratio': 'Unique passage ratio',
+        'Title sources disagree': 'Title sources disagree',
+        'Description sources disagree': 'Description sources disagree'
       };
       const listItems = (value) => typeof value === 'string'
         ? value.split(',').map((item) => item.trim()).filter((item) => item && item !== 'None')
@@ -306,7 +306,7 @@
         const declared = listItems(signal.value);
         const missingSignal = signals.find((item) => item.label === 'Missing expected properties');
         const missing = listItems(missingSignal ? missingSignal.value : '');
-        return `${declared.length} / ${declared.length + missing.length} mevcut`;
+        return `${declared.length} / ${declared.length + missing.length} present`;
       };
       const scoreDimensionCard = (dimension, scoreType) => {
         const friendlyLabel = friendlyDimensions[dimension.key] || dimension.label;
@@ -317,7 +317,7 @@
             <p class="score-weight">%${dimension.weight}</p>
             <h4 class="dimension-name">${escapeHtml(friendlyLabel)}<small class="technical-name">${escapeHtml(technicalLabel)}</small></h4>
             <strong class="dimension-score">${scoreValue(dimension.val)}</strong>
-            <span class="geo-detail-hint">Detayları gör &#9662;</span>
+            <span class="geo-detail-hint">Details &#9662;</span>
           </button>
         </article>`;
       };
@@ -333,7 +333,7 @@
           </li>
         `).join('');
         return `<section id="${detailId}" class="dimension-detail-panel hidden">
-            <h5>${escapeHtml(friendlyLabel)} Detayları <small class="technical-name">${escapeHtml(technicalLabel)}</small></h5>
+            <h5>${escapeHtml(friendlyLabel)} Details <small class="technical-name">${escapeHtml(technicalLabel)}</small></h5>
             <ul class="geo-signal-list">${rows}</ul>
           </section>`;
       };
@@ -365,7 +365,7 @@
       // them, and only a draft with nothing to report ever rendered.
       const declaredRows = (o) => (o.declared || []).map((d) => `<tr><td>${d.label}</td><td>${d.value}</td></tr>`).join('');
       const occurrence = (o) => `${o.detail ? `<span class="repeat-count">${o.detail}</span>` : ''}${o.declared ? `<table class="metadata-table declared">${declaredRows(o)}</table>` : ''}${o.excerpt ? `<blockquote>${o.excerpt}</blockquote>` : ''}`;
-      const card = (item) => `<article class="recommendation"><h4>${item.headline}</h4>${item.impact ? `<span class="badge impact-badge">Etkilediği alan: ${item.impact}</span>` : ''}${item.occurrences.map(occurrence).join('')}<p><strong>Ne yapmalısınız?</strong> ${item.what_to_do}</p><details><summary>Neden önemli?</summary><p>${item.why_it_matters}</p></details></article>`;
+      const card = (item) => `<article class="recommendation"><h4>${item.headline}</h4>${item.impact ? `<span class="badge impact-badge">Impact: ${item.impact}</span>` : ''}${item.occurrences.map(occurrence).join('')}<p><strong>What to do:</strong> ${item.what_to_do}</p><details><summary>Why it matters</summary><p>${item.why_it_matters}</p></details></article>`;
 
       const draftToggle = document.querySelector('#draft-tab');
       draftToggle.addEventListener('click', () => {
@@ -398,10 +398,10 @@
       }
 
       function renderDraft(draft) {
-        const paras = `${draft.paragraph_count} paragraf`;
-        const words = `${draft.word_count} kelime`;
+        const paras = `${draft.paragraph_count} ${draft.paragraph_count === 1 ? 'paragraph' : 'paragraphs'}`;
+        const words = `${draft.word_count} ${draft.word_count === 1 ? 'word' : 'words'}`;
         const compared = draft.compared_article_count
-          ? ` · ${draft.compared_article_count} makalenizle karşılaştırıldı`
+          ? ` · compared with ${draft.compared_article_count} ${draft.compared_article_count === 1 ? 'article' : 'articles'}`
           : '';
         document.querySelector('#draft-summary').textContent =
           `“${draft.headline}” — ${paras}, ${words}${compared}`;
@@ -411,7 +411,7 @@
           draft.checks_unavailable.map((c) => `<li>${c}</li>`).join('');
         document.querySelector('#draft-findings').innerHTML = draft.recommendations.length
           ? draft.recommendations.map(card).join('')
-          : '<p class="muted">Bu taslak için şu anda bir değişiklik önerisi yok.</p>';
+          : '<p class="muted">There are no recommended changes for this draft right now.</p>';
         renderDraftPreview(draft.seo_preview, 'seo', [
           'entity_coverage', 'structured_data', 'semantic_quality', 'technical_access'
         ]);
@@ -422,7 +422,7 @@
 
       function renderDraftPreview(score, kind, dimensions) {
         const total = score ? score.total : null;
-        document.querySelector(`#draft-${kind}-total`).textContent = total === null ? 'Henüz ölçülemiyor' : total;
+        document.querySelector(`#draft-${kind}-total`).textContent = total === null ? 'Not measured' : total;
         document.querySelector(`#draft-${kind}-suffix`).textContent = total === null ? '' : ' / 100';
         if (score) renderDimensionGroup(score, dimensions, `draft-${kind}`);
       }
@@ -452,26 +452,26 @@
         }
 
         const cards = [
-          ['Metadata', assessment.metadata, 'Bir sistemin makaleyi tanımlaması ve kaynağına bağlaması için gereken alanlar'],
+          ['Metadata', assessment.metadata, 'Fields a system needs to identify the article and connect it to its source'],
         ].filter(([, value]) => Boolean(value));
         document.querySelector('#assessment-grid').innerHTML = cards.map(([title, value, description]) => `<div class="assessment-card"><p>${description}</p><h3>${title}</h3>${statusBadge(value)}</div>`).join('');
         document.querySelector('#report-state').className = `badge ${assessment.metadata}`;
-        document.querySelector('#report-state').textContent = 'Değerlendirme hazır';
+        document.querySelector('#report-state').textContent = 'Assessment ready';
 
         const structure = view.structure;
-        document.querySelector('#structure-metrics').innerHTML = [metric('Metin bölümleri', structure.passage_count), metric('Kelimeler', structure.word_count)].join('');
+        document.querySelector('#structure-metrics').innerHTML = [metric('Passages', structure.passage_count), metric('Words', structure.word_count)].join('');
         const passageDetails = view.passage_details;
         document.querySelector('#passage-details-list').innerHTML = passageDetails.passages
-          .map((passage) => `<article class="metric-card"><h4>Bölüm ${passage.position} &mdash; ${passage.word_count} kelime</h4><p>${escapeHtml(passage.text)}</p></article>`)
+          .map((passage) => `<article class="metric-card"><h4>Passage ${passage.position} &mdash; ${passage.word_count} ${passage.word_count === 1 ? 'word' : 'words'}</h4><p>${escapeHtml(passage.text)}</p></article>`)
           .join('');
         document.querySelector('#passage-details-total').textContent =
-          `Çıkarma toplamı: ${passageDetails.passage_count} bölüm \u00b7 ${passageDetails.word_count} kelime`;
+          `Extraction total: ${passageDetails.passage_count} ${passageDetails.passage_count === 1 ? 'passage' : 'passages'} \u00b7 ${passageDetails.word_count} ${passageDetails.word_count === 1 ? 'word' : 'words'}`;
 
         const passageDiagnostic = view.passage_extractability;
         document.querySelector('#passage-extractability-metrics').innerHTML =
           passageDiagnostic.bands.map((band) => metric(
-            `>${band.bound} kelime`,
-            band.rate === null ? 'Henüz ölçülemiyor' : `%${(band.rate * 100).toFixed(1)} uzun bölüm`
+            `>${band.bound} words`,
+            band.rate === null ? 'Not measured' : `%${(band.rate * 100).toFixed(1)} long passages`
           )).join('');
 
         const passageBalanceDiagnostic = view.passage_balance;
@@ -482,15 +482,15 @@
 
         const directAnswerDiagnostic = view.direct_answer_coverage;
         document.querySelector('#direct-answer-coverage-metric').innerHTML = metric(
-          'Doğrudan Cevaplama',
+          'Direct Answer Coverage',
           directAnswerDiagnostic.ratio === null
-            ? 'Henüz ölçülemiyor'
+            ? 'Not measured'
             : `${(directAnswerDiagnostic.ratio * 100).toFixed(1)}%`
         );
 
         const missing = view.metadata.filter((field) => !field.available);
-        document.querySelector('#metadata-summary').textContent = missing.length ? `Kaydedilen makalede ${missing.length} metadata alanı eksik.` : 'Değerlendirilen metadata alanlarının tamamı mevcut.';
-        document.querySelector('#metadata-table').innerHTML = view.metadata.map((field) => `<tr><td>${friendlySignals[field.label] || field.label}</td><td class="${field.available ? 'available' : 'unavailable'}">${field.available ? 'Mevcut' : 'Eksik'}</td></tr>`).join('');
+        document.querySelector('#metadata-summary').textContent = missing.length ? `${missing.length} metadata ${missing.length === 1 ? 'field is' : 'fields are'} missing from the saved article.` : 'All assessed metadata fields are present.';
+        document.querySelector('#metadata-table').innerHTML = view.metadata.map((field) => `<tr><td>${friendlySignals[field.label] || field.label}</td><td class="${field.available ? 'available' : 'unavailable'}">${field.available ? 'Present' : 'Missing'}</td></tr>`).join('');
         document.querySelector('#missing-list').innerHTML = missing.map((field) => `<span class="missing-item">${friendlySignals[field.label] || field.label}: eksik</span>`).join('');
 
         const editorFindings = view.editor;
@@ -500,7 +500,7 @@
           document.querySelector('#editor-compared').textContent = editorFindings.compared_articles;
           document.querySelector('#editor-list').innerHTML = editorFindings.recommendations.length
             ? editorFindings.recommendations.map(card).join('')
-            : '<p class="muted">Bu makale için şu anda bir değişiklik önerisi yok.</p>';
+            : '<p class="muted">There are no recommended changes for this article right now.</p>';
         }
 
         const technical = view.technical;
@@ -509,7 +509,7 @@
           document.querySelector('#technical-subtitle').textContent = technical.subtitle;
           document.querySelector('#technical-list').innerHTML = technical.recommendations.length
             ? technical.recommendations.map(card).join('')
-            : '<p class="muted">Teknik bir değişiklik gerekmiyor; makalenin bildirimleri eksiksiz.</p>';
+            : '<p class="muted">No technical changes are needed; the article declarations are complete.</p>';
         }
         document.querySelector('#report').textContent = rawReport;
       }
@@ -520,10 +520,10 @@
         const warning = score >= 50 && score < 80;
         cardElement.classList.remove('score-good', 'score-warn', 'score-low');
         cardElement.classList.add(good ? 'score-good' : warning ? 'score-warn' : 'score-low');
-        document.querySelector(`#${kind}-band`).textContent = good ? 'Harika' : warning ? 'İyi, geliştirilebilir' : 'Geliştirilmeli';
+        document.querySelector(`#${kind}-band`).textContent = good ? 'Great' : warning ? 'Good, with room to improve' : 'Needs improvement';
         document.querySelector(`#${kind}-band-copy`).textContent = kind === 'seo'
-          ? (good ? 'Arama motorları için içeriğiniz oldukça iyi optimize edilmiş.' : 'Arama motorları için içeriğinizin görünürlüğü artırılabilir.')
-          : (good ? 'Yapay zeka sistemleri içeriğinizi güçlü biçimde okuyabilir.' : 'Yapay zeka sistemleri için içeriğinizin görünürlüğü artırılabilir.');
+          ? (good ? 'Your content is well optimized for search engines.' : 'Your content can be made more visible to search engines.')
+          : (good ? 'AI systems can read your content effectively.' : 'Your content can be made more visible to AI systems.');
       }
 
       // What comparing against a publisher will and will not do, stated before
@@ -538,11 +538,11 @@
         const note = document.querySelector('#draft-compare-state');
         if (!select || !note) return;
         if (select.value) {
-          note.textContent = `Tekrarlanan metin, ${select.value} için daha önce analiz ettiğiniz makalelerle karşılaştırılacak.`;
+          note.textContent = `Repeated text will be compared with articles you previously analyzed for ${select.value}.`;
         } else if (select.options.length > 1) {
-          note.textContent = 'Taslak kendi başına kontrol edilecek. Tekrarlanan metni de kontrol etmek için bir yayıncı seçin.';
+          note.textContent = 'This draft will be checked on its own. Select a publisher to also check for repeated text.';
         } else {
-          note.textContent = 'Sunucu başladığından beri makale analiz edilmediği için taslağın karşılaştırılacağı içerik yok.';
+          note.textContent = 'No articles have been analyzed since the server started, so there is nothing to compare this draft with.';
         }
       }
 
@@ -554,7 +554,7 @@
         // Rebuilding the list after every submission used to discard the
         // editor's choice, so a second check silently compared against nothing.
         const chosen = select.value;
-        select.innerHTML = ['<option value="">Karşılaştırma — taslağı kendi başına kontrol et</option>']
+        select.innerHTML = ['<option value="">No comparison — check the draft on its own</option>']
           .concat(names.map((n) => `<option value="${n}">${n}</option>`)).join('');
         select.value = names.includes(chosen) ? chosen : '';
         describeComparison();
@@ -577,10 +577,10 @@
           if (form.id === 'draft-form') {
             payload.set('content', draftIsRich ? draftArea.innerHTML : draftArea.textContent);
           }
-          button.disabled = true; delete status.dataset.error; status.textContent = 'Makale analiz ediliyor…'; reportCard.classList.add('hidden');
+          button.disabled = true; delete status.dataset.error; status.textContent = 'Analyzing article…'; reportCard.classList.add('hidden');
           try {
             const response = await fetch(form.dataset.endpoint, { method: 'POST', body: payload });
-            const data = await response.json(); if (!response.ok) throw new Error(data.detail || 'Analiz başarısız oldu');
+            const data = await response.json(); if (!response.ok) throw new Error(data.detail || 'Analysis failed');
             const outcomeCard = document.querySelector('#outcome-card');
             const draftCard = document.querySelector('#draft-card');
             outcomeCard.classList.add('hidden'); draftCard.classList.add('hidden');

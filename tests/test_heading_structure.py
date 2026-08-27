@@ -187,7 +187,7 @@ class HeadingStructureTests(unittest.TestCase):
 
         self.assertEqual(recommendation.heading_count, 2)
         self.assertEqual(recommendation.other_article_count, 0)
-        self.assertIn("ana başlık", heading_count_phrase(recommendation.heading_count))
+        self.assertIn("main headings", heading_count_phrase(recommendation.heading_count))
         self.assertNotIn("başka makale", heading_count_phrase(recommendation.heading_count))
 
     def test_rejects_an_article_version_from_a_different_article(self):

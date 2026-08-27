@@ -253,16 +253,7 @@ _TEMPLATE_PATH = Path(__file__).parent / "templates" / "index.html"
 _DRAFTS_WITHOUT_A_PUBLISHER = "Unpublished drafts"
 
 
-_USER_ERROR_TEXT = {
-    "URL must be an absolute HTTP(S) URL": "URL, http veya https ile başlayan geçerli bir adres olmalıdır.",
-    "source URL must be an absolute HTTP(S) URL": "Kaynak URL, http veya https ile başlayan geçerli bir adres olmalıdır.",
-    "There is nothing to check yet. Paste your article into the box above.": "Henüz kontrol edilecek içerik yok. Makalenizi yukarıdaki alana yapıştırın.",
-    "This draft has no heading. Please enter the headline you plan to publish.": "Taslağın başlığı yok. Yayınlamayı planladığınız başlığı girin.",
-    "Fallback publication date must be ISO-8601": "Yayın tarihi geçerli bir tarih biçiminde olmalıdır.",
-    "Fallback publication date must include a timezone": "Yayın tarihi saat dilimi içermelidir.",
-    "HTML file needs a source URL because no canonical URL was found": "canonical URL bulunamadığı için HTML dosyası bir kaynak URL gerektirir.",
-    "HTML file must be UTF-8 encoded": "HTML dosyası UTF-8 kodlamasında olmalıdır.",
-}
+_USER_ERROR_TEXT = {}
 
 
 def _user_error_text(error: Exception) -> str:

@@ -10,6 +10,7 @@ import unittest
 from dataclasses import dataclass, replace
 from pathlib import Path
 from statistics import fmean, median, pstdev
+from typing import Optional
 from unittest.mock import patch
 
 sys.path.insert(0, "src")
@@ -72,7 +73,7 @@ def _robust_outlier_fitness(word_counts: tuple[int, ...]) -> float:
     return 1.0 - fmean(values) if values else 1.0
 
 
-def _quartiles(word_counts: tuple[int, ...]) -> tuple[float, float] | None:
+def _quartiles(word_counts: tuple[int, ...]) -> Optional[tuple[float, float]]:
     """Tukey hinges; fewer than four passages are explicitly unsupported."""
     if len(word_counts) < 4:
         return None
@@ -191,7 +192,7 @@ LONG_OUTLIER_HTML = _article_html(
 
 class PassageBalanceRobustnessBenchmarkTests(unittest.TestCase):
     def measure(
-        self, name: str, html: str, source_url: str | None = None
+        self, name: str, html: str, source_url: Optional[str] = None
     ) -> BenchmarkResult:
         pipeline = AIReadinessPipeline()
         source_url = source_url or f"https://benchmark.example/{name}"

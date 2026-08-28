@@ -792,7 +792,7 @@ Passage."""
             "document.querySelector('#seo-limiting-factors').classList.contains('hidden');"
         )
 
-        self.assertEqual(dom["#empty-factor-state"]["text"], "true")
+        self.assertIs(dom["#empty-factor-state"]["text"], True)
 
     def test_limiting_factor_sections_are_compact_and_accessibly_named(self):
         template = self._template()

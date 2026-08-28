@@ -1,7 +1,7 @@
 """Deterministic plain-text, JSON, and Markdown renderers for AIReadinessReport."""
 
 import json
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 from aether.application.analysis.build_ai_readiness_report import AIReadinessReport
 from aether.application.analysis.derive_editor_recommendations import (
@@ -180,6 +180,10 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
                 "category": recommendation.category.value,
                 "code": recommendation.code.value,
                 "excerpt": recommendation.excerpt,
+                "passage_ids": list(recommendation.passage_ids),
+                "related_passages": _related_passage_mappings(
+                    report, recommendation.passage_ids
+                ),
                 "other_article_count": recommendation.other_article_count,
                 "declared_values": [
                     list(pair) for pair in recommendation.declared_values
@@ -193,6 +197,34 @@ def _report_mapping(report: AIReadinessReport) -> Dict[str, Any]:
             "geo_score": _score_mapping(geo_score),
         },
     }
+
+
+def _related_passage_mappings(
+    report: AIReadinessReport, passage_ids: Tuple[str, ...]
+) -> list:
+    """Resolve provenance without re-extracting text or recounting words."""
+
+    profiles_by_id = {
+        profile.passage_id: profile
+        for profile in report.passage_quality_summary.passage_profiles
+    }
+    profiles = []
+    seen = set()
+    for passage_id in passage_ids:
+        if passage_id in seen or passage_id not in profiles_by_id:
+            continue
+        seen.add(passage_id)
+        profiles.append(profiles_by_id[passage_id])
+    profiles.sort(key=lambda profile: profile.ordinal_position)
+    return [
+        {
+            "id": profile.passage_id,
+            "ordinal": profile.ordinal_position,
+            "text": profile.text,
+            "word_count": profile.word_count,
+        }
+        for profile in profiles
+    ]
 
 
 class JsonAIReadinessReportRenderer:

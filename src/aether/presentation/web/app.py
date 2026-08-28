@@ -359,8 +359,39 @@ def _recommendation_views(report: Any, category) -> list:
                 {"label": title_source_label(source), "value": value}
                 for source, value in recommendation.declared_values
             ]
+        related_passages = _related_passage_views(
+            report, recommendation.passage_ids
+        )
+        if related_passages:
+            occurrence["related_passages"] = related_passages
         group["occurrences"].append(occurrence)
     return list(grouped.values())
+
+
+def _related_passage_views(report: Any, passage_ids) -> list:
+    """Resolve recommendation provenance from canonical production profiles."""
+
+    profiles_by_id = {
+        profile.passage_id: profile
+        for profile in report.passage_quality_summary.passage_profiles
+    }
+    profiles = []
+    seen = set()
+    for passage_id in passage_ids:
+        if passage_id in seen or passage_id not in profiles_by_id:
+            continue
+        seen.add(passage_id)
+        profiles.append(profiles_by_id[passage_id])
+    profiles.sort(key=lambda profile: profile.ordinal_position)
+    return [
+        {
+            "id": profile.passage_id,
+            "ordinal": profile.ordinal_position,
+            "text": profile.text,
+            "word_count": profile.word_count,
+        }
+        for profile in profiles
+    ]
 
 
 def _score_dimension_view(

@@ -22,6 +22,10 @@ from aether.application.analysis.build_ai_readiness_report import (  # noqa: E40
 from aether.application.analysis.build_article_analysis_report import (  # noqa: E402
     ArticleAnalysisReport,
 )
+from aether.application.analysis.derive_editor_recommendations import (  # noqa: E402
+    EditorRecommendation,
+    RecommendationCode,
+)
 from aether.presentation.ai_readiness_report_renderers import (  # noqa: E402
     JsonAIReadinessReportRenderer,
     MarkdownAIReadinessReportRenderer,
@@ -203,6 +207,43 @@ class AIReadinessReportRendererTests(unittest.TestCase):
 
         for renderer in renderers:
             self.assertEqual(renderer.render(report), renderer.render(report))
+
+    def test_json_recommendation_passages_resolve_from_canonical_profiles(self):
+        report = self.report()
+        recommendation = EditorRecommendation(
+            code=RecommendationCode.WEAK_ARTICLE_OPENING,
+            passage_ids=("p-1", "p-1"),
+        )
+        report = replace(report, editor_recommendations=(recommendation,))
+
+        payload = json.loads(JsonAIReadinessReportRenderer().render(report))
+        serialized = payload["editor_recommendations"][0]
+
+        self.assertEqual(serialized["passage_ids"], ["p-1", "p-1"])
+        self.assertEqual(
+            serialized["related_passages"],
+            [
+                {
+                    "id": "p-1",
+                    "ordinal": 1,
+                    "text": "Exact extracted passage text.",
+                    "word_count": 4,
+                }
+            ],
+        )
+
+    def test_json_technical_recommendation_has_no_related_passages(self):
+        report = self.report()
+        recommendation = EditorRecommendation(
+            code=RecommendationCode.NO_ARTICLE_STRUCTURED_DATA,
+        )
+        report = replace(report, editor_recommendations=(recommendation,))
+
+        payload = json.loads(JsonAIReadinessReportRenderer().render(report))
+
+        self.assertEqual(
+            payload["editor_recommendations"][0]["related_passages"], []
+        )
 
 
 if __name__ == "__main__":

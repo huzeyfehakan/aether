@@ -1159,6 +1159,58 @@ Passage."""
         self.assertIn(
             "Bu icerik bilgilendirme", recommendation["occurrences"][0]["excerpt"]
         )
+        related = recommendation["occurrences"][0]["related_passages"]
+        self.assertEqual(len(related), 1)
+        passage = next(
+            item
+            for item in response.json()["view"]["passage_details"]["passages"]
+            if "Bu icerik bilgilendirme" in item["text"]
+        )
+        self.assertEqual(related[0]["ordinal"] + 1, passage["position"])
+        self.assertEqual(related[0]["text"], passage["text"])
+        self.assertEqual(related[0]["word_count"], passage["word_count"])
+
+        for item in response.json()["view"]["technical"]["recommendations"]:
+            for occurrence in item["occurrences"]:
+                self.assertNotIn("related_passages", occurrence)
+
+    def test_related_passage_text_is_escaped_by_the_served_page_script(self):
+        item = {
+            "headline": "Recommendation",
+            "impact": "Content Quality",
+            "what_to_do": "Revise it.",
+            "why_it_matters": "Context.",
+            "occurrences": [
+                {
+                    "related_passages": [
+                        {
+                            "id": "version:p0",
+                            "ordinal": 0,
+                            "text": "<script>alert('xss')</script>",
+                            "word_count": 1,
+                        }
+                    ]
+                }
+            ],
+        }
+
+        dom = run_page_script(
+            "document.querySelector('#xss-result').innerHTML = card("
+            + json.dumps(item)
+            + ");"
+        )
+        rendered = dom["#xss-result"]["html"]
+        self.assertIn("&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;", rendered)
+        self.assertNotIn("<script>", rendered)
+
+    def test_related_passage_markup_uses_the_shared_escape_function(self):
+        template = self._template()
+
+        related_renderer = template[
+            template.index("const relatedPassages"):
+            template.index("const occurrence")
+        ]
+        self.assertIn("escapeHtml(passage.text)", related_renderer)
 
     def _publish(self, slug, paragraph, publisher="ebeveynakademisi.trtcocuk.net.tr"):
         """Put one article into the corpus a draft can be compared against."""

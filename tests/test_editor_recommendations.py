@@ -22,6 +22,9 @@ from aether.application.analysis.analyze_declared_consistency import (  # noqa: 
 from aether.application.analysis.analyze_passage_quality import (  # noqa: E402
     AnalyzePassageQuality,
 )
+from aether.application.analysis.analyze_topic_introduction import (  # noqa: E402
+    AnalyzeTopicIntroduction,
+)
 from aether.application.analysis.assess_ai_readiness import AssessAIReadiness  # noqa: E402
 from aether.application.analysis.build_ai_readiness_report import (  # noqa: E402
     BuildAIReadinessReport,
@@ -236,9 +239,47 @@ class EditorRecommendationTests(unittest.TestCase):
 
         report = self.report_for(article)
 
+        recommendation = self.of_code(
+            report, RecommendationCode.WEAK_ARTICLE_OPENING
+        )[0]
         self.assertEqual(
-            len(self.of_code(report, RecommendationCode.WEAK_ARTICLE_OPENING)), 1
+            recommendation.passage_ids,
+            (report.passage_quality_summary.passage_profiles[0].passage_id,),
         )
+
+    def test_weak_topic_introduction_is_attributed_to_the_opening_passage(self):
+        registration = self.register.execute(
+            RawHtmlArticle(
+                html=(
+                    '<html lang="en"><head><title>Alpha Beta Gamma Delta</title></head>'
+                    '<body><main><p>Unrelated opening words.</p>'
+                    '<p>Alpha beta gamma delta appear later.</p></main></body></html>'
+                ),
+                source_url="https://example.com/weak-topic",
+                publisher="Example",
+                article_type="news_report",
+                observed_at=OBSERVED_AT,
+            )
+        )
+        analysis = BuildArticleAnalysisReport(
+            AnalyzeArticleStructure(self.repository),
+            AnalyzeArticleMetadata(self.repository),
+            AnalyzePassageQuality(self.repository),
+            topic_introduction_analysis=AnalyzeTopicIntroduction(self.repository),
+        ).execute(
+            registration.article,
+            registration.article_version.article_version_id,
+        )
+        report = BuildAIReadinessReport().execute(
+            AssessAIReadiness().execute(analysis)
+        )
+
+        recommendation = self.of_code(
+            report, RecommendationCode.WEAK_TOPIC_INTRODUCTION
+        )[0]
+        profiles = report.passage_quality_summary.passage_profiles
+        self.assertEqual(recommendation.passage_ids, (profiles[0].passage_id,))
+        self.assertNotIn(profiles[1].passage_id, recommendation.passage_ids)
 
     def test_does_not_recommend_a_long_article_with_an_opening_over_twenty_words(self):
         article = self.ingest("long-opening", [self.words(35), self.words(165)])
@@ -283,7 +324,40 @@ class EditorRecommendationTests(unittest.TestCase):
             recommendation.category, RecommendationCategory.EDITOR
         )
         self.assertEqual(recommendation.excerpt, NOTICE)
+        profiles = report.passage_quality_summary.passage_profiles
+        self.assertEqual(recommendation.passage_ids, (profiles[1].passage_id,))
+        self.assertNotIn(profiles[0].passage_id, recommendation.passage_ids)
         self.assertEqual(report.content_reuse_summary.compared_article_count, 1)
+
+    def test_mostly_repeated_body_carries_only_repeated_passages_in_document_order(self):
+        first_shared = self.words(30) + " first"
+        second_shared = self.words(30) + " second"
+        target = self.ingest("target", ["unique", first_shared, second_shared])
+        self.ingest("comparison-one", ["other", first_shared, second_shared])
+        self.ingest("comparison-two", ["different", second_shared])
+
+        report = self.report_for(target)
+        recommendation = self.of_code(
+            report, RecommendationCode.BODY_MOSTLY_REPEATED_TEXT
+        )[0]
+        profiles = report.passage_quality_summary.passage_profiles
+
+        self.assertEqual(
+            recommendation.passage_ids,
+            (profiles[1].passage_id, profiles[2].passage_id),
+        )
+        self.assertNotIn(profiles[0].passage_id, recommendation.passage_ids)
+
+    def test_article_level_and_technical_recommendations_have_no_passage_attribution(self):
+        article = self.ingest("no-statistics", ["Plain text without numbers."])
+        report = self.report_for(article)
+
+        for code in (
+            RecommendationCode.NO_STATISTICS,
+            RecommendationCode.MISSING_LAST_MODIFIED_DATE,
+        ):
+            recommendation = self.of_code(report, code)[0]
+            self.assertEqual(recommendation.passage_ids, ())
 
     def test_makes_no_recommendation_when_nothing_is_repeated(self):
         first = self.ingest("birinci", ["Özgün paragraf."])

@@ -363,12 +363,18 @@ class DeriveEditorRecommendations:
         total_word_count = sum(profile.word_count for profile in profiles)
         if total_word_count < 150 or profiles[0].word_count > 20:
             return ()
-        return (EditorRecommendation(code=RecommendationCode.WEAK_ARTICLE_OPENING),)
+        return (
+            EditorRecommendation(
+                code=RecommendationCode.WEAK_ARTICLE_OPENING,
+                passage_ids=(profiles[0].passage_id,),
+            ),
+        )
     @staticmethod
     def _topic_introduction(
         report: ArticleAnalysisReport,
     ) -> Tuple[EditorRecommendation, ...]:
         analysis = report.topic_introduction_analysis
+        profiles = report.passage_quality_analysis.passage_profiles
 
         if analysis is None:
             return ()
@@ -382,6 +388,7 @@ class DeriveEditorRecommendations:
         return (
             EditorRecommendation(
                 code=RecommendationCode.WEAK_TOPIC_INTRODUCTION,
+                passage_ids=(profiles[0].passage_id,) if profiles else (),
             ),
         )
 
@@ -426,6 +433,13 @@ class DeriveEditorRecommendations:
             (
                 EditorRecommendation(
                     code=RecommendationCode.BODY_MOSTLY_REPEATED_TEXT,
+                    passage_ids=tuple(
+                        repeated.passage_id
+                        for repeated in sorted(
+                            duplication.repeated_passages,
+                            key=lambda passage: passage.ordinal_position,
+                        )
+                    ),
                     repeated_word_count=duplication.repeated_word_count,
                     total_word_count=duplication.total_word_count,
                 ),

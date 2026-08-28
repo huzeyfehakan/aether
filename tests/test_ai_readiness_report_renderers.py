@@ -139,6 +139,34 @@ class AIReadinessReportRendererTests(unittest.TestCase):
         self.assertEqual(entity_signals["Publication date"], "Available")
         self.assertEqual(entity_signals["Last modified date"], "Missing")
 
+    def test_json_renderer_exposes_all_dimension_limiting_factor_fields(self):
+        payload = json.loads(JsonAIReadinessReportRenderer().render(self.report()))
+
+        seo_factors = payload["assessment_summary"]["seo_score"][
+            "limiting_factors"
+        ]
+        self.assertEqual(len(seo_factors), 1)
+        self.assertEqual(
+            seo_factors[0],
+            {
+                "dimension_key": "entity_coverage",
+                "dimension_score": 50.0,
+                "configured_weight_percentage": 30,
+                "effective_weight_percentage": 100.0,
+                "maximum_contribution": 100.0,
+                "actual_contribution": 50.0,
+                "lost_contribution": 50.0,
+            },
+        )
+
+        geo_factors = payload["assessment_summary"]["geo_score"][
+            "limiting_factors"
+        ]
+        self.assertEqual(
+            [factor["dimension_key"] for factor in geo_factors],
+            ["semantic_completeness", "entity_authority", "structural_richness"],
+        )
+
     def test_plain_text_renderer_includes_all_required_summaries(self):
         rendered = PlainTextAIReadinessReportRenderer().render(self.report())
 

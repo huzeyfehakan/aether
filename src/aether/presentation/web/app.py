@@ -419,6 +419,22 @@ def _score_dimension_view(
     }
 
 
+def _limiting_factor_views(score: Any, dimension_text) -> list:
+    return [
+        {
+            "key": factor.dimension_key,
+            "label": dimension_text(factor.dimension_key)["label"],
+            "score": factor.dimension_score,
+            "configured_weight": factor.configured_weight_percentage,
+            "effective_weight": factor.effective_weight_percentage,
+            "maximum_contribution": factor.maximum_contribution,
+            "actual_contribution": factor.actual_contribution,
+            "lost_contribution": factor.lost_contribution,
+        }
+        for factor in score.limiting_factors
+    ]
+
+
 def _report_view(report: Any) -> Dict[str, Any]:
     """Expose existing report facts for the web UI without re-assessing them."""
 
@@ -430,6 +446,9 @@ def _report_view(report: Any) -> Dict[str, Any]:
             "metadata": assessment.metadata_completeness.value,
             "seo_score": {
                 "total": report.assessment_summary.seo_score.total,
+                "limiting_factors": _limiting_factor_views(
+                    report.assessment_summary.seo_score, seo_dimension_text
+                ),
                 "entity_coverage": _score_dimension_view(
                     "entity_coverage", report.assessment_summary.seo_score.entity_coverage,
                     report.assessment_summary.seo_score.entity_coverage_detail,
@@ -453,6 +472,9 @@ def _report_view(report: Any) -> Dict[str, Any]:
             } if hasattr(report, 'assessment_summary') and hasattr(report.assessment_summary, 'seo_score') else None,
             "geo_score": {
                 "total": report.assessment_summary.geo_score.total,
+                "limiting_factors": _limiting_factor_views(
+                    report.assessment_summary.geo_score, geo_dimension_text
+                ),
                 "semantic_completeness": _score_dimension_view(
                     "semantic_completeness",
                     report.assessment_summary.geo_score.semantic_completeness,
@@ -599,6 +621,7 @@ def _seo_score_view(score: Any) -> Optional[Dict[str, Any]]:
         return None
     return {
         "total": score.total,
+        "limiting_factors": _limiting_factor_views(score, seo_dimension_text),
         **{
             key: _score_dimension_view(
                 key, getattr(score, key), getattr(score, f"{key}_detail"),
@@ -617,6 +640,7 @@ def _geo_score_view(score: Any) -> Optional[Dict[str, Any]]:
         return None
     return {
         "total": score.total,
+        "limiting_factors": _limiting_factor_views(score, geo_dimension_text),
         **{
             key: _score_dimension_view(
                 key, getattr(score, key), getattr(score, f"{key}_detail"),

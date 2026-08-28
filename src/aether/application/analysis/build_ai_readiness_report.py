@@ -16,6 +16,7 @@ from aether.application.analysis.analyze_passage_quality import PassageProfile
 from aether.application.analysis.assess_ai_readiness import (
     AIReadinessAssessment,
     CompletenessClassification,
+    ScoreDimension,
 )
 from aether.application.analysis.derive_editor_recommendations import (
     DeriveEditorRecommendations,
@@ -98,6 +99,19 @@ class ScoreDimensionDetail:
 
 
 @dataclass(frozen=True)
+class DimensionLimitingFactor:
+    """One measured dimension's contribution gap under score renormalization."""
+
+    dimension_key: str
+    dimension_score: float
+    configured_weight_percentage: int
+    effective_weight_percentage: float
+    maximum_contribution: float
+    actual_contribution: float
+    lost_contribution: float
+
+
+@dataclass(frozen=True)
 class SEOScoreSummary:
     """A user-facing summary of the total SEO score and its dimensions."""
     total: Optional[int]
@@ -109,6 +123,7 @@ class SEOScoreSummary:
     structured_data_detail: ScoreDimensionDetail
     semantic_quality_detail: ScoreDimensionDetail
     technical_access_detail: ScoreDimensionDetail
+    limiting_factors: Tuple[DimensionLimitingFactor, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -123,6 +138,7 @@ class GEOScoreSummary:
     entity_authority_detail: ScoreDimensionDetail
     structural_richness_detail: ScoreDimensionDetail
     discoverability_detail: ScoreDimensionDetail
+    limiting_factors: Tuple[DimensionLimitingFactor, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -225,6 +241,14 @@ class BuildAIReadinessReport:
             technical_access_detail=self._technical_access_detail(
                 report, raw_seo.technical_access.dimension_score
             ),
+            limiting_factors=self._dimension_limiting_factors(
+                (
+                    ("entity_coverage", raw_seo.entity_coverage),
+                    ("structured_data", raw_seo.structured_data),
+                    ("semantic_quality", raw_seo.semantic_quality),
+                    ("technical_access", raw_seo.technical_access),
+                )
+            ),
         )
 
         geo_summary = GEOScoreSummary(
@@ -260,6 +284,14 @@ class BuildAIReadinessReport:
             ),
             discoverability_detail=self._discoverability_detail(
                 report, raw_geo.discoverability.dimension_score
+            ),
+            limiting_factors=self._dimension_limiting_factors(
+                (
+                    ("semantic_completeness", raw_geo.semantic_completeness),
+                    ("entity_authority", raw_geo.entity_authority),
+                    ("structural_richness", raw_geo.structural_richness),
+                    ("discoverability", raw_geo.discoverability),
+                )
             ),
         )
 
@@ -307,6 +339,47 @@ class BuildAIReadinessReport:
             structured_data_summary=self._structured_data_summary(report),
             editor_recommendations=self._recommendations.execute(report),
         )
+
+    @staticmethod
+    def _dimension_limiting_factors(
+        dimensions: Tuple[Tuple[str, ScoreDimension], ...]
+    ) -> Tuple[DimensionLimitingFactor, ...]:
+        """Rank measured contribution gaps using the score's own dimensions."""
+
+        available = tuple(
+            (position, key, dimension)
+            for position, (key, dimension) in enumerate(dimensions)
+            if dimension.dimension_score is not None
+        )
+        available_weight = sum(
+            dimension.weight_percentage for _, _, dimension in available
+        )
+        if available_weight == 0:
+            return ()
+
+        ranked = []
+        for position, key, dimension in available:
+            effective_weight = dimension.weight_percentage / available_weight
+            maximum = effective_weight * 100.0
+            actual = effective_weight * dimension.dimension_score
+            lost = maximum - actual
+            if lost > 0.0:
+                ranked.append(
+                    (
+                        position,
+                        DimensionLimitingFactor(
+                            dimension_key=key,
+                            dimension_score=dimension.dimension_score,
+                            configured_weight_percentage=dimension.weight_percentage,
+                            effective_weight_percentage=effective_weight * 100.0,
+                            maximum_contribution=maximum,
+                            actual_contribution=actual,
+                            lost_contribution=lost,
+                        ),
+                    )
+                )
+        ranked.sort(key=lambda item: (-item[1].lost_contribution, item[0]))
+        return tuple(factor for _, factor in ranked)
 
     @staticmethod
     def _entity_coverage_detail(

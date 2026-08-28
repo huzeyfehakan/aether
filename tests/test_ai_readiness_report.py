@@ -31,6 +31,9 @@ from aether.application.analysis.analyze_structured_data import (  # noqa: E402
 )
 from aether.application.analysis.assess_ai_readiness import (  # noqa: E402
     AssessAIReadiness,
+    GEOScore,
+    SEOScore,
+    ScoreDimension,
 )
 from aether.application.analysis.build_ai_readiness_report import (  # noqa: E402
     AIReadinessReport,
@@ -194,6 +197,82 @@ class AIReadinessReportTests(unittest.TestCase):
             report.assessment_summary.metadata_completeness,
             assessment.metadata_completeness,
         )
+
+    def test_seo_limiting_factors_renormalize_available_dimensions(self):
+        assessment = self.assessment()
+        seo = SEOScore(
+            entity_coverage=ScoreDimension(30, 50.0),
+            structured_data=ScoreDimension(25, None),
+            semantic_quality=ScoreDimension(25, 0.0),
+            technical_access=ScoreDimension(20, 100.0),
+        )
+        assessment = replace(assessment, seo_score=seo)
+        score_before = assessment.seo_score
+
+        report = BuildAIReadinessReport().execute(assessment)
+        factors = report.assessment_summary.seo_score.limiting_factors
+
+        self.assertEqual(
+            [factor.dimension_key for factor in factors],
+            ["semantic_quality", "entity_coverage"],
+        )
+        self.assertEqual(factors[0].dimension_score, 0.0)
+        self.assertAlmostEqual(factors[0].effective_weight_percentage, 100 / 3)
+        self.assertAlmostEqual(factors[0].maximum_contribution, 100 / 3)
+        self.assertAlmostEqual(factors[0].actual_contribution, 0.0)
+        self.assertAlmostEqual(factors[0].lost_contribution, 100 / 3)
+        self.assertAlmostEqual(factors[1].effective_weight_percentage, 40.0)
+        self.assertAlmostEqual(factors[1].lost_contribution, 20.0)
+        self.assertNotIn(
+            "structured_data", [factor.dimension_key for factor in factors]
+        )
+        self.assertEqual(report.assessment_summary.seo_score.total, seo.total)
+        self.assertEqual(assessment.seo_score, score_before)
+
+    def test_geo_limiting_factors_use_lost_contribution_and_stable_ties(self):
+        assessment = self.assessment()
+        geo = GEOScore(
+            semantic_completeness=ScoreDimension(40, 50.0),
+            entity_authority=ScoreDimension(30, 50.0),
+            structural_richness=ScoreDimension(15, 0.0),
+            discoverability=ScoreDimension(15, 100.0),
+        )
+        assessment = replace(assessment, geo_score=geo)
+
+        report = BuildAIReadinessReport().execute(assessment)
+        factors = report.assessment_summary.geo_score.limiting_factors
+
+        self.assertEqual(
+            [factor.dimension_key for factor in factors],
+            ["semantic_completeness", "entity_authority", "structural_richness"],
+        )
+        self.assertAlmostEqual(factors[0].lost_contribution, 20.0)
+        self.assertAlmostEqual(factors[1].lost_contribution, 15.0)
+        self.assertAlmostEqual(factors[2].lost_contribution, 15.0)
+        self.assertEqual(report.assessment_summary.geo_score.total, geo.total)
+
+    def test_perfect_measured_dimensions_produce_no_limiting_factors(self):
+        assessment = self.assessment()
+        assessment = replace(
+            assessment,
+            seo_score=SEOScore(
+                entity_coverage=ScoreDimension(30, 100.0),
+                structured_data=ScoreDimension(25, 100.0),
+                semantic_quality=ScoreDimension(25, 100.0),
+                technical_access=ScoreDimension(20, 100.0),
+            ),
+            geo_score=GEOScore(
+                semantic_completeness=ScoreDimension(40, 100.0),
+                entity_authority=ScoreDimension(30, 100.0),
+                structural_richness=ScoreDimension(15, 100.0),
+                discoverability=ScoreDimension(15, 100.0),
+            ),
+        )
+
+        report = BuildAIReadinessReport().execute(assessment)
+
+        self.assertEqual(report.assessment_summary.seo_score.limiting_factors, ())
+        self.assertEqual(report.assessment_summary.geo_score.limiting_factors, ())
 
     def test_seo_details_project_only_existing_formula_inputs(self):
         assessment = self.assessment()

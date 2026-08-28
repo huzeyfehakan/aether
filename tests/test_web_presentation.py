@@ -727,6 +727,81 @@ Passage."""
             ],
         )
 
+    def test_web_payload_exposes_renormalized_dimension_limiting_factors(self):
+        assessment = self._analysed_view()["assessment"]
+
+        for score_name, dimension_keys in (
+            (
+                "seo_score",
+                (
+                    "entity_coverage", "structured_data",
+                    "semantic_quality", "technical_access",
+                ),
+            ),
+            (
+                "geo_score",
+                (
+                    "semantic_completeness", "entity_authority",
+                    "structural_richness", "discoverability",
+                ),
+            ),
+        ):
+            score = assessment[score_name]
+            measured = [score[key] for key in dimension_keys if score[key]["val"] is not None]
+            available_weight = sum(dimension["weight"] for dimension in measured)
+            expected = {
+                dimension["key"]: (
+                    dimension["weight"] / available_weight
+                    * (100.0 - dimension["val"])
+                )
+                for dimension in measured
+                if dimension["val"] < 100.0
+            }
+            factors = score["limiting_factors"]
+
+            self.assertEqual(
+                {factor["key"] for factor in factors}, set(expected)
+            )
+            for factor in factors:
+                self.assertAlmostEqual(
+                    factor["lost_contribution"], expected[factor["key"]]
+                )
+
+    def test_limiting_factors_render_at_most_three_items_per_score(self):
+        view = self._analysed_view()
+
+        dom = run_page_script(f"renderReport({json.dumps(view)}, 'report');")
+
+        for kind in ("seo", "geo"):
+            rendered = dom[f"#{kind}-limiting-factor-list"]["html"]
+            expected_count = min(
+                3, len(view["assessment"][f"{kind}_score"]["limiting_factors"])
+            )
+            self.assertEqual(rendered.count("<li>"), expected_count)
+            if expected_count:
+                self.assertIn("/ 100", rendered)
+                self.assertIn("points lost", rendered)
+
+    def test_empty_limiting_factor_section_stays_hidden(self):
+        view = self._analysed_view()
+        view["assessment"]["seo_score"]["limiting_factors"] = []
+
+        dom = run_page_script(
+            f"renderReport({json.dumps(view)}, 'report');"
+            "document.querySelector('#empty-factor-state').textContent = "
+            "document.querySelector('#seo-limiting-factors').classList.contains('hidden');"
+        )
+
+        self.assertEqual(dom["#empty-factor-state"]["text"], "true")
+
+    def test_limiting_factor_sections_are_compact_and_accessibly_named(self):
+        template = self._template()
+
+        self.assertIn("Top factors lowering this score", template)
+        self.assertIn('aria-labelledby="seo-limiting-factors-heading"', template)
+        self.assertIn('aria-labelledby="geo-limiting-factors-heading"', template)
+        self.assertIn(".limiting-factors", template)
+
     def test_all_geo_dimension_details_are_exposed_from_report_signals(self):
         geo_score = self._analysed_view()["assessment"]["geo_score"]
 

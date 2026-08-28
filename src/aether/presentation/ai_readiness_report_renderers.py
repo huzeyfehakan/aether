@@ -30,7 +30,23 @@ def _codes_in_order(recommendations) -> list:
 
 
 def _score_mapping(score) -> dict:
-    result = {"total": score.total}
+    result = {
+        "total": score.total,
+        "limiting_factors": [
+            {
+                "dimension_key": factor.dimension_key,
+                "dimension_score": factor.dimension_score,
+                "configured_weight_percentage": (
+                    factor.configured_weight_percentage
+                ),
+                "effective_weight_percentage": factor.effective_weight_percentage,
+                "maximum_contribution": factor.maximum_contribution,
+                "actual_contribution": factor.actual_contribution,
+                "lost_contribution": factor.lost_contribution,
+            }
+            for factor in score.limiting_factors
+        ],
+    }
     if hasattr(score, 'entity_coverage'):
         result["entity_coverage"] = {
             "weight_percentage": score.entity_coverage.weight_percentage,

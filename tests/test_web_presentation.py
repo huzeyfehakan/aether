@@ -1757,9 +1757,19 @@ Passage."""
         dom = run_page_script(f"renderDraft({json.dumps(draft)});")
         findings = dom["#draft-findings"]["html"]
 
-        self.assertIn("This paragraph also appears in your other articles", findings)
+        repeated = next(
+            item
+            for item in draft["recommendations"]
+            if item["translations"]["tr"]["headline"]
+            == "Bu paragraf diğer makalelerinizde de yer alıyor"
+        )
+        self.assertEqual(
+            repeated["translations"]["en"]["headline"],
+            "This paragraph also appears in your other articles",
+        )
+        self.assertIn("Bu paragraf diğer makalelerinizde de yer alıyor", findings)
         self.assertIn(shared, findings)
-        self.assertIn("What to do:", findings)
+        self.assertIn("Ne yapılmalı?", findings)
         self.assertNotIn("no recommended changes", findings)
 
     def test_a_draft_without_statistics_renders_the_current_recommendation(self):
@@ -1767,15 +1777,20 @@ Passage."""
         recommendation = next(
             item
             for item in draft["recommendations"]
-            if item["headline"] == "This article contains no statistics or data points"
+            if item["translations"]["tr"]["headline"]
+            == "Makalede istatistik veya sayısal veri yok"
+        )
+        self.assertEqual(
+            recommendation["translations"]["en"]["headline"],
+            "This article contains no statistics or data points",
         )
 
         dom = run_page_script(f"renderDraft({json.dumps(draft)});")
         findings = dom["#draft-findings"]["html"]
 
-        self.assertIn(recommendation["headline"], findings)
-        self.assertIn("What to do:", findings)
-        self.assertIn("Why it matters", findings)
+        self.assertIn("Makalede istatistik veya sayısal veri yok", findings)
+        self.assertIn("Ne yapılmalı?", findings)
+        self.assertIn("Neden önemli?", findings)
         self.assertNotIn("no recommended changes", findings)
 
     def test_index_shows_both_audience_sections(self):

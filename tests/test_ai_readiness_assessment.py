@@ -776,6 +776,7 @@ class AIReadinessAssessmentTests(unittest.TestCase):
                 article_version_id="version-1",
                 outgoing_link_count=5,
                 unique_target_count=5,
+                unique_body_target_count=0,
                 body_link_count=0,
                 incoming_link_count=1,
                 potential_orphan=False,

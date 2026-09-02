@@ -16,6 +16,7 @@ class InternalLinkAnalysisResult:
     article_version_id: str
     outgoing_link_count: int
     unique_target_count: int
+    unique_body_target_count: int
     body_link_count: int
     incoming_link_count: int
     potential_orphan: bool
@@ -50,6 +51,9 @@ class AnalyzeInternalLinks:
         links = source_data.internal_links
         outgoing_link_count = len(links)
         unique_targets = {link.target_url for link in links}
+        unique_body_targets = {
+            link.target_url for link in links if link.is_in_body
+        }
         body_link_count = sum(1 for link in links if link.is_in_body)
 
         # Count incoming links from other articles stored in the repository
@@ -118,6 +122,7 @@ class AnalyzeInternalLinks:
             article_version_id=article_version.article_version_id,
             outgoing_link_count=outgoing_link_count,
             unique_target_count=len(unique_targets),
+            unique_body_target_count=len(unique_body_targets),
             body_link_count=body_link_count,
             incoming_link_count=incoming_link_count,
             potential_orphan=(incoming_link_count == 0),

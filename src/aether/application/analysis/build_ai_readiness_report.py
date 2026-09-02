@@ -754,7 +754,9 @@ class BuildAIReadinessReport:
                 body_link_saturation = 0.0
                 
             if links.body_link_count > 0:
-                unique_target_ratio = (links.unique_target_count / links.body_link_count) * 100.0
+                unique_target_ratio = (
+                    links.unique_body_target_count / links.body_link_count
+                ) * 100.0
             else:
                 unique_target_ratio = 0.0
 

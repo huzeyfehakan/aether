@@ -138,6 +138,7 @@ class AIReadinessReportTests(unittest.TestCase):
                 article_version_id="version-1",
                 outgoing_link_count=2,
                 unique_target_count=2,
+                unique_body_target_count=2,
                 body_link_count=2,
                 incoming_link_count=0,
                 potential_orphan=True,
@@ -518,6 +519,58 @@ class AIReadinessReportTests(unittest.TestCase):
 
         self.assertEqual(signals["Body link saturation"], 50.0) # 1.0 / 2.0 * 100
         self.assertEqual(signals["Unique target ratio"], 100.0) # 2 targets / 2 body links
+
+    def test_discoverability_unique_target_ratio_uses_body_targets_only(self):
+        assessment = self.assessment_with_entity_authority_signals()
+
+        for unique_body_targets, expected_ratio in ((5, 100.0), (1, 20.0)):
+            with self.subTest(unique_body_targets=unique_body_targets):
+                report = BuildAIReadinessReport().execute(
+                    replace(
+                        assessment,
+                        report=replace(
+                            assessment.report,
+                            internal_link_analysis=replace(
+                                assessment.report.internal_link_analysis,
+                                outgoing_link_count=25,
+                                unique_target_count=25,
+                                unique_body_target_count=unique_body_targets,
+                                body_link_count=5,
+                            ),
+                        ),
+                    )
+                )
+                signals = {
+                    signal.label: signal.value
+                    for signal in report.assessment_summary.geo_score.discoverability_detail.signals
+                }
+
+                self.assertEqual(signals["Unique target ratio"], expected_ratio)
+                self.assertLessEqual(signals["Unique target ratio"], 100.0)
+
+    def test_discoverability_unique_target_ratio_is_zero_without_body_links(self):
+        assessment = self.assessment_with_entity_authority_signals()
+        report = BuildAIReadinessReport().execute(
+            replace(
+                assessment,
+                report=replace(
+                    assessment.report,
+                    internal_link_analysis=replace(
+                        assessment.report.internal_link_analysis,
+                        outgoing_link_count=5,
+                        unique_target_count=5,
+                        unique_body_target_count=0,
+                        body_link_count=0,
+                    ),
+                ),
+            )
+        )
+        signals = {
+            signal.label: signal.value
+            for signal in report.assessment_summary.geo_score.discoverability_detail.signals
+        }
+
+        self.assertEqual(signals["Unique target ratio"], 0.0)
 
 
 if __name__ == "__main__":n+    unittest.main()

@@ -1132,6 +1132,14 @@ Passage."""
         self.assertIn('class="geo-signal-row"', rendered)
         self.assertNotIn("geo-signal-row-stacked", rendered)
 
+    def test_ratio_signal_formats_already_scaled_percentage_without_multiplication(self):
+        dom = run_page_script(
+            "document.querySelector('#short-signal').innerHTML = "
+            "signalValue({value: 20.0, kind: 'RATIO'});"
+        )
+
+        self.assertEqual(dom["#short-signal"]["html"], "%20.0")
+
     def test_technical_access_web_detail_matches_consistency_score(self):
         html = """
             <html lang="tr"><head>

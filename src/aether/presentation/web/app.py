@@ -316,7 +316,7 @@ _IMPACT_MAP = {
 }
 
 
-def _recommendation_views(report: Any, category) -> list:
+def _recommendation_views(report: Any, category, language: str = "en") -> list:
     """Shape one category of recommendations for display.
 
     Findings of the same kind are grouped so their explanation is given once
@@ -326,7 +326,7 @@ def _recommendation_views(report: Any, category) -> list:
     for recommendation in report.editor_recommendations:
         if recommendation.category is not category:
             continue
-        text = recommendation_text(recommendation)
+        text = recommendation_text(recommendation, language)
         group = grouped.setdefault(
             recommendation.code,
             {
@@ -334,6 +334,20 @@ def _recommendation_views(report: Any, category) -> list:
                 "why_it_matters": text.why_it_matters,
                 "what_to_do": text.what_to_do,
                 "impact": impact_label(_IMPACT_MAP.get(recommendation.code, "")),
+                "translations": {
+                    item_language: {
+                        "headline": recommendation_text(
+                            recommendation, item_language
+                        ).headline,
+                        "why_it_matters": recommendation_text(
+                            recommendation, item_language
+                        ).why_it_matters,
+                        "what_to_do": recommendation_text(
+                            recommendation, item_language
+                        ).what_to_do,
+                    }
+                    for item_language in ("tr", "en")
+                },
                 "occurrences": [],
             },
         )
@@ -362,6 +376,7 @@ def _recommendation_views(report: Any, category) -> list:
         related_passages = _related_passage_views(
             report, recommendation.passage_ids
         )
+
         if related_passages:
             occurrence["related_passages"] = related_passages
         group["occurrences"].append(occurrence)
@@ -602,17 +617,46 @@ def _draft_view(review: Any) -> Dict[str, Any]:
         "checks_unavailable": [
             unavailable_check_text(check) for check in review.checks_unavailable
         ],
+        "localized_checks": {
+            language: {
+                "performed": [
+                    performed_check_text(check, language)
+                    for check in review.checks_performed
+                ],
+                "unavailable": [
+                    unavailable_check_text(check, language)
+                    for check in review.checks_unavailable
+                ],
+            }
+            for language in ("tr", "en")
+        },
         "seo_preview": _seo_score_view(review.seo_preview),
         "geo_preview": _geo_score_view(review.geo_preview),
         "recommendations": [
-            {
-                "headline": recommendation_text(r).headline,
-                "why_it_matters": recommendation_text(r).why_it_matters,
-                "what_to_do": recommendation_text(r).what_to_do,
-                "occurrences": [_occurrence_view(r)],
-            }
-            for r in review.recommendations
+            _localized_draft_recommendation_view(r) for r in review.recommendations
         ],
+    }
+
+
+def _localized_draft_recommendation_view(recommendation: Any) -> Dict[str, Any]:
+    english = recommendation_text(recommendation, "en")
+    return {
+        "headline": english.headline,
+        "why_it_matters": english.why_it_matters,
+        "what_to_do": english.what_to_do,
+        "translations": {
+            language: {
+                "headline": recommendation_text(recommendation, language).headline,
+                "why_it_matters": recommendation_text(
+                    recommendation, language
+                ).why_it_matters,
+                "what_to_do": recommendation_text(
+                    recommendation, language
+                ).what_to_do,
+            }
+            for language in ("tr", "en")
+        },
+        "occurrences": [_occurrence_view(recommendation)],
     }
 
 
@@ -678,6 +722,9 @@ def _analysis_response(result: Any) -> Dict[str, Any]:
     """
     outcome = outcome_view(result) if isinstance(result, PageAssessment) else None
     if outcome is not None:
+        outcome["translations"] = {
+            language: outcome_view(result, language) for language in ("tr", "en")
+        }
         return {"report": None, "view": None, "outcome": outcome}
     return {
         "report": PlainTextAIReadinessReportRenderer().render(result),

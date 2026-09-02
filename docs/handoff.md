@@ -75,19 +75,17 @@ editorial prototype.
   configured threshold.
 - Its usefulness and threshold need evaluation on real publisher articles.
 
-**Turkish interface edition.** Uncommitted, and not ready to land.
-
-- Working: negotiation is `X-Aether-Language` → `Accept-Language` → Turkish;
-  every user-facing surface has Turkish wording; the manual TR/EN switcher
-  persists to `localStorage` and beats the browser preference.
-- Not yet consistent: about half the translations are second lookup tables as
-  designed. The rest are inline `if language is TURKISH else` ternaries and
-  dicts rebuilt inside function bodies — roughly twenty in the plain-text
-  renderer, four in `_report_view`, two helpers in
-  `editor_recommendation_text.py`. The four in `_report_view` violate
-  [decision 0007](decisions/0007-separate-finding-codes-from-wording.md) and are
-  the reason this has not landed.
-- The interface language module is not yet part of the committed tree.
+**Turkish interface edition.** Implemented and intentionally left uncommitted
+because the requester prohibited git add/commit/push. Turkish is the static,
+missing-preference, and invalid-preference default. The accessible TR/EN
+switcher persists valid choices in `localStorage` and rerenders retained report
+data without fetching or repeating analysis. Recommendation, draft-check, and
+non-article outcome wording remains owned by Python presentation modules; the
+web payload carries both supported renderings while source excerpts and numeric
+results remain unchanged. Score-dimension detail panels are now rendered inside
+their owning cards with independent accessible toggles and localized open/close
+labels. Browser JavaScript verification is outstanding because Node is
+unavailable.
 
 ## Blockers
 
@@ -98,7 +96,7 @@ articles before retaining or changing their thresholds.
 
 | Level                    | Status                                                                      |
 | ------------------------ | --------------------------------------------------------------------------- |
-| **tests pass**           | Yes — 303 passed, 14 skipped                                                |
+| **tests pass**           | Yes — 345 passed, 19 skipped                                                |
 | **served-page verified** | Unverified — breakdown type formatting and new discoverability score need browser verification |
 | **feature complete**     | No — breakdown item separation and format changes completed but need full manual verification       |
 

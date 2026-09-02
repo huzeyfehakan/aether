@@ -52,9 +52,37 @@ _TEXT: Dict[PageOutcome, OutcomeText] = {
     ),
 }
 
+_TEXT_TR: Dict[PageOutcome, OutcomeText] = {
+    PageOutcome.ARTICLE_TEXT_UNREADABLE: OutcomeText(
+        headline="Sayfa kendisini makale olarak tanımlıyor ancak metni okunamadı",
+        what_happened=(
+            "Sayfa yazılımlara kendisini makale olarak tanımlıyor ancak sunulan "
+            "sayfada makale metni bulunmuyor. Tarayıcı dışında okuyan bir sistem "
+            "yalnızca başlığı görebiliyor."
+        ),
+        what_to_do=(
+            "Bunu siteyi yöneten teknik ekiple paylaşın. Makale metni büyük "
+            "olasılıkla sayfa yüklendikten sonra tarayıcıda oluşturuluyor; metnin "
+            "sunucunun gönderdiği sayfada yer alması gerekir."
+        ),
+    ),
+    PageOutcome.NO_ARTICLE_TEXT_FOUND: OutcomeText(
+        headline="Bu sayfada makale metni bulunamadı",
+        what_happened=(
+            "Makale metni okunamadı ve sayfa kendisini makale olarak tanımlamıyor. "
+            "Bu durum video, liste ve program sayfaları için normaldir; Aether "
+            "burada değerlendirecek bir makale bulamadı."
+        ),
+        what_to_do=(
+            "Bu bir makale değilse sorun yoktur ve işlem gerekmez. Makaleyse metin "
+            "tarayıcıda sonradan oluşturuluyor olabileceğinden teknik ekiple paylaşın."
+        ),
+    ),
+}
 
-def outcome_text(outcome: PageOutcome) -> OutcomeText:
-    return _TEXT[outcome]
+
+def outcome_text(outcome: PageOutcome, language: str = "en") -> OutcomeText:
+    return (_TEXT_TR if language == "tr" else _TEXT)[outcome]
 
 
 def declared_evidence(assessment: PageAssessment) -> Tuple[str, ...]:
@@ -80,15 +108,38 @@ def declared_evidence(assessment: PageAssessment) -> Tuple[str, ...]:
     return tuple(evidence)
 
 
-def outcome_view(assessment: PageAssessment) -> Optional[Dict[str, object]]:
+def declared_evidence_tr(assessment: PageAssessment) -> Tuple[str, ...]:
+    evidence = []
+    if assessment.declared_page_type:
+        evidence.append(
+            f'Sayfa kendisini “{assessment.declared_page_type}” olarak tanımlıyor.'
+        )
+    if assessment.declared_types:
+        evidence.append(
+            "Sayfadaki yapılandırılmış veri şu türleri bildiriyor: "
+            + ", ".join(assessment.declared_types)
+            + "."
+        )
+    else:
+        evidence.append("Sayfa yapılandırılmış veri yayımlamıyor.")
+    return tuple(evidence)
+
+
+def outcome_view(
+    assessment: PageAssessment, language: str = "en"
+) -> Optional[Dict[str, object]]:
     """Shape a non-analysable outcome for display, or nothing if it analysed."""
     if assessment.is_analyzable:
         return None
-    text = outcome_text(assessment.outcome)
+    text = outcome_text(assessment.outcome, language)
     return {
         "outcome": assessment.outcome.value,
         "headline": text.headline,
         "what_happened": text.what_happened,
         "what_to_do": text.what_to_do,
-        "evidence": list(declared_evidence(assessment)),
+        "evidence": list(
+            declared_evidence_tr(assessment)
+            if language == "tr"
+            else declared_evidence(assessment)
+        ),
     }

@@ -459,9 +459,11 @@ _TEXT_EN.update({
 })
 
 
-def recommendation_text(recommendation: EditorRecommendation) -> RecommendationText:
+def recommendation_text(
+    recommendation: EditorRecommendation, language: str = "en"
+) -> RecommendationText:
     """Return the editor-facing wording for one recommendation."""
-    return _TEXT_EN[recommendation.code]
+    return (_TEXT_TR if language == "tr" else _TEXT_EN)[recommendation.code]
 
 
 def category_title(category: RecommendationCategory) -> str:

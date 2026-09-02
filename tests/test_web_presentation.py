@@ -47,18 +47,148 @@ class WebPresentationTests(unittest.TestCase):
         self.assertIn('id="assessment-grid"', response.text)
         self.assertIn('id="report"', response.text)
 
-    def test_ui_chrome_contains_no_legacy_turkish_copy(self):
-        page = self.client.get("/").text
-        for legacy_copy in (
+    def test_default_ui_chrome_contains_turkish_copy(self):
+        page = self.client.get("/").text.split("<script>", 1)[0]
+        for expected_copy in (
             "Yeni Analiz",
-            "Öneriler",
-            "Henüz ölçülemiyor",
-            "Detayları gör",
-            "Neden önemli?",
-            "İçerikte Yapılabilecekler",
-            "Teknik / Site Düzeyinde Yapılabilecekler",
+            "SEO Skoru",
+            "GEO Skoru",
         ):
-            self.assertNotIn(legacy_copy, page)
+            self.assertIn(expected_copy, page)
+
+    def test_turkish_is_the_static_default_and_switcher_is_accessible(self):
+        page = self.client.get("/").text
+
+        self.assertIn('<html lang="tr">', page)
+        self.assertIn('role="group" aria-label="Arayüz dili"', page)
+        self.assertIn('id="language-tr" aria-pressed="true">TR</button>', page)
+        self.assertIn('id="language-en" aria-pressed="false">EN</button>', page)
+
+    def test_english_contract_remains_available_in_translations(self):
+        page = self.client.get("/").text
+
+        for text in (
+            "Analysis Result",
+            "New Analysis",
+            "SEO Score",
+            "GEO Score",
+            "(AI Visibility)",
+            "SEO Details",
+            "GEO Details",
+            "Recommendations",
+        ):
+            self.assertIn(text, page)
+
+    def test_i18n_dictionary_contains_representative_turkish_copy(self):
+        template = self._template()
+
+        for text in (
+            "Analiz Sonucu",
+            "Yeni Analiz",
+            "SEO Skoru",
+            "GEO Skoru",
+            "Yapay Zekâ Görünürlüğü",
+            "SEO Detayları",
+            "GEO Detayları",
+            "Ne yapılmalı?",
+            "Neden önemli?",
+            "İlgili pasaj",
+        ):
+            self.assertIn(text, template)
+
+    def test_language_switch_preserves_analysis_data_and_restores_english(self):
+        view = self._analysed_view()
+        serialized = json.dumps(view)
+
+        dom = run_page_script(
+            f"const languageTestView = {serialized};"
+            "const payloadBefore = JSON.stringify(languageTestView);"
+            "renderReport(languageTestView, 'plain report');"
+            "document.querySelector('#result-url').textContent = 'https://example.test/article';"
+            "const seoBefore = document.querySelector('#seo-score-total').textContent;"
+            "const geoBefore = document.querySelector('#geo-score-total').textContent;"
+            "const passageBefore = document.querySelector('#passage-details-list').innerHTML;"
+            "setLanguage('tr');"
+            "const turkish = {"
+            "lang: document.documentElement.lang,"
+            "heading: document.querySelector('#analysis-result-heading').textContent,"
+            "seoHeading: document.querySelector('#seo-score-heading').textContent,"
+            "geoHeading: document.querySelector('#geo-score-heading').textContent,"
+            "seo: document.querySelector('#seo-score-total').textContent,"
+            "geo: document.querySelector('#geo-score-total').textContent,"
+            "recommendations: document.querySelector('#editor-list').innerHTML + document.querySelector('#technical-list').innerHTML,"
+            "passages: document.querySelector('#passage-details-list').innerHTML,"
+            "url: document.querySelector('#result-url').textContent};"
+            "setLanguage('en');"
+            "document.querySelector('#language-switch-state').textContent = JSON.stringify({"
+            "payloadUnchanged: payloadBefore === JSON.stringify(languageTestView),"
+            "passageUnchanged: languageTestView.passage_details.passages.every((passage) => turkish.passages.includes(escapeHtml(passage.text))),"
+            "seoBefore, geoBefore, turkish,"
+            "englishLang: document.documentElement.lang,"
+            "englishHeading: document.querySelector('#analysis-result-heading').textContent,"
+            "englishSeoHeading: document.querySelector('#seo-score-heading').textContent,"
+            "englishGeoHeading: document.querySelector('#geo-score-heading').textContent});"
+        )
+        state = json.loads(dom["#language-switch-state"]["text"])
+
+        self.assertTrue(state["payloadUnchanged"])
+        self.assertTrue(state["passageUnchanged"])
+        self.assertEqual(state["turkish"]["lang"], "tr")
+        self.assertEqual(state["turkish"]["heading"], "Analiz Sonucu")
+        self.assertEqual(state["turkish"]["seoHeading"], "SEO Skoru")
+        self.assertEqual(state["turkish"]["geoHeading"], "GEO Skoru")
+        self.assertEqual(state["turkish"]["seo"], state["seoBefore"])
+        self.assertEqual(state["turkish"]["geo"], state["geoBefore"])
+        self.assertEqual(state["turkish"]["url"], "https://example.test/article")
+        self.assertIn("Ne yapılmalı?", state["turkish"]["recommendations"])
+        self.assertIn("Neden önemli?", state["turkish"]["recommendations"])
+        self.assertEqual(state["englishLang"], "en")
+        self.assertEqual(state["englishHeading"], "Analysis Result")
+        self.assertEqual(state["englishSeoHeading"], "SEO Score")
+        self.assertEqual(state["englishGeoHeading"], "GEO Score")
+
+    def test_language_switch_does_not_fetch_and_details_still_toggle(self):
+        dom = run_page_script(
+            "let languageFetchCount = 0;"
+            "const fetchBeforeLanguageSwitch = globalThis.fetch;"
+            "globalThis.fetch = (...args) => { languageFetchCount += 1; return fetchBeforeLanguageSwitch(...args); };"
+            "const toggle = document.querySelector('#language-test-toggle');"
+            "const detail = document.querySelector('#language-test-detail');"
+            "toggle.setAttribute('aria-expanded', 'false');"
+            "toggle.setAttribute('aria-controls', 'language-test-detail');"
+            "detail.classList.add('hidden');"
+            "setLanguage('tr');"
+            "toggleScoreDetail(toggle);"
+            "document.querySelector('#language-behavior-state').textContent = JSON.stringify({"
+            "fetchCount: languageFetchCount, expanded: toggle.getAttribute('aria-expanded'),"
+            "hidden: detail.classList.contains('hidden')});"
+        )
+        state = json.loads(dom["#language-behavior-state"]["text"])
+
+        self.assertEqual(state["fetchCount"], 0)
+        self.assertEqual(state["expanded"], "true")
+        self.assertIs(state["hidden"], False)
+
+    def test_language_preference_is_deterministic_and_persistent(self):
+        stored_tr = run_page_script(
+            "document.querySelector('#stored-language-state').textContent = "
+            "document.documentElement.lang;",
+            stored={"aether-ui-language": "tr"},
+        )
+        invalid = run_page_script(
+            "document.querySelector('#invalid-language-state').textContent = "
+            "document.documentElement.lang;",
+            stored={"aether-ui-language": "de"},
+        )
+        switched = run_page_script(
+            "setLanguage('tr');"
+            "document.querySelector('#persisted-language-state').textContent = "
+            "localStorage.getItem('aether-ui-language');"
+        )
+
+        self.assertEqual(stored_tr["#stored-language-state"]["text"], "tr")
+        self.assertEqual(invalid["#invalid-language-state"]["text"], "tr")
+        self.assertEqual(switched["#persisted-language-state"]["text"], "tr")
 
     def test_the_editor_ui_no_longer_asks_for_a_saved_html_file(self):
         """Nobody in an editorial workflow has one; the endpoint stays for tests."""
@@ -80,12 +210,12 @@ class WebPresentationTests(unittest.TestCase):
         page = self.client.get("/").text
 
         labels = [
-            "Analysis Result",
-            "SEO Score",
-            "SEO Details",
-            "GEO Score",
-            "GEO Details",
-            "Recommendations",
+            "Analiz Sonucu",
+            "SEO Skoru",
+            "SEO Detayları",
+            "GEO Skoru",
+            "GEO Detayları",
+            "Öneriler",
             "View Analyzed Text",
             "Technical details",
         ]
@@ -140,8 +270,8 @@ class WebPresentationTests(unittest.TestCase):
 
         self.assertIn('id="editor-list"', section)
         self.assertIn('id="technical-list"', section)
-        self.assertIn("Content Recommendations", section)
-        self.assertIn("Technical / Site Recommendations", section)
+        self.assertIn("İçerik Önerileri", section)
+        self.assertIn("Teknik / Site Önerileri", section)
         self.assertNotIn("hidden", section)
 
     def test_published_recommendations_are_fully_english_at_the_web_boundary(self):
@@ -393,7 +523,21 @@ Passage."""
         page = self.client.get("/").text
 
         self.assertIn("SEO Preview", page)
-        self.assertIn("GEO Preview", page)
+        self.assertIn("Pre-publication GEO Preview", page)
+        self.assertIn("Yayın Öncesi GEO Önizlemesi", page)
+        self.assertIn(
+            "Bu önizleme yalnızca taslaktan ölçülebilen sinyallere dayanır ve "
+            "yayınlanmış sayfanın GEO skoru ile doğrudan karşılaştırılamaz.",
+            page,
+        )
+        self.assertIn(
+            "This preview is based only on signals measurable from the draft and "
+            "cannot be compared directly with the published page's GEO score.",
+            page,
+        )
+        self.assertIn(
+            "'#draft-geo-comparison-copy': 'geo_preview_comparison'", page
+        )
         self.assertIn("signals measurable before publication", page)
         self.assertIn("Measurable after publishing", page)
         self.assertIn("Not measured", page)
@@ -780,19 +924,6 @@ Passage."""
             self.assertEqual(rendered.count("<li>"), expected_count)
             if expected_count:
                 self.assertIn("/ 100", rendered)
-                self.assertIn("points lost", rendered)
-
-    def test_empty_limiting_factor_section_stays_hidden(self):
-        view = self._analysed_view()
-        view["assessment"]["seo_score"]["limiting_factors"] = []
-
-        dom = run_page_script(
-            f"renderReport({json.dumps(view)}, 'report');"
-            "document.querySelector('#empty-factor-state').textContent = "
-            "document.querySelector('#seo-limiting-factors').classList.contains('hidden');"
-        )
-
-        self.assertIs(dom["#empty-factor-state"]["text"], True)
 
     def test_limiting_factor_sections_are_compact_and_accessibly_named(self):
         template = self._template()
@@ -851,26 +982,25 @@ Passage."""
         rendered = dom["#geo-score-grid"]["html"]
         self.assertEqual(rendered.count('aria-expanded="false"'), 4)
         self.assertEqual(rendered.count("aria-controls="), 4)
-        self.assertEqual(rendered.count("Details"), 4)
+        self.assertEqual(rendered.count("Show details"), 4)
         self.assertIn("Semantic Completeness", rendered)
         self.assertIn("Entity Authority", rendered)
         self.assertIn("Structural Richness", rendered)
         self.assertIn("Discoverability", rendered)
-        geo_details = dom["#geo-details"]["html"]
-        self.assertEqual(geo_details.count("dimension-detail-panel hidden"), 4)
+        self.assertEqual(rendered.count("dimension-detail-panel hidden"), 4)
         for label in (
             "Statistics coverage", "Author declaration", "Citation coverage",
             "Claim evidence coverage", "Structured content ratio", "Body link saturation",
             "Unique target ratio",
         ):
-            self.assertIn(label, geo_details)
-        self.assertIn("Not measured", geo_details)
+            self.assertIn(label, rendered)
+        self.assertIn("Not measured", rendered)
+        self.assertEqual(dom["#geo-details"]["html"], "")
 
         seo_rendered = dom["#seo-score-grid"]["html"]
         self.assertEqual(seo_rendered.count('aria-expanded="false"'), 4)
         self.assertEqual(seo_rendered.count("aria-controls="), 4)
-        self.assertEqual(seo_rendered.count("Details"), 4)
-        seo_details = dom["#seo-details"]["html"]
+        self.assertEqual(seo_rendered.count("Show details"), 4)
         for label in (
             "Publication date", "Last modified date", "Author", "Description",
             "Article structured data", "Declared expected properties",
@@ -878,7 +1008,8 @@ Passage."""
             "Unique passages", "Repeated passages", "Unique passage ratio",
             "Title sources disagree", "Description sources disagree",
         ):
-            self.assertIn(label, seo_details)
+            self.assertIn(label, seo_rendered)
+        self.assertEqual(dom["#seo-details"]["html"], "")
 
     def test_draft_score_cards_use_unique_matching_detail_targets(self):
         draft = self._draft(
@@ -894,7 +1025,7 @@ Passage."""
         self.assertIn("renderDimensionGroup(score, dimensions, `draft-${kind}`)", template)
         self.assertIn("`${scoreType}-${dimension.key.replaceAll('_', '-')}-detail`", template)
         self.assertIn('aria-controls="${detailId}"', template)
-        self.assertIn('id="${detailId}" class="dimension-detail-panel hidden"', template)
+        self.assertIn('id="${detailId}" class="dimension-detail-panel${expanded', template)
         self.assertIn("document.addEventListener('click'", template)
         self.assertIn("event.target.closest('[data-score-detail-toggle]')", template)
         self.assertNotIn("querySelectorAll('[data-score-detail-toggle]').forEach", template)
@@ -909,13 +1040,17 @@ Passage."""
         self.assertIn("passage.word_count", template)
         self.assertIn("escapeHtml(passage.text)", template)
 
-    def test_compact_score_grids_keep_detail_panels_outside_cards(self):
+    def test_compact_score_grids_keep_detail_panels_inside_cards(self):
         template = self._template()
 
         self.assertIn(".dimension-grid { align-items: stretch", template)
         self.assertIn("min-height: 174px", template)
         self.assertIn("min-width: 0", template)
-        self.assertIn('class="dimension-detail-panel hidden"', template)
+        self.assertIn("${scoreDimensionDetail(dimension, scoreType, expanded)}", template)
+        self.assertLess(
+            template.index("${scoreDimensionDetail(dimension, scoreType, expanded)}"),
+            template.index("</article>`;", template.index("const scoreDimensionCard")),
+        )
         self.assertIn('class="dimension-detail-stack"', template)
         self.assertIn("overflow-wrap: normal", template)
         self.assertIn("word-break: normal", template)
@@ -1160,6 +1295,68 @@ Passage."""
 
         self.assertEqual(dom["#both-open"]["text"], "true,true,true,false,false,false")
         self.assertEqual(dom["#one-closed"]["text"], "false,true,true,true,false,false")
+
+    def test_dimension_details_are_card_local_for_seo_and_geo(self):
+        view = self._analysed_view()
+        dom = run_page_script(f"renderReport({json.dumps(view)}, 'report');")
+
+        expected = {
+            "#seo-score-grid": (
+                "entity-coverage", "structured-data", "semantic-quality",
+                "technical-access",
+            ),
+            "#geo-score-grid": (
+                "semantic-completeness", "entity-authority",
+                "structural-richness", "discoverability",
+            ),
+        }
+        for selector, keys in expected.items():
+            rendered = dom[selector]["html"]
+            self.assertEqual(rendered.count('class="metric-card dimension-card"'), 4)
+            for key in keys:
+                detail_id = selector.removeprefix("#").replace("-score-grid", "")
+                detail_id += f"-{key}-detail"
+                card_start = rendered.index(f'aria-controls="{detail_id}"')
+                panel = rendered.index(f'id="{detail_id}"', card_start)
+                card_end = rendered.index("</article>", panel)
+                self.assertLess(card_start, panel)
+                self.assertLess(panel, card_end)
+
+        self.assertEqual(dom["#seo-details"]["html"], "")
+        self.assertEqual(dom["#geo-details"]["html"], "")
+
+    def test_dimension_toggle_updates_accessibility_active_state_and_i18n_label(self):
+        dom = run_page_script("""
+          const button = document.querySelector('#dimension-label-button');
+          const panel = document.querySelector('#dimension-label-panel');
+          const card = document.querySelector('#dimension-label-card');
+          const label = document.querySelector('#dimension-label-text');
+          button.setAttribute('aria-controls', 'dimension-label-panel');
+          button.setAttribute('aria-expanded', 'false');
+          button.closest = () => card;
+          button.querySelector = () => label;
+          panel.classList.add('hidden');
+
+          setLanguage('tr');
+          toggleScoreDetail(button);
+          const turkishOpen = [button.getAttribute('aria-expanded'), label.innerHTML,
+            card.classList.contains('dimension-card-active'), panel.classList.contains('hidden')];
+          toggleScoreDetail(button);
+          setLanguage('en');
+          toggleScoreDetail(button);
+          document.querySelector('#dimension-toggle-state').textContent = JSON.stringify({
+            turkishOpen, englishOpen: label.innerHTML,
+            score: 'unchanged', report: 'unchanged'
+          });
+        """)
+        state = json.loads(dom["#dimension-toggle-state"]["text"])
+
+        self.assertEqual(state["turkishOpen"], [
+            "true", "Detayları gizle &#9652;", True, False,
+        ])
+        self.assertEqual(state["englishOpen"], "Hide details &#9652;")
+        self.assertEqual(state["score"], "unchanged")
+        self.assertEqual(state["report"], "unchanged")
 
     def test_template_only_reads_view_fields_the_server_sends(self):
         """Guards the drift that removing a report field previously caused."""

@@ -45,14 +45,15 @@
       .geo-dimension-detail h5 { font-size: .92rem; margin: 0 0 10px; }
       .geo-signal-list { list-style: none; margin: 0; padding: 0; }
       .dimension-grid { align-items: stretch; display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .dimension-card { align-self: stretch; display: flex; min-height: 174px; min-width: 0; padding: 14px; }
-      .dimension-card .geo-dimension-button { display: flex; flex-direction: column; }
+      .dimension-card { align-self: start; display: flex; flex-direction: column; min-height: 174px; min-width: 0; padding: 14px; transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease; }
+      .dimension-card.dimension-card-active { background: #fffafa; border-color: #d9aeb3; box-shadow: 0 0 0 1px #B4232F12; }
+      .dimension-card .geo-dimension-button { display: flex; flex: 1 1 auto; flex-direction: column; }
       .dimension-card .dimension-name { color: #24374d; font-size: .96rem; line-height: 1.25; margin: 0; }
       .dimension-card .technical-name { color: #7a8797; display: block; font-size: .74rem; font-weight: 500; margin-top: 3px; }
       .dimension-card .dimension-score { color: #45617d; display: block; margin-top: auto; padding-top: 12px; }
       .dimension-card .geo-detail-hint { align-self: flex-start; }
       .dimension-detail-stack { margin-top: 12px; }
-      .dimension-detail-panel { background: #fafbfc; border: 1px solid #e0e8f1; border-radius: 12px; margin-top: 10px; padding: 16px; }
+      .dimension-detail-panel { background: #faf7f8; border: 1px solid #eadcdf; border-radius: 9px; margin-top: 12px; padding: 14px; }
       .dimension-detail-panel h5 { color: #24374d; font-size: .95rem; margin: 0 0 10px; }
       .signal-technical-name { color: #8793a2; display: block; font-size: .72rem; margin-top: 2px; }
       .signal-raw { border-top: 0; margin: 4px 0 0; padding: 0; width: 100%; }
@@ -74,6 +75,12 @@
       .result-url { color: #52657b; margin: 4px 0 0; overflow-wrap: break-word; }
       .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
       .secondary { border: 1px solid #d9aeb3; border-radius: 9px; background: #fff; color: #8f1c27; cursor: pointer; font: inherit; font-weight: 720; padding: 10px 14px; }
+      .header-row { align-items: flex-start; display: flex; gap: 20px; justify-content: space-between; }
+      .language-switcher { border: 1px solid #d9aeb3; border-radius: 9px; display: inline-flex; flex: 0 0 auto; overflow: hidden; }
+      .language-switcher button { background: #fff; border: 0; color: #8f1c27; cursor: pointer; font: inherit; font-size: .78rem; font-weight: 760; padding: 7px 9px; }
+      .language-switcher button + button { border-left: 1px solid #d9aeb3; }
+      .language-switcher button[aria-pressed="true"] { background: #B4232F; color: #fff; }
+      .language-switcher button:focus-visible { outline: 3px solid #B4232F44; outline-offset: -3px; }
       .score-summary { border: 1px solid #dfe8f2; border-radius: 16px; padding: 22px; }
       .score-summary h3 { color: #17314f; font-size: 1rem; margin: 0 0 18px; }
       .score-summary .score-total { font-size: 2.8rem; }
@@ -95,18 +102,21 @@
   </head>
   <body>
     <div class="shell">
-      <header>
-        <div class="eyebrow">Aether</div>
-        <h1>Measure your content's SEO and AI visibility</h1>
-        <p class="intro">Analyze your website or draft and get recommendations for improvement.</p>
+      <header class="header-row">
+        <div><div class="eyebrow">Aether</div>
+        <h1 id="app-title">İçeriğinizin SEO ve yapay zekâ görünürlüğünü ölçün</h1>
+        <p class="intro" id="app-intro">Web sitenizi veya taslağınızı analiz edin ve iyileştirme önerileri alın.</p></div>
+        <div class="language-switcher" role="group" aria-label="Arayüz dili">
+          <button type="button" id="language-tr" aria-pressed="true">TR</button><button type="button" id="language-en" aria-pressed="false">EN</button>
+        </div>
       </header>
 
       <section class="panel" aria-label="Analysis source" style="padding: 20px;">
         <div class="choice-grid">
         <div class="choice-card">
         <form class="form-panel active" id="url-form" data-endpoint="/analyze/url">
-          <h2>Check a published page</h2>
-          <p class="muted">Enter a URL to analyze your page's SEO and AI visibility.</p>
+          <h2 id="published-heading">Yayınlanmış bir sayfayı kontrol et</h2>
+          <p class="muted" id="published-copy">Sayfanızın SEO ve yapay zekâ görünürlüğünü analiz etmek için URL girin.</p>
           <label>URL <input name="url" type="url" placeholder="https://site.com/yazi" required /></label>
           <input name="article_type" type="hidden" value="news_report" />
           <div class="recovery hidden" data-recovery>
@@ -120,13 +130,13 @@
             <label class="hidden" data-need="published">When was the article published?
               <input name="fallback_published_at" type="date" /></label>
           </div>
-          <button class="primary">Analyze</button>
+          <button class="primary" id="analyze-url-label">Analiz Et</button>
         </form>
         </div>
         <div class="choice-card">
-        <h2>Check unpublished content</h2>
-        <p class="muted">Paste your headline and content to check them before publishing.</p>
-        <button class="tab" id="draft-tab" type="button" aria-controls="draft-fields" aria-expanded="false">Analyze Draft</button>
+        <h2 id="draft-heading">Yayınlanmamış içeriği kontrol et</h2>
+        <p class="muted" id="draft-copy">Yayınlamadan önce kontrol etmek için başlığınızı ve içeriğinizi yapıştırın.</p>
+        <button class="tab" id="draft-tab" type="button" aria-controls="draft-fields" aria-expanded="false">Taslağı Analiz Et</button>
         <form class="form-panel" id="draft-form" data-endpoint="/analyze/draft">
           <div id="draft-fields" class="draft-fields hidden">
           <label>Headline <input name="headline" placeholder="The headline you plan to publish" required /></label>
@@ -141,7 +151,7 @@
           <details class="advanced-options"><summary>Advanced options</summary>
           <label>Compare with publisher <select name="publisher" id="draft-publisher"></select>
             <p class="help" id="draft-compare-state"></p></label></details>
-          <button class="primary">Analyze Draft</button>
+          <button class="primary" id="analyze-draft-label">Taslağı Analiz Et</button>
           </div>
         </form>
         </div>
@@ -151,73 +161,73 @@
       <p id="status" role="alert"></p>
 
       <section id="draft-card" class="panel hidden" aria-live="polite">
-        <div class="report-heading"><div><div class="eyebrow">Draft review</div><h2>See what you can improve before publishing</h2></div></div>
+        <div class="report-heading"><div><div class="eyebrow" id="draft-review-label">Draft review</div><h2 id="draft-review-heading">See what you can improve before publishing</h2></div></div>
         <p id="draft-summary" class="muted"></p>
         <div class="section" id="draft-preview-section">
-          <p class="muted">These scores are based only on signals measurable before publication. Results may change after publishing.</p>
+          <p class="muted" id="draft-preview-copy">Bu skorlar yalnızca yayın öncesinde ölçülebilen sinyallere dayanır. Sonuçlar yayınlandıktan sonra değişebilir.</p>
           <div style="display: flex; gap: 32px; flex-wrap: wrap;">
-            <div style="flex: 1; min-width: 260px;"><h3>SEO Preview</h3><div class="score-headline"><span id="draft-seo-total" class="score-total">Not measured</span><span id="draft-seo-suffix"></span></div><div id="draft-seo-grid" class="dimension-grid"></div><div id="draft-seo-details" class="dimension-detail-stack"></div></div>
-            <div style="flex: 1; min-width: 260px;"><h3>GEO Preview</h3><div class="score-headline"><span id="draft-geo-total" class="score-total">Not measured</span><span id="draft-geo-suffix"></span></div><div id="draft-geo-grid" class="dimension-grid"></div><div id="draft-geo-details" class="dimension-detail-stack"></div></div>
+            <div style="flex: 1; min-width: 260px;"><h3 id="seo-preview-heading">SEO Önizlemesi</h3><div class="score-headline"><span id="draft-seo-total" class="score-total">Henüz ölçülemiyor</span><span id="draft-seo-suffix"></span></div><div id="draft-seo-grid" class="dimension-grid"></div><div id="draft-seo-details" class="dimension-detail-stack"></div></div>
+            <div style="flex: 1; min-width: 260px;"><h3 id="geo-preview-heading">Yayın Öncesi GEO Önizlemesi</h3><p class="muted" id="draft-geo-comparison-copy">Bu önizleme yalnızca taslaktan ölçülebilen sinyallere dayanır ve yayınlanmış sayfanın GEO skoru ile doğrudan karşılaştırılamaz.</p><div class="score-headline"><span id="draft-geo-total" class="score-total">Henüz ölçülemiyor</span><span id="draft-geo-suffix"></span></div><div id="draft-geo-grid" class="dimension-grid"></div><div id="draft-geo-details" class="dimension-detail-stack"></div></div>
           </div>
         </div>
-        <div class="section"><h3>Kontrol edilenler</h3><ul id="draft-performed" class="not-checked"></ul><div id="draft-findings"></div></div>
-        <div class="section"><h3>Measurable after publishing</h3><p class="muted">Values that require a live page remain “Not measured” and are not treated as zero.</p><ul id="draft-unavailable" class="not-checked"></ul></div>
+        <div class="section"><h3 id="draft-performed-heading">Checks performed</h3><ul id="draft-performed" class="not-checked"></ul><div id="draft-findings"></div></div>
+        <div class="section"><h3 id="measurable-after-heading">Measurable after publishing</h3><p class="muted" id="measurable-after-copy">Values that require a live page remain “Not measured” and are not treated as zero.</p><ul id="draft-unavailable" class="not-checked"></ul></div>
       </section>
 
       <section id="outcome-card" class="panel hidden" aria-live="polite">
-        <div class="report-heading"><div><div class="eyebrow">Analysis complete</div><h2 id="outcome-headline"></h2></div></div>
+        <div class="report-heading"><div><div class="eyebrow" id="outcome-complete-label">Analysis complete</div><h2 id="outcome-headline"></h2></div></div>
         <p id="outcome-happened"></p>
         <ul id="outcome-evidence" class="muted"></ul>
-        <div class="recommendation"><p><strong>What to do:</strong> <span id="outcome-action"></span></p></div>
+        <div class="recommendation"><p><strong id="outcome-action-label">What to do:</strong> <span id="outcome-action"></span></p></div>
       </section>
 
       <section id="report-card" class="panel hidden" aria-live="polite">
-        <div class="report-heading"><div><div class="eyebrow">Analysis complete</div><h2>Analysis Result</h2><p id="result-url" class="result-url"></p></div><button type="button" class="secondary" id="new-analysis">New Analysis</button><span id="report-state" class="sr-only"></span></div>
+        <div class="report-heading"><div><div class="eyebrow" id="analysis-complete-label">Analiz tamamlandı</div><h2 id="analysis-result-heading">Analiz Sonucu</h2><p id="result-url" class="result-url"></p></div><button type="button" class="secondary" id="new-analysis">Yeni Analiz</button><span id="report-state" class="sr-only"></span></div>
         
         <!-- AI readiness score section -->
         <div class="section" id="score-section" style="margin-top: 0;">
           <div class="score-summary-grid">
             <div class="score-summary" id="seo-summary-card">
-              <h3>SEO Score</h3>
+              <h3 id="seo-score-heading">SEO Skoru</h3>
               <div class="score-headline">
                 <span id="seo-score-total" class="score-total">0</span>
                 <span style="font-size: 1.1rem; color: #58677b;">/ 100</span>
               </div>
               <p id="seo-band" class="score-band"></p><p id="seo-band-copy" class="score-copy"></p>
-              <section id="seo-limiting-factors" class="limiting-factors hidden" aria-labelledby="seo-limiting-factors-heading"><h4 id="seo-limiting-factors-heading">Top factors lowering this score</h4><ol id="seo-limiting-factor-list"></ol></section>
-              <div class="score-details" aria-labelledby="seo-details-heading"><h4 id="seo-details-heading">SEO Details</h4><div id="seo-score-grid" class="dimension-grid"></div><div id="seo-details" class="dimension-detail-stack"></div></div>
+              <section id="seo-limiting-factors" class="limiting-factors hidden" aria-labelledby="seo-limiting-factors-heading"><h4 id="seo-limiting-factors-heading">Bu skoru düşüren başlıca etkenler</h4><ol id="seo-limiting-factor-list"></ol></section>
+              <div class="score-details" aria-labelledby="seo-details-heading"><h4 id="seo-details-heading">SEO Detayları</h4><div id="seo-score-grid" class="dimension-grid"></div><div id="seo-details" class="dimension-detail-stack"></div></div>
             </div>
             <div class="score-summary" id="geo-summary-card">
-              <h3>GEO Score <span class="muted">(AI Visibility)</span></h3>
+              <h3><span id="geo-score-heading">GEO Skoru</span> <span class="muted" id="geo-visibility-label">(Yapay Zekâ Görünürlüğü)</span></h3>
               <div class="score-headline">
                 <span id="geo-score-total" class="score-total">0</span>
                 <span style="font-size: 1.1rem; color: #58677b;">/ 100</span>
               </div>
               <p id="geo-band" class="score-band"></p><p id="geo-band-copy" class="score-copy"></p>
-              <section id="geo-limiting-factors" class="limiting-factors hidden" aria-labelledby="geo-limiting-factors-heading"><h4 id="geo-limiting-factors-heading">Top factors lowering this score</h4><ol id="geo-limiting-factor-list"></ol></section>
-              <div class="score-details" aria-labelledby="geo-details-heading"><h4 id="geo-details-heading">GEO Details</h4><div id="geo-score-grid" class="dimension-grid"></div><div id="geo-details" class="dimension-detail-stack"></div></div>
+              <section id="geo-limiting-factors" class="limiting-factors hidden" aria-labelledby="geo-limiting-factors-heading"><h4 id="geo-limiting-factors-heading">Bu skoru düşüren başlıca etkenler</h4><ol id="geo-limiting-factor-list"></ol></section>
+              <div class="score-details" aria-labelledby="geo-details-heading"><h4 id="geo-details-heading">GEO Detayları</h4><div id="geo-score-grid" class="dimension-grid"></div><div id="geo-details" class="dimension-detail-stack"></div></div>
             </div>
           </div>
         </div>
         <!-- End AI readiness score section -->
 
-        <section class="section" aria-labelledby="recommendations-heading"><h3 id="recommendations-heading">Recommendations</h3><div id="editor-section"><h4>Content Recommendations</h4><p class="muted" id="editor-subtitle"></p><p id="editor-compared"></p><div id="editor-list" class="recommendation-list"></div></div><div id="technical-section"><h4>Technical / Site Recommendations</h4><p class="muted" id="technical-subtitle"></p><div id="technical-list" class="recommendation-list"></div></div></section>
+        <section class="section" aria-labelledby="recommendations-heading"><h3 id="recommendations-heading">Öneriler</h3><div id="editor-section"><h4 id="content-recommendations-heading">İçerik Önerileri</h4><p class="muted" id="editor-subtitle"></p><p id="editor-compared"></p><div id="editor-list" class="recommendation-list"></div></div><div id="technical-section"><h4 id="technical-recommendations-heading">Teknik / Site Önerileri</h4><p class="muted" id="technical-subtitle"></p><div id="technical-list" class="recommendation-list"></div></div></section>
 
         <div class="section" aria-labelledby="analysed-text-heading">
           <h3 id="analysed-text-heading">Analyzed Text</h3>
           <button type="button" class="geo-dimension-button" data-score-detail-toggle aria-expanded="false" aria-controls="passage-details-panel">
-            <span>View Analyzed Text</span><span class="geo-detail-hint">Details &#9662;</span>
+            <span id="view-analysed-text-label">View Analyzed Text</span><span class="geo-detail-hint"><span id="analysed-text-details-label">Details</span> &#9662;</span>
           </button>
           <div id="passage-details-panel" class="geo-dimension-detail hidden">
-            <h4>Extracted passages</h4>
+            <h4 id="extracted-passages-heading">Extracted passages</h4>
             <div id="passage-details-list"></div>
             <p id="passage-details-total" class="muted"></p>
           </div>
         </div>
 
-        <details class="technical"><summary>Assessment and technical diagnostics</summary>
-        <div class="section"><h3>Assessment Summary</h3><div id="assessment-grid" class="assessment-grid"></div></div>
-        <div class="section"><h3>Article structure</h3><p>How the saved article was organized for passage analysis.</p><div id="structure-metrics" class="metric-grid"></div></div>
+        <details class="technical"><summary id="diagnostics-summary">Assessment and technical diagnostics</summary>
+        <div class="section"><h3 id="assessment-summary-heading">Assessment Summary</h3><div id="assessment-grid" class="assessment-grid"></div></div>
+        <div class="section"><h3 id="article-structure-heading">Article structure</h3><p id="article-structure-copy">How the saved article was organized for passage analysis.</p><div id="structure-metrics" class="metric-grid"></div></div>
 
         <section class="section" aria-labelledby="passage-extractability-heading">
           <h3 id="passage-extractability-heading">Passage Extractability — Experimental diagnostic</h3>
@@ -245,21 +255,125 @@
     </div>
 
     <script>
-      const statusLabels = { complete: 'Complete', partial: 'Partial', missing: 'Missing' };
-      const statusBadge = (value) => `<span class="badge ${value}">${statusLabels[value] || value}</span>`;
+      const translations = {
+        en: {
+          app_title: "Measure your content's SEO and AI visibility", app_intro: 'Analyze your website or draft and get recommendations for improvement.',
+          published_heading: 'Check a published page', published_copy: "Enter a URL to analyze your page's SEO and AI visibility.", analyze: 'Analyze',
+          draft_heading: 'Check unpublished content', draft_copy: 'Paste your headline and content to check them before publishing.', analyze_draft: 'Analyze Draft',
+          checks_performed: 'Checks performed', analysis_complete: 'Analysis complete', analysis_result: 'Analysis Result', new_analysis: 'New Analysis',
+          seo_score: 'SEO Score', geo_score: 'GEO Score', ai_visibility: '(AI Visibility)', seo_details: 'SEO Details', geo_details: 'GEO Details',
+          recommendations: 'Recommendations', content_recommendations: 'Content Recommendations', technical_recommendations: 'Technical / Site Recommendations',
+          details: 'Details', show_details: 'Show details', hide_details: 'Hide details', full_list: 'Full list', not_measured: 'Not measured', present: 'Present', missing: 'Missing', available: 'Available', none: 'None',
+          related_passage: 'Related passage', related_passages: 'Related passages', passage: 'Passage', word: 'word', words: 'words',
+          impact: 'Impact', what_to_do: 'What to do:', why_it_matters: 'Why it matters', assessment_ready: 'Assessment ready',
+          complete: 'Complete', partial: 'Partial', great: 'Great', good_room: 'Good, with room to improve', needs_improvement: 'Needs improvement',
+          seo_good: 'Your content is well optimized for search engines.', seo_improve: 'Your content can be made more visible to search engines.',
+          geo_good: 'AI systems can read your content effectively.', geo_improve: 'Your content can be made more visible to AI systems.',
+          no_draft_changes: 'There are no recommended changes for this draft right now.', no_article_changes: 'There are no recommended changes for this article right now.',
+          no_technical_changes: 'No technical changes are needed; the article declarations are complete.',
+          present_count: 'present', metadata_all_present: 'All assessed metadata fields are present.', missing_suffix: 'missing',
+          passages: 'Passages', extraction_total: 'Extraction total', long_passages: 'long passages',
+          draft_review: 'Draft review', draft_review_heading: 'See what you can improve before publishing',
+          draft_preview_copy: 'These scores are based only on signals measurable before publication. Results may change after publishing.',
+          seo_preview: 'SEO Preview', geo_preview: 'Pre-publication GEO Preview', geo_preview_comparison: "This preview is based only on signals measurable from the draft and cannot be compared directly with the published page's GEO score.", measurable_after: 'Measurable after publishing',
+          measurable_after_copy: 'Values that require a live page remain “Not measured” and are not treated as zero.',
+          analyzed_text: 'Analyzed Text', view_analyzed_text: 'View Analyzed Text', extracted_passages: 'Extracted passages',
+          diagnostics: 'Assessment and technical diagnostics', assessment_summary: 'Assessment Summary', article_structure: 'Article structure',
+          article_structure_copy: 'How the saved article was organized for passage analysis.', limiting_factors: 'Top factors lowering this score', points_lost: 'points lost',
+        },
+        tr: {
+          app_title: 'İçeriğinizin SEO ve yapay zekâ görünürlüğünü ölçün', app_intro: 'Web sitenizi veya taslağınızı analiz edin ve iyileştirme önerileri alın.',
+          published_heading: 'Yayınlanmış bir sayfayı kontrol et', published_copy: 'Sayfanızın SEO ve yapay zekâ görünürlüğünü analiz etmek için URL girin.', analyze: 'Analiz Et',
+          draft_heading: 'Yayınlanmamış içeriği kontrol et', draft_copy: 'Yayınlamadan önce kontrol etmek için başlığınızı ve içeriğinizi yapıştırın.', analyze_draft: 'Taslağı Analiz Et',
+          checks_performed: 'Kontrol edilenler', analysis_complete: 'Analiz tamamlandı', analysis_result: 'Analiz Sonucu', new_analysis: 'Yeni Analiz',
+          seo_score: 'SEO Skoru', geo_score: 'GEO Skoru', ai_visibility: '(Yapay Zekâ Görünürlüğü)', seo_details: 'SEO Detayları', geo_details: 'GEO Detayları',
+          recommendations: 'Öneriler', content_recommendations: 'İçerik Önerileri', technical_recommendations: 'Teknik / Site Önerileri',
+          details: 'Detaylar', show_details: 'Detayları gör', hide_details: 'Detayları gizle', full_list: 'Tam liste', not_measured: 'Henüz ölçülemiyor', present: 'Mevcut', missing: 'Eksik', available: 'Kullanılabilir', none: 'Yok',
+          related_passage: 'İlgili pasaj', related_passages: 'İlgili pasajlar', passage: 'Pasaj', word: 'kelime', words: 'kelime',
+          impact: 'Etki', what_to_do: 'Ne yapılmalı?', why_it_matters: 'Neden önemli?', assessment_ready: 'Değerlendirme hazır',
+          complete: 'Tam', partial: 'Kısmi', great: 'Harika', good_room: 'İyi, geliştirilebilir', needs_improvement: 'Geliştirilmeli',
+          seo_good: 'İçeriğiniz arama motorları için iyi optimize edilmiş.', seo_improve: 'İçeriğiniz arama motorlarında daha görünür hâle getirilebilir.',
+          geo_good: 'Yapay zekâ sistemleri içeriğinizi etkili biçimde okuyabilir.', geo_improve: 'İçeriğiniz yapay zekâ sistemleri için daha görünür hâle getirilebilir.',
+          no_draft_changes: 'Bu taslak için şu anda önerilen bir değişiklik yok.', no_article_changes: 'Bu makale için şu anda önerilen bir değişiklik yok.',
+          no_technical_changes: 'Teknik değişiklik gerekmiyor; makale bildirimleri tamam.',
+          present_count: 'mevcut', metadata_all_present: 'Değerlendirilen tüm metadata alanları mevcut.', missing_suffix: 'eksik',
+          passages: 'Pasajlar', extraction_total: 'Çıkarma toplamı', long_passages: 'uzun pasaj',
+          draft_review: 'Taslak incelemesi', draft_review_heading: 'Yayınlamadan önce neleri iyileştirebileceğinizi görün',
+          draft_preview_copy: 'Bu skorlar yalnızca yayın öncesinde ölçülebilen sinyallere dayanır. Sonuçlar yayınlandıktan sonra değişebilir.',
+          seo_preview: 'SEO Önizlemesi', geo_preview: 'Yayın Öncesi GEO Önizlemesi', geo_preview_comparison: 'Bu önizleme yalnızca taslaktan ölçülebilen sinyallere dayanır ve yayınlanmış sayfanın GEO skoru ile doğrudan karşılaştırılamaz.', measurable_after: 'Yayınlandıktan sonra ölçülebilecekler',
+          measurable_after_copy: 'Canlı sayfa gerektiren değerler “Henüz ölçülemiyor” olarak kalır ve sıfır kabul edilmez.',
+          analyzed_text: 'Analiz Edilen Metin', view_analyzed_text: 'Analiz Edilen Metni Gör', extracted_passages: 'Çıkarılan pasajlar',
+          diagnostics: 'Değerlendirme ve teknik tanılar', assessment_summary: 'Değerlendirme Özeti', article_structure: 'Makale yapısı',
+          article_structure_copy: 'Kaydedilen makalenin pasaj analizi için nasıl düzenlendiği.', limiting_factors: 'Bu skoru düşüren başlıca etkenler', points_lost: 'puan kaybı',
+        },
+      };
+      const dimensionLabels = {
+        en: { entity_coverage: 'Entity Coverage', structured_data: 'Structured Data', semantic_quality: 'Semantic Quality', technical_access: 'Technical Access', semantic_completeness: 'Semantic Completeness', entity_authority: 'Entity Authority', structural_richness: 'Structural Richness', discoverability: 'Discoverability', passage_balance: 'Passage Balance', direct_answer_coverage: 'Direct Answer Coverage' },
+        tr: { entity_coverage: 'Varlık Kapsamı', structured_data: 'Yapısal Veri', semantic_quality: 'Anlamsal Kalite', technical_access: 'Teknik Erişim', semantic_completeness: 'İçerik Bütünlüğü', entity_authority: 'Kaynak ve Güvenilirlik', structural_richness: 'İçerik Yapısı', discoverability: 'Bulunabilirlik', passage_balance: 'Pasaj Dengesi', direct_answer_coverage: 'Doğrudan Yanıt Kapsamı' },
+      };
+      const signalLabelsTr = {
+        'Publication date': 'Yayın tarihi', 'Last modified date': 'Son güncelleme tarihi', Author: 'Yazar', Description: 'Açıklama',
+        'Article structured data': 'Makale yapısal verisi', 'Declared expected properties': 'Bildirilen beklenen özellikler', 'Missing expected properties': 'Eksik beklenen özellikler', 'Property coverage': 'Özellik kapsamı',
+        'Statistics coverage': 'İstatistik kapsamı', 'Heading-passage overlap': 'Başlık-pasaj örtüşmesi', 'Sentence balance': 'Cümle dengesi', 'Structural variety': 'Yapısal çeşitlilik',
+        'Author declaration': 'Yazar bildirimi', 'Outbound body sources': 'Gövde içi dış kaynaklar', 'Trust index': 'Güven endeksi', 'Third-party source ratio': 'Üçüncü taraf kaynak oranı',
+        'Supported entities': 'Desteklenen varlıklar', 'Citation coverage': 'Atıf kapsamı', 'Claim evidence coverage': 'İddia kanıt kapsamı', 'Table word share': 'Tablo kelime payı',
+        'List word share': 'Liste kelime payı', 'Blockquote word share': 'Alıntı kelime payı', 'Structured content ratio': 'Yapılandırılmış içerik oranı', 'Answered question ratio': 'Yanıtlanan soru oranı',
+        'Outgoing links': 'Giden bağlantılar', 'Body links': 'Gövde bağlantıları', 'Body link ratio': 'Gövde bağlantı oranı', 'Body link saturation': 'Gövde bağlantı doygunluğu',
+        'Unique target ratio': 'Benzersiz hedef oranı', 'Unique targets': 'Benzersiz hedefler', 'Total passages': 'Toplam pasaj', 'Unique passages': 'Benzersiz pasajlar',
+        'Repeated passages': 'Tekrarlanan pasajlar', 'Unique passage ratio': 'Benzersiz pasaj oranı', 'Title sources disagree': 'Başlık kaynakları uyuşmuyor', 'Description sources disagree': 'Açıklama kaynakları uyuşmuyor',
+      };
+      const storedLanguage = localStorage.getItem('aether-ui-language');
+      let uiLanguage = storedLanguage === 'tr' || storedLanguage === 'en' ? storedLanguage : 'tr';
+      const t = (key) => translations[uiLanguage][key] || translations.tr[key] || translations.en[key] || key;
+      const staticTextTargets = {
+        '#app-title': 'app_title', '#app-intro': 'app_intro', '#published-heading': 'published_heading', '#published-copy': 'published_copy',
+        '#analyze-url-label': 'analyze', '#draft-heading': 'draft_heading', '#draft-copy': 'draft_copy', '#draft-tab': 'analyze_draft', '#analyze-draft-label': 'analyze_draft',
+        '#draft-performed-heading': 'checks_performed', '#analysis-complete-label': 'analysis_complete', '#analysis-result-heading': 'analysis_result',
+        '#new-analysis': 'new_analysis', '#seo-score-heading': 'seo_score', '#geo-score-heading': 'geo_score', '#geo-visibility-label': 'ai_visibility',
+        '#seo-details-heading': 'seo_details', '#geo-details-heading': 'geo_details', '#recommendations-heading': 'recommendations',
+        '#content-recommendations-heading': 'content_recommendations', '#technical-recommendations-heading': 'technical_recommendations',
+        '#draft-review-label': 'draft_review', '#draft-review-heading': 'draft_review_heading', '#draft-preview-copy': 'draft_preview_copy',
+        '#seo-preview-heading': 'seo_preview', '#geo-preview-heading': 'geo_preview', '#draft-geo-comparison-copy': 'geo_preview_comparison', '#measurable-after-heading': 'measurable_after',
+        '#measurable-after-copy': 'measurable_after_copy', '#outcome-complete-label': 'analysis_complete', '#outcome-action-label': 'what_to_do',
+        '#analysed-text-heading': 'analyzed_text', '#view-analysed-text-label': 'view_analyzed_text', '#analysed-text-details-label': 'details',
+        '#extracted-passages-heading': 'extracted_passages', '#diagnostics-summary': 'diagnostics', '#assessment-summary-heading': 'assessment_summary',
+        '#article-structure-heading': 'article_structure', '#article-structure-copy': 'article_structure_copy',
+        '#seo-limiting-factors-heading': 'limiting_factors', '#geo-limiting-factors-heading': 'limiting_factors',
+      };
+      let lastReportRender = null;
+      let lastDraftRender = null;
+      let lastOutcomeRender = null;
+      const applyLanguage = () => {
+        document.documentElement.lang = uiLanguage;
+        Object.entries(staticTextTargets).forEach(([selector, key]) => { document.querySelector(selector).textContent = t(key); });
+        document.querySelector('#language-en').setAttribute('aria-pressed', String(uiLanguage === 'en'));
+        document.querySelector('#language-tr').setAttribute('aria-pressed', String(uiLanguage === 'tr'));
+        if (lastReportRender) renderReport(lastReportRender.view, lastReportRender.rawReport);
+        if (lastDraftRender) renderDraft(lastDraftRender);
+        if (lastOutcomeRender) renderOutcome(lastOutcomeRender);
+      };
+      const setLanguage = (language, persist = true) => {
+        uiLanguage = language === 'en' ? 'en' : 'tr';
+        if (persist) localStorage.setItem('aether-ui-language', uiLanguage);
+        applyLanguage();
+      };
+      const statusBadge = (value) => `<span class="badge ${value}">${t(value) || value}</span>`;
       const metric = (label, value) => `<div class="metric-card"><p>${label}</p><strong>${value}</strong></div>`;
       const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
       })[character]);
-      const scoreValue = (value) => value !== null ? `${value.toFixed(1)} / 100` : 'Not measured';
+      const scoreValue = (value) => value !== null ? `${value.toFixed(1)} / 100` : t('not_measured');
       const signalValue = (signal) => {
-        if (signal.value === null) return 'Not measured';
+        if (signal.value === null) return t('not_measured');
         const kind = signal.kind ? signal.kind.split('.').pop() : null; // Handle Enum string
         if (kind === 'SCORE') return `${signal.value.toFixed(1)} / 100`;
         if (kind === 'RATIO') return `%${signal.value.toFixed(1)}`;
         if (kind === 'COUNT') return Math.round(signal.value).toLocaleString('tr-TR');
         if (typeof signal.value === 'number') return signal.value.toFixed(1);
-        return ({ Yes: 'Yes', No: 'No', True: 'Present', False: 'Missing', Available: 'Available', Missing: 'Missing', Present: 'Present', None: 'None' })[signal.value] || signal.value;
+        const values = uiLanguage === 'tr'
+          ? { Yes: 'Evet', No: 'Hayır', True: t('present'), False: t('missing'), Available: t('available'), Missing: t('missing'), Present: t('present'), None: t('none') }
+          : { Yes: 'Yes', No: 'No', True: 'Present', False: 'Missing', Available: 'Available', Missing: 'Missing', Present: 'Present', None: 'None' };
+        return values[signal.value] || signal.value;
       };
       const signalRowClass = (signal) => {
         const value = signal.value;
@@ -271,13 +385,6 @@
           cls += ' geo-signal-context';
         }
         return cls;
-      };
-      const friendlyDimensions = {
-        entity_coverage: 'Entity Coverage', semantic_quality: 'Semantic Quality',
-        semantic_completeness: 'Semantic Completeness', entity_authority: 'Entity Authority',
-        structural_richness: 'Structural Richness', discoverability: 'Discoverability',
-        passage_balance: 'Passage Balance', direct_answer_coverage: 'Direct Answer Coverage',
-        technical_access: 'Technical Access', structured_data: 'Structured Data'
       };
       const friendlySignals = {
         'Publication date': 'Publication date', 'Last modified date': 'Last modified date',
@@ -302,6 +409,8 @@
         'Title sources disagree': 'Title sources disagree',
         'Description sources disagree': 'Description sources disagree'
       };
+      const dimensionLabel = (key, fallback) => dimensionLabels[uiLanguage][key] || fallback;
+      const signalLabel = (label) => uiLanguage === 'tr' ? (signalLabelsTr[label] || label) : (friendlySignals[label] || label);
       const listItems = (value) => typeof value === 'string'
         ? value.split(',').map((item) => item.trim()).filter((item) => item && item !== 'None')
         : [];
@@ -310,48 +419,54 @@
         const declared = listItems(signal.value);
         const missingSignal = signals.find((item) => item.label === 'Missing expected properties');
         const missing = listItems(missingSignal ? missingSignal.value : '');
-        return `${declared.length} / ${declared.length + missing.length} present`;
+        return `${declared.length} / ${declared.length + missing.length} ${t('present_count')}`;
       };
-      const scoreDimensionCard = (dimension, scoreType) => {
-        const friendlyLabel = friendlyDimensions[dimension.key] || dimension.label;
+      const scoreDimensionCard = (dimension, scoreType, expanded = false) => {
+        const friendlyLabel = dimensionLabel(dimension.key, dimension.label);
         const technicalLabel = dimension.detail ? dimension.detail.label : dimension.label;
         const detailId = `${scoreType}-${dimension.key.replaceAll('_', '-')}-detail`;
-        return `<article class="metric-card dimension-card">
-          <button type="button" class="geo-dimension-button" data-score-detail-toggle aria-expanded="false" aria-controls="${detailId}">
+        return `<article class="metric-card dimension-card${expanded ? ' dimension-card-active' : ''}">
+          <button type="button" class="geo-dimension-button" data-score-detail-toggle aria-expanded="${expanded}" aria-controls="${detailId}">
             <p class="score-weight">%${dimension.weight}</p>
             <h4 class="dimension-name">${escapeHtml(friendlyLabel)}<small class="technical-name">${escapeHtml(technicalLabel)}</small></h4>
             <strong class="dimension-score">${scoreValue(dimension.val)}</strong>
-            <span class="geo-detail-hint">Details &#9662;</span>
+            <span class="geo-detail-hint" data-score-detail-label>${t(expanded ? 'hide_details' : 'show_details')} ${expanded ? '&#9652;' : '&#9662;'}</span>
           </button>
+          ${scoreDimensionDetail(dimension, scoreType, expanded)}
         </article>`;
       };
-      const scoreDimensionDetail = (dimension, scoreType) => {
+      const scoreDimensionDetail = (dimension, scoreType, expanded = false) => {
         if (!dimension.detail) return '';
         const detailId = `${scoreType}-${dimension.key.replaceAll('_', '-')}-detail`;
-        const friendlyLabel = friendlyDimensions[dimension.key] || dimension.label;
+        const friendlyLabel = dimensionLabel(dimension.key, dimension.label);
         const technicalLabel = dimension.detail.label;
         const rows = dimension.detail.signals.map((signal) => `
           <li class="${signalRowClass(signal)}" title="${escapeHtml(signal.explanation || '')}">
-            <span>&bull; ${escapeHtml(friendlySignals[signal.label] || signal.label)}<small class="signal-technical-name">${escapeHtml(signal.label)}</small></span>
-            <strong>${escapeHtml(compactSignalValue(signal, dimension.detail.signals))}${signal.label === 'Declared expected properties' && listItems(signal.value).length ? `<details class="signal-raw"><summary>Full list</summary><span>${escapeHtml(signal.value)}</span></details>` : ''}</strong>
+            <span>&bull; ${escapeHtml(signalLabel(signal.label))}<small class="signal-technical-name">${escapeHtml(signal.label)}</small></span>
+            <strong>${escapeHtml(compactSignalValue(signal, dimension.detail.signals))}${signal.label === 'Declared expected properties' && listItems(signal.value).length ? `<details class="signal-raw"><summary>${t('full_list')}</summary><span>${escapeHtml(signal.value)}</span></details>` : ''}</strong>
           </li>
         `).join('');
-        return `<section id="${detailId}" class="dimension-detail-panel hidden">
-            <h5>${escapeHtml(friendlyLabel)} Details <small class="technical-name">${escapeHtml(technicalLabel)}</small></h5>
+        return `<section id="${detailId}" class="dimension-detail-panel${expanded ? '' : ' hidden'}">
+            <h5>${escapeHtml(friendlyLabel)} ${t('details')} <small class="technical-name">${escapeHtml(technicalLabel)}</small></h5>
             <ul class="geo-signal-list">${rows}</ul>
           </section>`;
       };
       const renderDimensionGroup = (score, dimensions, kind) => {
         const selected = dimensions.map((key) => score[key]);
         const gridId = kind === 'seo' || kind === 'geo' ? `${kind}-score-grid` : `${kind}-grid`;
-        document.querySelector(`#${gridId}`).innerHTML = selected.map((dimension) => scoreDimensionCard(dimension, kind)).join('');
-        document.querySelector(`#${kind}-details`).innerHTML = selected.map((dimension) => scoreDimensionDetail(dimension, kind)).join('');
+        const grid = document.querySelector(`#${gridId}`);
+        const expandedIds = new Set(Array.from(grid.innerHTML.matchAll(/aria-expanded="true" aria-controls="([^"]+)"/g), (match) => match[1]));
+        grid.innerHTML = selected.map((dimension) => {
+          const detailId = `${kind}-${dimension.key.replaceAll('_', '-')}-detail`;
+          return scoreDimensionCard(dimension, kind, expandedIds.has(detailId));
+        }).join('');
+        document.querySelector(`#${kind}-details`).innerHTML = '';
       };
       const renderLimitingFactors = (score, kind) => {
         const section = document.querySelector(`#${kind}-limiting-factors`);
         const factors = (score.limiting_factors || []).slice(0, 3);
         section.classList.toggle('hidden', factors.length === 0);
-        document.querySelector(`#${kind}-limiting-factor-list`).innerHTML = factors.map((factor) => `<li><strong>${escapeHtml(factor.label)}</strong><span class="limiting-factor-score">${factor.score.toFixed(1)} / 100 &middot; ${factor.lost_contribution.toFixed(1)} points lost</span></li>`).join('');
+        document.querySelector(`#${kind}-limiting-factor-list`).innerHTML = factors.map((factor) => `<li><strong>${escapeHtml(dimensionLabel(factor.key, factor.label))}</strong><span class="limiting-factor-score">${factor.score.toFixed(1)} / 100 &middot; ${factor.lost_contribution.toFixed(1)} ${t('points_lost')}</span></li>`).join('');
       };
       const toggleScoreDetail = (button) => {
         const detail = document.querySelector(`#${button.getAttribute('aria-controls')}`);
@@ -359,6 +474,12 @@
         const expanded = button.getAttribute('aria-expanded') === 'true';
         button.setAttribute('aria-expanded', String(!expanded));
         detail.classList.toggle('hidden', expanded);
+        const card = button.closest ? button.closest('.dimension-card') : null;
+        if (card) {
+          card.classList.toggle('dimension-card-active', !expanded);
+          const label = button.querySelector('[data-score-detail-label]');
+          if (label) label.innerHTML = `${t(expanded ? 'show_details' : 'hide_details')} ${expanded ? '&#9662;' : '&#9652;'}`;
+        }
       };
       // Score cards are rendered after the response arrives. Delegate once so
       // published and draft cards share the same behavior regardless of when
@@ -374,9 +495,12 @@
       // that did not exist: a draft that had findings threw instead of showing
       // them, and only a draft with nothing to report ever rendered.
       const declaredRows = (o) => (o.declared || []).map((d) => `<tr><td>${d.label}</td><td>${d.value}</td></tr>`).join('');
-      const relatedPassages = (passages) => !passages || !passages.length ? '' : `<div class="related-passages"><strong>${passages.length === 1 ? 'Related passage' : 'Related passages'}</strong>${passages.map((passage) => `<div class="related-passage"><span class="related-passage-meta">Passage ${passage.ordinal + 1} &middot; ${passage.word_count} ${passage.word_count === 1 ? 'word' : 'words'}</span><p class="related-passage-text">&ldquo;${escapeHtml(passage.text)}&rdquo;</p></div>`).join('')}</div>`;
+      const relatedPassages = (passages) => !passages || !passages.length ? '' : `<div class="related-passages"><strong>${passages.length === 1 ? t('related_passage') : t('related_passages')}</strong>${passages.map((passage) => `<div class="related-passage"><span class="related-passage-meta">${t('passage')} ${passage.ordinal + 1} &middot; ${passage.word_count} ${passage.word_count === 1 ? t('word') : t('words')}</span><p class="related-passage-text">&ldquo;${escapeHtml(passage.text)}&rdquo;</p></div>`).join('')}</div>`;
       const occurrence = (o) => `${o.detail ? `<span class="repeat-count">${o.detail}</span>` : ''}${o.declared ? `<table class="metadata-table declared">${declaredRows(o)}</table>` : ''}${o.excerpt && !(o.related_passages || []).length ? `<blockquote>${escapeHtml(o.excerpt)}</blockquote>` : ''}${relatedPassages(o.related_passages)}`;
-      const card = (item) => `<article class="recommendation"><h4>${item.headline}</h4>${item.impact ? `<span class="badge impact-badge">Impact: ${item.impact}</span>` : ''}${item.occurrences.map(occurrence).join('')}<p><strong>What to do:</strong> ${item.what_to_do}</p><details><summary>Why it matters</summary><p>${item.why_it_matters}</p></details></article>`;
+      const localizedItem = (item) => item.translations && item.translations[uiLanguage]
+        ? { ...item, ...item.translations[uiLanguage] }
+        : item;
+      const card = (sourceItem) => { const item = localizedItem(sourceItem); return `<article class="recommendation"><h4>${item.headline}</h4>${item.impact ? `<span class="badge impact-badge">${t('impact')}: ${item.impact}</span>` : ''}${item.occurrences.map(occurrence).join('')}<p><strong>${t('what_to_do')}</strong> ${item.what_to_do}</p><details><summary>${t('why_it_matters')}</summary><p>${item.why_it_matters}</p></details></article>`; };
 
       const draftToggle = document.querySelector('#draft-tab');
       draftToggle.addEventListener('click', () => {
@@ -409,20 +533,21 @@
       }
 
       function renderDraft(draft) {
-        const paras = `${draft.paragraph_count} ${draft.paragraph_count === 1 ? 'paragraph' : 'paragraphs'}`;
-        const words = `${draft.word_count} ${draft.word_count === 1 ? 'word' : 'words'}`;
+        lastDraftRender = draft;
+        const paras = `${draft.paragraph_count} ${draft.paragraph_count === 1 ? (uiLanguage === 'tr' ? 'paragraf' : 'paragraph') : (uiLanguage === 'tr' ? 'paragraf' : 'paragraphs')}`;
+        const words = `${draft.word_count} ${draft.word_count === 1 ? t('word') : t('words')}`;
         const compared = draft.compared_article_count
           ? ` · compared with ${draft.compared_article_count} ${draft.compared_article_count === 1 ? 'article' : 'articles'}`
           : '';
         document.querySelector('#draft-summary').textContent =
           `“${draft.headline}” — ${paras}, ${words}${compared}`;
         document.querySelector('#draft-performed').innerHTML =
-          draft.checks_performed.map((c) => `<li>${c}</li>`).join('');
+          (draft.localized_checks ? draft.localized_checks[uiLanguage].performed : draft.checks_performed).map((c) => `<li>${c}</li>`).join('');
         document.querySelector('#draft-unavailable').innerHTML =
-          draft.checks_unavailable.map((c) => `<li>${c}</li>`).join('');
+          (draft.localized_checks ? draft.localized_checks[uiLanguage].unavailable : draft.checks_unavailable).map((c) => `<li>${c}</li>`).join('');
         document.querySelector('#draft-findings').innerHTML = draft.recommendations.length
           ? draft.recommendations.map(card).join('')
-          : '<p class="muted">There are no recommended changes for this draft right now.</p>';
+          : `<p class="muted">${t('no_draft_changes')}</p>`;
         renderDraftPreview(draft.seo_preview, 'seo', [
           'entity_coverage', 'structured_data', 'semantic_quality', 'technical_access'
         ]);
@@ -433,14 +558,25 @@
 
       function renderDraftPreview(score, kind, dimensions) {
         const total = score ? score.total : null;
-        document.querySelector(`#draft-${kind}-total`).textContent = total === null ? 'Not measured' : total;
+        document.querySelector(`#draft-${kind}-total`).textContent = total === null ? t('not_measured') : total;
         document.querySelector(`#draft-${kind}-suffix`).textContent = total === null ? '' : ' / 100';
         if (score) renderDimensionGroup(score, dimensions, `draft-${kind}`);
       }
 
+      function renderOutcome(sourceOutcome) {
+        lastOutcomeRender = sourceOutcome;
+        const outcome = sourceOutcome.translations
+          ? sourceOutcome.translations[uiLanguage]
+          : sourceOutcome;
+        document.querySelector('#outcome-headline').textContent = outcome.headline;
+        document.querySelector('#outcome-happened').textContent = outcome.what_happened;
+        document.querySelector('#outcome-evidence').innerHTML = outcome.evidence.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+        document.querySelector('#outcome-action').textContent = outcome.what_to_do;
+      }
+
 
       function renderReport(view, rawReport) {
-        
+        lastReportRender = { view, rawReport };
         const assessment = view.assessment;
 
         if (assessment.seo_score) {
@@ -469,22 +605,22 @@
         ].filter(([, value]) => Boolean(value));
         document.querySelector('#assessment-grid').innerHTML = cards.map(([title, value, description]) => `<div class="assessment-card"><p>${description}</p><h3>${title}</h3>${statusBadge(value)}</div>`).join('');
         document.querySelector('#report-state').className = `badge ${assessment.metadata}`;
-        document.querySelector('#report-state').textContent = 'Assessment ready';
+        document.querySelector('#report-state').textContent = t('assessment_ready');
 
         const structure = view.structure;
-        document.querySelector('#structure-metrics').innerHTML = [metric('Passages', structure.passage_count), metric('Words', structure.word_count)].join('');
+        document.querySelector('#structure-metrics').innerHTML = [metric(t('passages'), structure.passage_count), metric(t('words'), structure.word_count)].join('');
         const passageDetails = view.passage_details;
         document.querySelector('#passage-details-list').innerHTML = passageDetails.passages
-          .map((passage) => `<article class="metric-card"><h4>Passage ${passage.position} &mdash; ${passage.word_count} ${passage.word_count === 1 ? 'word' : 'words'}</h4><p>${escapeHtml(passage.text)}</p></article>`)
+          .map((passage) => `<article class="metric-card"><h4>${t('passage')} ${passage.position} &mdash; ${passage.word_count} ${passage.word_count === 1 ? t('word') : t('words')}</h4><p>${escapeHtml(passage.text)}</p></article>`)
           .join('');
         document.querySelector('#passage-details-total').textContent =
-          `Extraction total: ${passageDetails.passage_count} ${passageDetails.passage_count === 1 ? 'passage' : 'passages'} \u00b7 ${passageDetails.word_count} ${passageDetails.word_count === 1 ? 'word' : 'words'}`;
+          `${t('extraction_total')}: ${passageDetails.passage_count} ${passageDetails.passage_count === 1 ? t('passage').toLowerCase() : t('passages').toLowerCase()} \u00b7 ${passageDetails.word_count} ${passageDetails.word_count === 1 ? t('word') : t('words')}`;
 
         const passageDiagnostic = view.passage_extractability;
         document.querySelector('#passage-extractability-metrics').innerHTML =
           passageDiagnostic.bands.map((band) => metric(
             `>${band.bound} words`,
-            band.rate === null ? 'Not measured' : `%${(band.rate * 100).toFixed(1)} long passages`
+            band.rate === null ? t('not_measured') : `%${(band.rate * 100).toFixed(1)} ${t('long_passages')}`
           )).join('');
 
         const passageBalanceDiagnostic = view.passage_balance;
@@ -497,14 +633,14 @@
         document.querySelector('#direct-answer-coverage-metric').innerHTML = metric(
           'Direct Answer Coverage',
           directAnswerDiagnostic.ratio === null
-            ? 'Not measured'
+            ? t('not_measured')
             : `${(directAnswerDiagnostic.ratio * 100).toFixed(1)}%`
         );
 
         const missing = view.metadata.filter((field) => !field.available);
-        document.querySelector('#metadata-summary').textContent = missing.length ? `${missing.length} metadata ${missing.length === 1 ? 'field is' : 'fields are'} missing from the saved article.` : 'All assessed metadata fields are present.';
-        document.querySelector('#metadata-table').innerHTML = view.metadata.map((field) => `<tr><td>${friendlySignals[field.label] || field.label}</td><td class="${field.available ? 'available' : 'unavailable'}">${field.available ? 'Present' : 'Missing'}</td></tr>`).join('');
-        document.querySelector('#missing-list').innerHTML = missing.map((field) => `<span class="missing-item">${friendlySignals[field.label] || field.label}: eksik</span>`).join('');
+        document.querySelector('#metadata-summary').textContent = missing.length ? (uiLanguage === 'tr' ? `${missing.length} metadata alanı kayıtlı makalede eksik.` : `${missing.length} metadata ${missing.length === 1 ? 'field is' : 'fields are'} missing from the saved article.`) : t('metadata_all_present');
+        document.querySelector('#metadata-table').innerHTML = view.metadata.map((field) => `<tr><td>${signalLabel(field.label)}</td><td class="${field.available ? 'available' : 'unavailable'}">${field.available ? t('present') : t('missing')}</td></tr>`).join('');
+        document.querySelector('#missing-list').innerHTML = missing.map((field) => `<span class="missing-item">${signalLabel(field.label)}: ${t('missing_suffix')}</span>`).join('');
 
         const editorFindings = view.editor;
         document.querySelector('#editor-section').classList.toggle('hidden', !editorFindings);
@@ -513,7 +649,7 @@
           document.querySelector('#editor-compared').textContent = editorFindings.compared_articles;
           document.querySelector('#editor-list').innerHTML = editorFindings.recommendations.length
             ? editorFindings.recommendations.map(card).join('')
-            : '<p class="muted">There are no recommended changes for this article right now.</p>';
+            : `<p class="muted">${t('no_article_changes')}</p>`;
         }
 
         const technical = view.technical;
@@ -522,7 +658,7 @@
           document.querySelector('#technical-subtitle').textContent = technical.subtitle;
           document.querySelector('#technical-list').innerHTML = technical.recommendations.length
             ? technical.recommendations.map(card).join('')
-            : '<p class="muted">No technical changes are needed; the article declarations are complete.</p>';
+            : `<p class="muted">${t('no_technical_changes')}</p>`;
         }
         document.querySelector('#report').textContent = rawReport;
       }
@@ -533,10 +669,10 @@
         const warning = score >= 50 && score < 80;
         cardElement.classList.remove('score-good', 'score-warn', 'score-low');
         cardElement.classList.add(good ? 'score-good' : warning ? 'score-warn' : 'score-low');
-        document.querySelector(`#${kind}-band`).textContent = good ? 'Great' : warning ? 'Good, with room to improve' : 'Needs improvement';
+        document.querySelector(`#${kind}-band`).textContent = good ? t('great') : warning ? t('good_room') : t('needs_improvement');
         document.querySelector(`#${kind}-band-copy`).textContent = kind === 'seo'
-          ? (good ? 'Your content is well optimized for search engines.' : 'Your content can be made more visible to search engines.')
-          : (good ? 'AI systems can read your content effectively.' : 'Your content can be made more visible to AI systems.');
+          ? (good ? t('seo_good') : t('seo_improve'))
+          : (good ? t('geo_good') : t('geo_improve'));
       }
 
       // What comparing against a publisher will and will not do, stated before
@@ -574,13 +710,15 @@
       }
       const publisherSelect = document.querySelector('#draft-publisher');
       if (publisherSelect) publisherSelect.addEventListener('change', describeComparison);
+      document.querySelector('#language-en').addEventListener('click', () => setLanguage('en'));
+      document.querySelector('#language-tr').addEventListener('click', () => setLanguage('tr'));
+      applyLanguage();
       refreshPublishers();
       document.querySelector('#new-analysis').addEventListener('click', () => {
         document.querySelector('#report-card').classList.add('hidden');
         document.querySelector('#url-form input[name="url"]').focus();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       });
-
       document.querySelectorAll('form[data-endpoint]').forEach((form) => {
         form.addEventListener('submit', async (event) => {
           event.preventDefault();
@@ -604,10 +742,7 @@
               return;
             }
             if (data.outcome) {
-              document.querySelector('#outcome-headline').textContent = data.outcome.headline;
-              document.querySelector('#outcome-happened').textContent = data.outcome.what_happened;
-              document.querySelector('#outcome-evidence').innerHTML = data.outcome.evidence.map((e) => `<li>${e}</li>`).join('');
-              document.querySelector('#outcome-action').textContent = data.outcome.what_to_do;
+              renderOutcome(data.outcome);
               outcomeCard.classList.remove('hidden'); outcomeCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
               return;
             }

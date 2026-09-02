@@ -24,6 +24,12 @@ PERFORMED_TEXT: Dict[DraftCheck, str] = {
     DraftCheck.REPEATED_TEXT: "Text repeated in your other articles",
 }
 
+PERFORMED_TEXT_TR: Dict[DraftCheck, str] = {
+    DraftCheck.PARAGRAPH_STRUCTURE: "Paragraf yapısı",
+    DraftCheck.HEADING_STRUCTURE: "Başlık yapısı",
+    DraftCheck.REPEATED_TEXT: "Diğer makalelerinizde tekrarlanan metin",
+}
+
 UNAVAILABLE_TEXT: Dict[UnavailableCheck, str] = {
     UnavailableCheck.PUBLISHED_METADATA: (
         "Publication date, author, and description set when the article is published"
@@ -47,10 +53,33 @@ UNAVAILABLE_TEXT: Dict[UnavailableCheck, str] = {
     ),
 }
 
+UNAVAILABLE_TEXT_TR: Dict[UnavailableCheck, str] = {
+    UnavailableCheck.PUBLISHED_METADATA: (
+        "Makale yayımlandığında belirlenen yayın tarihi, yazar ve açıklama"
+    ),
+    UnavailableCheck.DECLARED_CONSISTENCY: (
+        "Sayfanın tutarlı bir başlık ve açıklama bildirip bildirmediği; bunun "
+        "için yayımlanmış sayfa gerekir"
+    ),
+    UnavailableCheck.STRUCTURED_DATA: (
+        "Site şablonunun oluşturduğu Schema.org yapılandırılmış verisi"
+    ),
+    UnavailableCheck.HEADING_STRUCTURE_WITHOUT_MARKUP: (
+        "Yapıştırılan taslak biçimlendirme içermediği için başlık yapısı"
+    ),
+    UnavailableCheck.REPEATED_TEXT_NO_PUBLISHER: (
+        "Yayıncı seçilmediği için diğer makalelerde tekrarlanan metin"
+    ),
+    UnavailableCheck.REPEATED_TEXT_NO_ARTICLES: (
+        "Bu yayıncıya ait henüz makale analiz edilmediği için diğer "
+        "makalelerde tekrarlanan metin"
+    ),
+}
 
-def performed_check_text(check: DraftCheck) -> str:
-    return PERFORMED_TEXT[check]
+
+def performed_check_text(check: DraftCheck, language: str = "en") -> str:
+    return (PERFORMED_TEXT_TR if language == "tr" else PERFORMED_TEXT)[check]
 
 
-def unavailable_check_text(check: UnavailableCheck) -> str:
-    return UNAVAILABLE_TEXT[check]
+def unavailable_check_text(check: UnavailableCheck, language: str = "en") -> str:
+    return (UNAVAILABLE_TEXT_TR if language == "tr" else UNAVAILABLE_TEXT)[check]

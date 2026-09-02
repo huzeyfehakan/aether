@@ -982,7 +982,7 @@ Passage."""
         rendered = dom["#geo-score-grid"]["html"]
         self.assertEqual(rendered.count('aria-expanded="false"'), 4)
         self.assertEqual(rendered.count("aria-controls="), 4)
-        self.assertEqual(rendered.count("Show details"), 4)
+        self.assertEqual(rendered.count("Detayları gör"), 4)
         self.assertIn("Semantic Completeness", rendered)
         self.assertIn("Entity Authority", rendered)
         self.assertIn("Structural Richness", rendered)
@@ -994,13 +994,13 @@ Passage."""
             "Unique target ratio",
         ):
             self.assertIn(label, rendered)
-        self.assertIn("Not measured", rendered)
+        self.assertIn("Henüz ölçülemiyor", rendered)
         self.assertEqual(dom["#geo-details"]["html"], "")
 
         seo_rendered = dom["#seo-score-grid"]["html"]
         self.assertEqual(seo_rendered.count('aria-expanded="false"'), 4)
         self.assertEqual(seo_rendered.count("aria-controls="), 4)
-        self.assertEqual(seo_rendered.count("Show details"), 4)
+        self.assertEqual(seo_rendered.count("Detayları gör"), 4)
         for label in (
             "Publication date", "Last modified date", "Author", "Description",
             "Article structured data", "Declared expected properties",
@@ -1086,12 +1086,17 @@ Passage."""
         dom = run_page_script(
             "document.querySelector('#long-card').innerHTML = "
             f"scoreDimensionCard({json.dumps(dimension)}, 'seo');"
+            "setLanguage('en');"
             "document.querySelector('#long-detail').innerHTML = "
             f"scoreDimensionDetail({json.dumps(dimension)}, 'seo');"
         )
         card_rendered = dom["#long-card"]["html"]
         rendered = dom["#long-detail"]["html"]
-        self.assertNotIn(long_value, card_rendered)
+        compact_card = card_rendered.split('<details class="signal-raw"', 1)[0]
+        self.assertNotIn(long_value, compact_card)
+        self.assertIn("8 / 8 mevcut", card_rendered)
+        self.assertIn("Tam liste", card_rendered)
+        self.assertIn(long_value, card_rendered)
         self.assertIn("8 / 8 present", rendered)
         self.assertIn("Full list", rendered)
         self.assertIn(long_value, rendered)
@@ -1243,9 +1248,16 @@ Passage."""
         view = self._analysed_view()
         view["direct_answer_coverage"]["ratio"] = None
 
-        dom = run_page_script(f"renderReport({json.dumps(view)}, 'report');")
-        rendered = dom["#direct-answer-coverage-metric"]["html"]
-        self.assertIn("Not measured", rendered)
+        dom = run_page_script(
+            f"renderReport({json.dumps(view)}, 'report');"
+            "document.querySelector('#short-signal').innerHTML = "
+            "document.querySelector('#direct-answer-coverage-metric').innerHTML;"
+            "setLanguage('en');"
+        )
+        self.assertIn("Henüz ölçülemiyor", dom["#short-signal"]["html"])
+        self.assertIn(
+            "Not measured", dom["#direct-answer-coverage-metric"]["html"]
+        )
 
     def test_passage_extractability_bands_render_without_classification(self):
         view = self._analysed_view()
@@ -1263,9 +1275,17 @@ Passage."""
         for band in view["passage_extractability"]["bands"]:
             band["rate"] = None
 
-        dom = run_page_script(f"renderReport({json.dumps(view)}, 'report');")
-        rendered = dom["#passage-extractability-metrics"]["html"]
-        self.assertEqual(rendered.count("Not measured"), 3)
+        dom = run_page_script(
+            f"renderReport({json.dumps(view)}, 'report');"
+            "document.querySelector('#short-signal').innerHTML = "
+            "document.querySelector('#passage-extractability-metrics').innerHTML;"
+            "setLanguage('en');"
+        )
+        self.assertEqual(dom["#short-signal"]["html"].count("Henüz ölçülemiyor"), 3)
+        self.assertEqual(
+            dom["#passage-extractability-metrics"]["html"].count("Not measured"),
+            3,
+        )
 
     def test_seo_and_geo_dimension_panels_toggle_independently(self):
         dom = run_page_script("""
@@ -1337,18 +1357,18 @@ Passage."""
         dom = run_page_script("""
           const button = document.querySelector('#dimension-label-button');
           const panel = document.querySelector('#dimension-label-panel');
-          const card = document.querySelector('#dimension-label-card');
+          const dimensionCard = document.querySelector('#dimension-label-card');
           const label = document.querySelector('#dimension-label-text');
           button.setAttribute('aria-controls', 'dimension-label-panel');
           button.setAttribute('aria-expanded', 'false');
-          button.closest = () => card;
+          button.closest = () => dimensionCard;
           button.querySelector = () => label;
           panel.classList.add('hidden');
 
           setLanguage('tr');
           toggleScoreDetail(button);
           const turkishOpen = [button.getAttribute('aria-expanded'), label.innerHTML,
-            card.classList.contains('dimension-card-active'), panel.classList.contains('hidden')];
+            dimensionCard.classList.contains('dimension-card-active'), panel.classList.contains('hidden')];
           toggleScoreDetail(button);
           setLanguage('en');
           toggleScoreDetail(button);

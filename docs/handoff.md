@@ -13,92 +13,46 @@ piece of work belongs elsewhere.
 
 ## Current task
 
-The current work combines two deterministic prototypes:
-
-**Topic introduction recommendation.** A deterministic editor recommendation
-checks whether the article's main topic is sufficiently represented in the
-opening passage.
-
-**Proportional Dual Scoring (SEO/GEO).** Separate SEO and GEO visibility
-scores are calculated using deterministic rule-based metrics and presented in
-the article report.
-
-Both features are being evaluated on real publisher articles before further
-product work is finalized.
+Prepare the existing product documentation for final handoff. Application
+behaviour is unchanged in this documentation-only work.
 
 ## Released
 
-Latest release: `v2.0.1`. See [`../README.md`](../README.md) for shipped
-capabilities.
+Latest tagged release: `v2.0.1`. The current handoff branch contains additional
+work after that tag; its delivered state is described below.
 
-## In progress
+## Delivered state
 
-**Draft Markdown structure and SEO/GEO previews.** Implemented and intentionally
-left uncommitted because the requester prohibited git add/commit/push. ATX
-H1-H6 headings and blank-line paragraphs now enter normal HTML structural
-analysis, and draft results expose preview scores with source-only dimensions
-left unmeasured. Clipboard fragment precedence and shared delegated score-detail
-toggles now cover the draft result path. The full Python/server suite passes
-(313 tests, 14 skipped);
-browser JavaScript verification remains outstanding because Node is unavailable.
+- Turkish-first presentation is committed. Turkish is the default and fallback;
+  the TR/EN switcher persists a valid choice and rerenders retained results.
+- Published URL analysis and draft analysis expose deterministic SEO and GEO
+  score dimensions. Score details are rendered inside their owning cards.
+- Discoverability's Unique Target Ratio is calculated as unique **body** targets
+  divided by body links, rather than using page-wide targets or links.
+- Editor recommendations include related-passage attribution where the
+  underlying recommendation has identifiable source passages.
+- Draft GEO is presented as a pre-publication preview ("Yayın Öncesi GEO
+  Önizlemesi"). Draft and published-page GEO are not directly comparable because
+  their measurable signal sets differ; unavailable draft dimensions remain
+  unmeasured.
+- The experimental revised-content / what-if GEO scenario was evaluated and
+  intentionally rolled back. It is not part of the delivered product.
 
-**Published passage details.** Implemented and intentionally uncommitted. The
-published report now exposes each final production `PassageProfile` text and
-its existing `word_count` in production order, behind the shared accessible
-Details toggle. The TRT regression remains 11 passages / 343 words; headings
-and metadata remain outside the passage list and totals. Draft passage details
-are intentionally out of scope because the draft review model does not retain
-the production passage profiles.
-
-**Check a draft before publishing.** Implemented, unreleased. Its usefulness is
-under review rather than settled — the checks are thinner than the reporting
-frame around them. See [`product-discovery.md`](product-discovery.md).
-
-**Proportional Dual Scoring (SEO/GEO).** Implemented, unreleased.
-
-- Dual scores (`seo_score` and `geo_score`) are calculated using deterministic
-  rule-based metrics.
-- Ingestion, analysis, presentation renderers, and the `index.html` template
-  support both scores and gracefully represent unmeasured dimensions as
-  `null` (`Optional[float]`).
-- [Decision 0011](decisions/0011-dual-scoring-supersedes-0003.md) records the
-  rationale and supersedes decision 0003.
-- The implementation is being evaluated before release.
-
-- **Discontinuity note**: Discoverability scores (and thus total GEO scores) generated before this change are not comparable to new scores due to the formula shift from body/outgoing ratio to paragraph density.
-
-**Topic introduction recommendation.** Implemented as a deterministic
-editorial prototype.
-
-- It evaluates title-term coverage in the opening passage.
-- It produces an editor recommendation when coverage falls below the
-  configured threshold.
-- Its usefulness and threshold need evaluation on real publisher articles.
-
-**Turkish interface edition.** Implemented and intentionally left uncommitted
-because the requester prohibited git add/commit/push. Turkish is the static,
-missing-preference, and invalid-preference default. The accessible TR/EN
-switcher persists valid choices in `localStorage` and rerenders retained report
-data without fetching or repeating analysis. Recommendation, draft-check, and
-non-article outcome wording remains owned by Python presentation modules; the
-web payload carries both supported renderings while source excerpts and numeric
-results remain unchanged. Score-dimension detail panels are now rendered inside
-their owning cards with independent accessible toggles and localized open/close
-labels. Browser JavaScript verification is outstanding because Node is
-unavailable.
+The current branch is synchronized with origin at `dabb815`.
 
 ## Blockers
 
-No implementation blocker. The prototypes need evaluation on real publisher
-articles before retaining or changing their thresholds.
+No implementation blocker is recorded for the delivered handoff state.
 
 ## Verification
 
 | Level                    | Status                                                                      |
 | ------------------------ | --------------------------------------------------------------------------- |
-| **tests pass**           | Yes — 345 passed, 19 skipped                                                |
-| **served-page verified** | Unverified — breakdown type formatting and new discoverability score need browser verification |
-| **feature complete**     | No — breakdown item separation and format changes completed but need full manual verification       |
+| **tests pass**           | Yes — ran 354 tests: `OK (skipped=22)` |
+| **served-page verified** | Not fully verified locally — Node was unavailable, so Node-dependent browser/presentation tests were skipped |
+| **feature complete**     | Delivered functionality is present; the skipped browser paths remain explicitly unverified locally |
+
+`git diff --check` passed during final local verification.
 
 Why a green suite is weaker than it looks — the structural reasons — is
 recorded in [`architecture.md`](architecture.md). The vocabulary is in
@@ -106,6 +60,8 @@ recorded in [`architecture.md`](architecture.md). The vocabulary is in
 
 ## Next actions
 
-1. Run browser verification on the breakdown formatting (SCORE/COUNT/RATIO/MEASUREMENT separation) and new context visual dimming.
-2. Evaluate the topic-introduction threshold on real publisher articles.
-3. Retain, change, or remove the prototypes based on that evaluation; do not add further deterministic editorial recommendations before that review.
+1. Run the Node-dependent presentation/browser tests in an environment with
+   Node available.
+2. Perform any final stakeholder acceptance review required before release or
+   merge; do not reintroduce the rolled-back revised-content scenario without a
+   new product decision and evidence.

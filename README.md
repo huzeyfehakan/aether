@@ -1,18 +1,34 @@
 # Aether
 
-A deterministic AI Publishing Assistant for publisher articles.
+A deterministic SEO and GEO / AI-readiness assistant for publisher articles.
 
-Aether reads an article and reports what an editor can improve — whether the
-page names its author, whether it states one headline or several, whether its
-body is mostly boilerplate, whether it tells machines what it is. It works on a
-published URL, and on a draft pasted from a CMS before it goes out. Every
-finding is derived from the page itself by fixed rules. Nothing is inferred by
-a language model, and no finding depends on a threshold someone chose.
+Aether analyses either a published URL or a draft pasted from a CMS or word
+processor. Its Turkish-first web interface can be switched to English. It
+combines actionable findings with separate, explainable SEO and GEO scores,
+all calculated from measurable page or draft signals by fixed rules.
 
-It deliberately does **not** predict how any AI system will rank, quote or
-answer from an article. It reports what is on the page and what that costs.
+Aether does **not** call OpenAI, Gemini, Anthropic, Ollama, or another large
+language model at runtime. It does not predict ChatGPT, Gemini, Perplexity, or
+any other system's rankings, citations, visibility, or behaviour. The scores
+measure deterministic structural and content readiness; they are not forecasts
+of model outcomes.
 
 ## What it produces
+
+Published-page analysis provides two 0–100 composite scores with their
+dimensions and underlying signal details:
+
+| SEO | GEO / AI readiness |
+| --- | --- |
+| Entity Coverage | Semantic Completeness |
+| Structured Data | Entity Authority |
+| Semantic Quality | Structural Richness |
+| Technical Access | Discoverability |
+
+Each dimension's details are rendered inside its owning score card, including
+the measured inputs and the factors currently limiting the composite score.
+Counts, ratios, scores, measurements, and contextual values retain distinct
+formats so that supporting context is not presented as a scoring input.
 
 Findings are separated by who can act on them. An editor can change what an
 article says today; markup and templates need the CMS or engineering, and
@@ -39,8 +55,10 @@ Your article markup leaves some details undeclared
   Not declared: language
 ```
 
-Every recommendation names a concrete action and what the gap costs. None of
-them says "author is missing" and stops.
+Every recommendation names a concrete action and what the gap costs. Where the
+underlying analysis identifies relevant article passages, the recommendation
+also attributes those passages so the editor can inspect the evidence in
+context. None of them says "author is missing" and stops.
 
 ## What it checks
 
@@ -61,9 +79,17 @@ nothing is wrong.
 
 **Checking a draft.** An editor can paste a draft from a CMS or word processor,
 keeping formatting so headings survive, and choose which publisher's
-already-checked articles to compare it against. The review states what was
-checked, what can only be checked after publishing, and why. A check that could
-not run is never reported as a failure.
+already-checked articles to compare it against. The result includes editor
+recommendations and a pre-publication draft GEO preview, labelled in Turkish as
+"Yayın Öncesi GEO Önizlemesi". It states what was checked, what can only be
+measured after publishing, and why. A check that could not run is never
+reported as a failure.
+
+Draft GEO and published-page GEO are **not directly comparable**. A draft has
+only the signals measurable from its content before publication; a published
+page adds signals from the delivered HTML, metadata, structured data, links,
+and technical presentation. Missing post-publication signals remain unmeasured
+rather than being treated as failures.
 
 ## Quick start
 
@@ -75,7 +101,8 @@ python -m pip install -e .
 uvicorn aether.presentation.web.app:app --reload
 ```
 
-Open <http://127.0.0.1:8000/> and analyse a URL, or upload a saved HTML file.
+Open <http://127.0.0.1:8000/> to analyse a published URL or check a draft before
+publication.
 
 From Python:
 
@@ -107,9 +134,9 @@ condition that would reopen it.
 
 | | |
 |---|---|
-| [Deterministic, without chosen thresholds](docs/decisions/0001-deterministic-rules-without-thresholds.md) | A body is "mostly boilerplate" when its shared words outnumber its own — never when it falls under a chosen length |
+| [Deterministic analysis](docs/decisions/0001-deterministic-rules-without-thresholds.md) | The same input and comparison corpus produce the same measurements; any explicit prototype thresholds are documented |
 | [No publisher-specific rules](docs/decisions/0002-no-publisher-specific-rules.md) | Nothing keys on a name, host or URL pattern |
-| [Never predict model behaviour](docs/decisions/0003-never-predict-model-behaviour.md) | No score, no forecast of how any AI system will treat the page |
+| [Scores measure readiness, not model behaviour](docs/decisions/0011-dual-scoring-supersedes-0003.md) | SEO and GEO scores summarize deterministic signals; they do not forecast rankings, citations, visibility, or answers |
 | [Every finding names who can act on it](docs/decisions/0004-every-finding-names-who-can-act.md) | Editor or technical; a finding nobody can act on is not reported |
 | [Fail toward silence](docs/decisions/0005-fail-toward-silence.md) | A false positive costs an editor's trust; a missed finding costs less |
 | [Separate finding codes from wording](docs/decisions/0007-separate-finding-codes-from-wording.md) | The application emits a code; presentation decides how it reads |
